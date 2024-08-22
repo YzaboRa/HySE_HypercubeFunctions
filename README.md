@@ -33,15 +33,9 @@ vidPath = DataPath+Name+'.mp4'
 ## to help optimising
 EdgePos = FindHypercube(vidPath, Wavelengths_list, PeakHeight=0.045)
 
-## Will output something like this:
-<img width="452" alt="FindHypercubeOutput" src="https://github.com/user-attachments/assets/b6d45c7a-b74b-455e-97e9-ff4649ad153e">
-
-
 
 ## Once the sweeps have been properly identified, compute the hypercube
 Hypercube, Dark = ComputeHypercube(vidPath, EdgePos, Wavelengths_list, Name=Name)
-## Will output something like this:
-<img width="304" alt="ComputeHypercubeOutput" src="https://github.com/user-attachments/assets/afd3fbb1-79c5-4c69-9a6d-0dc0e0fe4a1f">
 
 
 ## Obtain the white reference hypercube to be used to normalise the illumination profile
@@ -58,13 +52,18 @@ Hypercube_White, Dark_White = ComputeHypercube(vidPath_White, EdgePos_White, Wav
 ## And finally normalise the hypercube
 HypercubeNormalised = NormaliseHypercube(Hypercube, Hypercube_White, Dark_White, Wavelengths_list)
 
-## Will output something like this:
-<img width="296" alt="NormaliseHypercubeOutput" src="https://github.com/user-attachments/assets/42648e4a-8a94-481b-9727-0c1ae76998be">
-
 
 ## The hypercubes (saved as npy files) can be visualised with the Hypercube visualiser
 ```
 
+Output from FindHypercube:
+<img width="452" alt="FindHypercubeOutput" src="https://github.com/user-attachments/assets/b6d45c7a-b74b-455e-97e9-ff4649ad153e">
+
+Output from ComputeHypercube:
+<img width="304" alt="ComputeHypercubeOutput" src="https://github.com/user-attachments/assets/afd3fbb1-79c5-4c69-9a6d-0dc0e0fe4a1f">
+
+Output from NormaliseHypercube:
+<img width="296" alt="NormaliseHypercubeOutput" src="https://github.com/user-attachments/assets/42648e4a-8a94-481b-9727-0c1ae76998be">
 
 ## Comments
 - The data and plots will be saved where this main code is located (not where the 
