@@ -2,7 +2,7 @@
 Functions to compute hypercube from endoscope videos 
 
 ## Installation
-Python 3 code, requires the following packaging:
+Python 3 code, requires the following packages:
 
 - numpy
 - opencv-python
