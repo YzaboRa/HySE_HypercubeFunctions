@@ -68,7 +68,7 @@ def ImportData(Path, *Coords, **Info):
 		Trace = False
 
 	try:
-		CropIm = Info['Trace']
+		CropIm = Info['CropIm']
 	except KeyError:
 		CropIm = True
 	if CropIm:
