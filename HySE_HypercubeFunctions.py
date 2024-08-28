@@ -45,17 +45,18 @@ def ImportData_imageio(Path, *Coords, **Info):
 		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}], \
 			y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
 	except KeyError:
-		CropImDimensions = [702,1856, 39,1039]
+		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC standard canvas
 
-
-
-	# ## Coordinates for the image (empirical)
-	# ImagePos_PCIe = [702,1856, 39,1039] ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
 
    
 	## Define start and end parameters
-	cap = cv2.VideoCapture(Path)
-	NNvid = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+	vid = imageio.get_reader(Path, 'ffmpeg')
+	## This reader cannot read the number of frames correctly
+	## Estimate it with the duration and fps
+	metadata = imageio.get_reader(vidPath).get_meta_data()
+	NNvid = int(metadata['fps']*metadata['duration'])
+
+	## Define the start and end frames to read
 	if len(Coords)<2:
 		Nstart = 0
 		Nend = NNvid
@@ -71,55 +72,60 @@ def ImportData_imageio(Path, *Coords, **Info):
 		NN = Nend-Nstart
 
 	## Get video parameters
-	XX = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-	YY = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+	(XX, YY) = metadata['size']
 	if CropIm:
-		# XX = ImagePos_PCIe[1]-ImagePos_PCIe[0]
-		# YY = ImagePos_PCIe[3]-ImagePos_PCIe[2]
 		XX = CropImDimensions[1]-CropImDimensions[0]
 		YY = CropImDimensions[3]-CropImDimensions[2]
 
-	## Create empty array to store the data
-	if RGB:
-		if Trace:
-			data = []
-		else:
-			data = np.empty((NN, YY, XX, 3), np.dtype('uint8'))
-	else:
-		if Trace:
-			data = []
-		else:
-			data = np.empty((NN*3, YY, XX), np.dtype('uint8'))
 
-	## Populate the array
-	fc = 0
-	ret = True
-	ii = 0
-	while (fc < NNvid and ret): 
-		ret, frame = cap.read()
-		if CropIm:
-			# frame = frame[ImagePos_PCIe[2]:ImagePos_PCIe[3], ImagePos_PCIe[0]:ImagePos_PCIe[1]]
-			frame = frame[CropImDimensions[2]:CropImDimensions[3], CropImDimensions[0]:CropImDimensions[1]]
-		if (fc>=Nstart) and (fc<Nend):
-			if RGB:
-				if Trace:
-					data.append(np.average(frame))
-				else:
-					data[ii] = frame
-			else: ## bgr format
-				if Trace:
-					data.append(np.average(frame[:,:,2]))
-					data.append(np.average(frame[:,:,1]))
-					data.append(np.average(frame[:,:,0]))
-				else:
-					data[3*ii,:,:] = frame[:,:,2]
-					data[3*ii+1,:,:] = frame[:,:,1]
-					data[3*ii+2,:,:] = frame[:,:,0]
-			ii += 1
-		fc += 1
-	cap.release()
+	## Define function to read frames
+	def GetFrames(n0, Nframes, VID, ImagePos, RGB):
+		Ims = []
+		if RGB:
+			for n in range(n0, n0+Nframes):
+				frame = VID.get_data(n)
+				im = frame[ImagePos[2]:ImagePos[3], ImagePos[0]:ImagePos[1]]
+				Ims.append(im)
+		else:
+			for n in range(n0, n0+Nframes):
+				frame = VID.get_data(n)
+				ima, imb, imc = ExtractImageFromFrame(frame, ImagePos) 
+				Ims.append(ima)
+				Ims.append(imb)
+				Ims.append(imc)
+		return np.array(Ims)
+
+	## Define function read frame traces
+	def GetFrameTraces(n0, Nframes, VID, ImagePos, RGB):
+		Ims = []
+		if RGB:
+			for n in range(n0, n0+Nframes):
+				frame = VID.get_data(n)
+				im = frame[ImagePos[2]:ImagePos[3], ImagePos[0]:ImagePos[1]]
+				Ims.append(np.average(im))
+		else:
+			for n in range(n0, n0+Nframes):
+				frame = VID.get_data(n)
+				ima, imb, imc = ExtractImageFromFrame(frame, ImagePos) 
+				Ims.append(np.average(ima))
+				Ims.append(np.average(imb))
+				Ims.append(np.average(imc))
+		return np.array(Ims)
+
+	## Define function to extract the image from each frame
+	def ExtractImageFromFrame(frame, ImagePos):
+		im3D = frame[ImagePos[2]:ImagePos[3], ImagePos[0]:ImagePos[1]]
+		# im3D = im3D.astype('float64')
+		im3D = im3D.astype('unit8')
+		return im3D[:,:,0], im3D[:,:,1], im3D[:,:,2]
+		
+
+	## Extract the required data
 	if Trace:
-		data = np.array(data)
+		data = GetFrameTraces(Nstart, Nend, vid, CropImDimensions)
+	else:
+		data = GetFrames(Nstart, Nend, vid, CropImDimensions)
+
 	return data
 
 
@@ -138,7 +144,7 @@ def ImportData(Path, *Coords, **Info):
 		- **Info: (optional) --> RGB, Trace
 		
 			- RGB = True if you want not to flatten the imported frames into 2D
-			        (defaul is RGB = False)
+					(defaul is RGB = False)
 			
 			- Trace = True if you want to only calculate the average of each frame
 					  Can be used to identify hypercube for large datasets 
@@ -193,7 +199,7 @@ def ImportData(Path, *Coords, **Info):
 		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}], \
 			y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
 	except KeyError:
-		CropImDimensions = [702,1856, 39,1039]
+		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC standard canvas
 
 
 
