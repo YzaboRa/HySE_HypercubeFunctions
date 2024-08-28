@@ -250,7 +250,7 @@ def ImportData_imageio(Path, *Coords, **Info):
 		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}], \
 			y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
 	except KeyError:
-		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC standard canvas
+		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
 
 
    
@@ -258,7 +258,7 @@ def ImportData_imageio(Path, *Coords, **Info):
 	vid = imageio.get_reader(Path, 'ffmpeg')
 	## This reader cannot read the number of frames correctly
 	## Estimate it with the duration and fps
-	metadata = imageio.get_reader(vidPath).get_meta_data()
+	metadata = imageio.get_reader(Path).get_meta_data()
 	NNvid = int(metadata['fps']*metadata['duration'])
 
 	## Define the start and end frames to read
@@ -321,15 +321,15 @@ def ImportData_imageio(Path, *Coords, **Info):
 	def ExtractImageFromFrame(frame, ImagePos):
 		im3D = frame[ImagePos[2]:ImagePos[3], ImagePos[0]:ImagePos[1]]
 		# im3D = im3D.astype('float64')
-		im3D = im3D.astype('unit8')
+		# im3D = im3D.astype('uint8')
 		return im3D[:,:,0], im3D[:,:,1], im3D[:,:,2]
 		
 
 	## Extract the required data
 	if Trace:
-		data = GetFrameTraces(Nstart, Nend, vid, CropImDimensions)
+		data = GetFrameTraces(Nstart, Nend, vid, CropImDimensions, RGB)
 	else:
-		data = GetFrames(Nstart, Nend, vid, CropImDimensions)
+		data = GetFrames(Nstart, Nend, vid, CropImDimensions, RGB)
 
 	return data
 
