@@ -9,6 +9,7 @@ from datetime import datetime
 from scipy.signal import savgol_filter, find_peaks
 import matplotlib
 from matplotlib import pyplot as plt
+import imageio
 # import matplotlib.colors as colors
 # import matplotlib.cm as cmx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -96,6 +97,8 @@ def Help():
 	print(f'				- Trace = False(True): Calculate trace (frame avg)')
 	print(f'				- CropIm = True(False): Crop the patient info')
 	print(f'				- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)')
+	print(f'					[702,1856, 39,1039] : CCRC Full HD')
+	print(f'					[263,695, 99,475] : CCRC standard/smaller canvas')
 	print(f'		Outputs:')
 	print(f'			- data (array)')
 	print(f'')
