@@ -17,7 +17,7 @@ Python 3 code, requires the following packages:
 import sys
 PathToFunctions = '{Path to where the HySE_HypercubeFunctions.py code is located}'
 sys.path.append(PathToFunctions)
-from ScopeAnalysisFunctions import *
+from HySE_HypercubeFunctions import *
 
 ## Indicate which wavelengths were used (Panel4, Panel2), in nm
 Wavelengths_list = np.array([486,572,478,646,584,511,617,540, 643,606,563,498,594,526,630,553])
