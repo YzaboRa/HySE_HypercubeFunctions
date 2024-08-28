@@ -16,7 +16,112 @@ matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
 
-## Test
+def ImportData_imageio(Path, *Coords, **Info):
+	try:
+		RGB = Info['RGB']
+		print(f'Setting RGB format = {RGB}')
+	except KeyError:
+		RGB = False
+		
+	try:
+		Trace = Info['Trace']
+		print(f'Only importing the trace of the data')
+	except KeyError:
+		Trace = False
+
+	try:
+		CropIm = Info['CropIm']
+	except KeyError:
+		CropIm = True
+	if CropIm:
+		print(f'Cropping Image')
+	else:
+		print(f'Keeping full frame')
+
+	try:
+		CropImDimensions = Info['CropImDimensions']
+		## [702,1856, 39,1039] ## xmin, xmax, ymin, ymax - CCRC SDI full canvas
+		## [263,695, 99,475] ## xmin, xmax, ymin, ymax  - CCRC standard canvas
+		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}], \
+			y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
+	except KeyError:
+		CropImDimensions = [702,1856, 39,1039]
+
+
+
+	# ## Coordinates for the image (empirical)
+	# ImagePos_PCIe = [702,1856, 39,1039] ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
+
+   
+	## Define start and end parameters
+	cap = cv2.VideoCapture(Path)
+	NNvid = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+	if len(Coords)<2:
+		Nstart = 0
+		Nend = NNvid
+		NN = NNvid
+	else:
+		Nstart = Coords[0]
+		Nend = Coords[1]
+		## Make sure that there are enough frames to read until Nend frame
+		if Nend>NNvid:
+			print(f'Nend = {Nend} is larger than the number of frames in the video')
+			print(f'Setting Nend to the maximal number of frames for this video: {NNvid}')
+			Nend = NNvid
+		NN = Nend-Nstart
+
+	## Get video parameters
+	XX = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+	YY = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+	if CropIm:
+		# XX = ImagePos_PCIe[1]-ImagePos_PCIe[0]
+		# YY = ImagePos_PCIe[3]-ImagePos_PCIe[2]
+		XX = CropImDimensions[1]-CropImDimensions[0]
+		YY = CropImDimensions[3]-CropImDimensions[2]
+
+	## Create empty array to store the data
+	if RGB:
+		if Trace:
+			data = []
+		else:
+			data = np.empty((NN, YY, XX, 3), np.dtype('uint8'))
+	else:
+		if Trace:
+			data = []
+		else:
+			data = np.empty((NN*3, YY, XX), np.dtype('uint8'))
+
+	## Populate the array
+	fc = 0
+	ret = True
+	ii = 0
+	while (fc < NNvid and ret): 
+		ret, frame = cap.read()
+		if CropIm:
+			# frame = frame[ImagePos_PCIe[2]:ImagePos_PCIe[3], ImagePos_PCIe[0]:ImagePos_PCIe[1]]
+			frame = frame[CropImDimensions[2]:CropImDimensions[3], CropImDimensions[0]:CropImDimensions[1]]
+		if (fc>=Nstart) and (fc<Nend):
+			if RGB:
+				if Trace:
+					data.append(np.average(frame))
+				else:
+					data[ii] = frame
+			else: ## bgr format
+				if Trace:
+					data.append(np.average(frame[:,:,2]))
+					data.append(np.average(frame[:,:,1]))
+					data.append(np.average(frame[:,:,0]))
+				else:
+					data[3*ii,:,:] = frame[:,:,2]
+					data[3*ii+1,:,:] = frame[:,:,1]
+					data[3*ii+2,:,:] = frame[:,:,0]
+			ii += 1
+		fc += 1
+	cap.release()
+	if Trace:
+		data = np.array(data)
+	return data
+
 
 def ImportData(Path, *Coords, **Info):
 	"""
@@ -32,14 +137,18 @@ def ImportData(Path, *Coords, **Info):
 				
 		- **Info: (optional) --> RGB, Trace
 		
-			RGB = True if you want not to flatten the imported frames into 2D
-			(defaul is RGB = False)
+			- RGB = True if you want not to flatten the imported frames into 2D
+			        (defaul is RGB = False)
 			
-			Trace = True if you want to only calculate the average of each frame
-			Can be used to identify hypercube for large datasets 
-			Will average single frames unless RGB=True, in which case it will average the whole RGB frame
+			- Trace = True if you want to only calculate the average of each frame
+					  Can be used to identify hypercube for large datasets 
+					  Will average single frames unless RGB=True, in which case it will average the whole RGB frame
 
-			CropIm = False if you want the full frame (image + patient info)
+			- CropIm = False if you want the full frame (image + patient info)
+
+			- CropImDimensions = [xmin, xmax, ymin, ymax] If not using the standard dimensions for the Full HD output
+								 (For example when having lower resolution data). Indicates where to crop the data to 
+								 keep just the image and get rid of the patient information
 
 	Output:
 		- Array containing the data 
@@ -77,9 +186,19 @@ def ImportData(Path, *Coords, **Info):
 	else:
 		print(f'Keeping full frame')
 
+	try:
+		CropImDimensions = Info['CropImDimensions']
+		## [702,1856, 39,1039] ## xmin, xmax, ymin, ymax - CCRC SDI full canvas
+		## [263,695, 99,475] ## xmin, xmax, ymin, ymax  - CCRC standard canvas
+		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}], \
+			y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
+	except KeyError:
+		CropImDimensions = [702,1856, 39,1039]
 
-	## Coordinates for the image (empirical)
-	ImagePos_PCIe = [702,1856, 39,1039] ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
+
+
+	# ## Coordinates for the image (empirical)
+	# ImagePos_PCIe = [702,1856, 39,1039] ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
 
    
 	## Define start and end parameters
@@ -99,13 +218,14 @@ def ImportData(Path, *Coords, **Info):
 			Nend = NNvid
 		NN = Nend-Nstart
 
-	cap = cv2.VideoCapture(Path)
 	## Get video parameters
 	XX = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 	YY = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 	if CropIm:
-		XX = ImagePos_PCIe[1]-ImagePos_PCIe[0]
-		YY = ImagePos_PCIe[3]-ImagePos_PCIe[2]
+		# XX = ImagePos_PCIe[1]-ImagePos_PCIe[0]
+		# YY = ImagePos_PCIe[3]-ImagePos_PCIe[2]
+		XX = CropImDimensions[1]-CropImDimensions[0]
+		YY = CropImDimensions[3]-CropImDimensions[2]
 
 	## Create empty array to store the data
 	if RGB:
@@ -126,7 +246,8 @@ def ImportData(Path, *Coords, **Info):
 	while (fc < NNvid and ret): 
 		ret, frame = cap.read()
 		if CropIm:
-			frame = frame[ImagePos_PCIe[2]:ImagePos_PCIe[3], ImagePos_PCIe[0]:ImagePos_PCIe[1]]
+			# frame = frame[ImagePos_PCIe[2]:ImagePos_PCIe[3], ImagePos_PCIe[0]:ImagePos_PCIe[1]]
+			frame = frame[CropImDimensions[2]:CropImDimensions[3], CropImDimensions[0]:CropImDimensions[1]]
 		if (fc>=Nstart) and (fc<Nend):
 			if RGB:
 				if Trace:
@@ -148,6 +269,7 @@ def ImportData(Path, *Coords, **Info):
 	if Trace:
 		data = np.array(data)
 	return data
+
 
 
 def wavelength_to_rgb(wavelength, gamma=0.8):
