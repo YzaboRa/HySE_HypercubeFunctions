@@ -407,7 +407,7 @@ def ImportData(Path, *Coords, **Info):
 		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}], \
 			y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
 	except KeyError:
-		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC standard canvas
+		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
 
 
 
