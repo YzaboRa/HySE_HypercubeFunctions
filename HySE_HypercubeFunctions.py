@@ -33,7 +33,7 @@ def Help():
 	print(f'				- PlotGradient = True: To plot gratient of smoothed trace and detected peaks')
 	print(f'					To see effect of other parameters when optimising')
 	print(f'				- PrintPeaks = True: To print the list of all detected peaks and their positions')
-	print(f'				- Maxsize = Integer: Set the maximal expected size for a plateau.')
+	print(f'				- MaxPlateauSize = Integer: Set the maximal expected size for a plateau.')
 	print(f'				- WindowLength = Integer: Window over which the smoothing of the trace is performed')
 	print(f'					If the data consists of NxRGB cycles, this number should be a factor of 3')
 	print(f'				- PolyOrder = Integer: Order of the polynomial used in smoothing (Savitzky-Golay)')
@@ -47,6 +47,10 @@ def Help():
 	print(f'					Depends on the repeat number and will impact how well double plateaux are handled')
 	print(f'					Automatically adjusts expected size when plateaux are detected, but needs to be set')
 	print(f'					manually if a full sweep could not be detected automatically.')
+	print(f'				- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)')
+	print(f'				- ReturnPeaks = True: if want the list of peaks and peak distances')
+	print(f'					(for manual tests, for example if fewer than 8 colours')
+	print(f'				- Ncolours = integer: if different from 8 (for example, if one FSK was off)')
 	print(f'		Outputs:')
 	print(f'			- EdgePos: Positions indicating where each sections of frames is for each wavelength ')
 	print(f'				for all sweeps in the dataset')
@@ -120,7 +124,7 @@ def Help():
 	print(f'			- SGfilter (for plotting)')
 	print(f'')
 	print(f'')
-	print(f'	GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxSize, PlateauSize, printInfo=True)')
+	print(f'	GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, printInfo=True)')
 	print(f'		Function that identify sweeps from the detected peaks.')
 	print(f'		Input:')
 	print(f'			- Peaks_dist: outut from GetPeakDist')
@@ -129,7 +133,7 @@ def Help():
 	print(f'				starting after FrameStart instead of 0')
 	print(f'			- FrameEnd: (No longer used) Allows to only consider a subsectino of the dataset')
 	print(f'				ending at FrameEnd instead of -1')
-	print(f'			- MaxSize: Maximal expected size for a normal pleateau. Helps handle double plateau that ')
+	print(f'			- MaxPlateauSize: Maximal expected size for a normal pleateau. Helps handle double plateau that ')
 	print(f'				occur when two neightbouring colours have poor contrast and the transition')
 	print(f'				cannot be detected by the peak threshold.')
 	print(f'				Should be smaller than DarkMin.')
@@ -621,21 +625,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	- kwargs: Parameters for the smoothing of the data (savgol filter) and finding peaks
 			  Sets to default numbers that typically give decent results if nothing is input
 			  
-			  Accepts:
-				window_length = integer (factor 3) : smoothing window
-				polyorder = integer (<window_length) : smoothing param
-				peak_height = float : detection threshold
-				DarkMin = integer : minimum lenght of a long dark separating individual
-									sweeps
-				MaxSize = integer : if a plateau is larger than this (but smaller than
-									long dark), assumed to be double (low contrast)
-				Plateau size = integer : expected size of a plateau
-				peak_distance = integer : max distance between detected peaks
-				PlotGradient = True/False
-				PrintPeaks = True/False
-				CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)
-# 					[702,1856, 39,1039] : CCRC Full HD
-# 					[263,695, 99,475] : CCRC standard/smaller canvas
+			  See help for list of accepted kwargs
 				
 	Output:
 	
@@ -657,7 +647,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		print(f'	- PlotGradient = True: To plot gratient of smoothed trace and detected peaks')
 		print(f'			To see effect of other parameters when optimising')
 		print(f'	- PrintPeaks = True: To print the list of all detected peaks and their positions')
-		print(f'	- Maxsize = Integer: Set the maximal expected size for a plateau.')
+		print(f'	- MaxPlateauSize = Integer: Set the maximal expected size for a plateau.')
 		print(f'	- WindowLength = Integer: Window over which the smoothing of the trace is performed')
 		print(f'			If the data consists of NxRGB cycles, this number should be a factor of 3')
 		print(f'	- PolyOrder = Integer: Order of the polynomial used in smoothing (Savitzky-Golay)')
@@ -672,6 +662,9 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		print(f'			Automatically adjusts expected size when plateaux are detected, but needs to be set')
 		print(f'			manually if a full sweep could not be detected automatically.')
 		print(f'	- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)')
+		print(f'	- ReturnPeaks = True: if want the list of peaks and peak distances')
+		print(f'			(for manual tests, for example if fewer than 8 colours')
+		print(f'	- Ncolours = integer: if different from 8 (for example, if one FSK was off)')
 		return 0
 	else:
 		print(f'Add \'Help=True\' in input for a list and description of all optional parameters ')
@@ -694,14 +687,14 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	## give too low contrast 
 	## Needs to be adjusted if chaning repeat number
 	try:
-		MaxSize = kwargs['MaxSize']
-		print(f'Max plateau size set to {MaxSize}')
+		MaxPlateauSize = kwargs['MaxPlateauSize']
+		print(f'Max plateau size set to {MaxPlateauSize}')
 	except KeyError:
-		MaxSize = 40
-		print(f'Max plateay size set to default of {MaxSize}')
+		MaxPlateauSize = 40
+		print(f'Max plateay size set to default of {MaxPlateauSize}')
 	  
 	## Check if user has set the minimum size of long dark (separating sweeps)
-	## Will vary with repeat number, should be larger than MaxSize
+	## Will vary with repeat number, should be larger than MaxPlateauSize
 	try:
 		DarkMin = kwargs['DarkMin']
 		print(f'Min long dark size set to {DarkMin}')
@@ -716,6 +709,20 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	except KeyError:
 		PlateauSize = 45
 		print(f'Expected plateau size set to default {PlateauSize}')
+
+	## Check if the user wants to return the peaks
+	try:
+		ReturnPeaks = kwargs['ReturnPeaks']
+		print(f'ATTENTION: ReturnPeaks is set to True. Be careful, the output will have three elements!')
+	except KeyError:
+		ReturnPeaks = False
+
+	## Check if the user wants to return the peaks
+	try:
+		Ncolours = kwargs['Ncolours']
+		print(f'Assuming {Ncolours} wavelengths instead of normal 8')
+	except KeyError:
+		Ncolours = 8
 
 	
 	## Import trace
@@ -734,7 +741,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	if PrintPeaks:
 		print(peaks_dist) 
 	## Find sweep positions, will print edges for each identified sweep
-	EdgePos, Stats = GetEdgesPos(peaks_dist, DarkMin, 0, len(trace), MaxSize, PlateauSize, printInfo=True)
+	EdgePos, Stats = GetEdgesPos(peaks_dist, DarkMin, 0, len(trace), MaxPlateauSize, PlateauSize, Ncolours, printInfo=True)
 	
 	## Now make figure to make sure all is right
 	SweepColors = ['royalblue', 'indianred', 'limegreen', 'gold', 'darkturquoise', 'magenta', 'orangered']
@@ -754,6 +761,8 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 				ax.axvline(peaks[i], ls='solid', c='red', label='Plateau edge')
 			else:
 				ax.axvline(peaks[i], ls='solid', c='red')
+		ax2.set_ylabel('Gradient', c='limegreen', fontsize=fs)
+		ax2.yaxis.label.set_color('limegreen')
 		
 		
 	for k in range(0,len(EdgePos)):
@@ -785,14 +794,18 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	
 	plt.savefig(f'{cwd}/{time_now}_Trace.png')
 	plt.show()
+
+	if ReturnPeaks:
+		return EdgePos, peaks, peaks_dist
 	
-	return EdgePos
+	else:
+		return EdgePos
 
 
 
 
 
-def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxSize, PlateauSize, printInfo=True):
+def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, Ncolours, printInfo=True):
 	"""
 	Function that identify sweeps from the detected peaks.
 	Input:
@@ -802,13 +815,14 @@ def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxSize, PlateauSize,
 					starting after FrameStart instead of 0
 		- FrameEnd: (No longer used) Allows to only consider a subsectino of the dataset
 					ending at FrameEnd instead of -1
-		- MaxSize: Maximal expected size for a normal pleateau. Helps handle double plateau that 
+		- MaxPlateauSize: Maximal expected size for a normal pleateau. Helps handle double plateau that 
 					occur when two neightbouring colours have poor contrast and the transition
 					cannot be detected by the peak threshold.
 					Should be smaller than DarkMin.
 		- PleateauSize: Expected plateay size. Helps handle double plateau that 
 					occur when two neightbouring colours have poor contrast and the transition
 					cannot be detected by the peak threshold.
+		- Ncolours: Added to handle cases when there are fewer than 8 wavelengths (one FSK off for example)
 		- PrintInfo: (default True): prints details about each sweep
 
 	Output:
@@ -821,12 +835,14 @@ def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxSize, PlateauSize,
 	temp = []
 	Stats = []
 	## Expected size of a sweep (based on number of colours (8*2) + dark (1))
-	temp_size=17
+	# temp_size = 17
+	temp_size = 17 - (8-Ncolours)
 	for i in range(0,len(peaks_dist)):
 		## Check if we are within the right range to avoid errors
 		if (peaks_dist[i,0]>=FrameStart and peaks_dist[i,0]<=FrameEnd):
 			if peaks_dist[i,1]>DarkMin: ## Long dark - new sweep
 				temp = np.array(temp)
+				# print(f'  Start of a new plateau. len(temp) = {len(temp)}, time_size = {temp_size}')
 				if len(temp)==temp_size:
 					temp_avg = np.average(temp[:,1])
 					temp_std = np.std(temp[:,1])
@@ -851,7 +867,9 @@ def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxSize, PlateauSize,
 			else:
 				## Ad hoc to fix white double plateau
 				## Sometimes two neighbouring colours are too similar and the code can't pick up the difference
-				if peaks_dist[i, 1]>MaxSize: 
+				# print(f'Double plateau:  peaks_dist[i, 1] = {peaks_dist[i, 1]}, MaxPlateauSize = {MaxPlateauSize}')
+				if peaks_dist[i, 1]>MaxPlateauSize: 
+					# print(f'Splitting plateau')
 					# x0 = peaks_dist[i,0]
 					# x1 = peaks_dist[i,0]+PlateauSize
 					temp.append([peaks_dist[i,0], PlateauSize])
@@ -862,9 +880,10 @@ def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxSize, PlateauSize,
 	
 	## Print error message with suggestions if no sweep found
 	if len(EdgePos)==0:
-		print(f'\nNo sweep found. Set PlotGradient to True and play with parameters improve detection')
+		print(f'\nNo sweep found. Set PlotGradient to True and play with parameters to improve detection')
 		print(f'   To adjust smoothing: window_length, polyorder')
 		print(f'   To adjust edge detection: peak_height, peak_distance')
+		print(f'   To adjust the number of expected wavelengths: Ncolours')
 	return np.array(EdgePos), np.array(Stats)
 
 
