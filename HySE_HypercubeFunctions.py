@@ -404,8 +404,7 @@ def ImportData(Path, *Coords, **Info):
 		CropImDimensions = Info['CropImDimensions']
 		## [702,1856, 39,1039] ## xmin, xmax, ymin, ymax - CCRC SDI full canvas
 		## [263,695, 99,475] ## xmin, xmax, ymin, ymax  - CCRC standard canvas
-		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}], \
-			y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
+		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}],y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
 	except KeyError:
 		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
 
@@ -459,26 +458,27 @@ def ImportData(Path, *Coords, **Info):
 	ii = 0
 	while (fc < NNvid and ret): 
 		ret, frame = cap.read()
-		if CropIm:
-			# frame = frame[ImagePos_PCIe[2]:ImagePos_PCIe[3], ImagePos_PCIe[0]:ImagePos_PCIe[1]]
-			frame = frame[CropImDimensions[2]:CropImDimensions[3], CropImDimensions[0]:CropImDimensions[1]]
-		if (fc>=Nstart) and (fc<Nend):
-			if RGB:
-				if Trace:
-					data.append(np.average(frame))
-				else:
-					data[ii] = frame
-			else: ## bgr format
-				if Trace:
-					data.append(np.average(frame[:,:,2]))
-					data.append(np.average(frame[:,:,1]))
-					data.append(np.average(frame[:,:,0]))
-				else:
-					data[3*ii,:,:] = frame[:,:,2]
-					data[3*ii+1,:,:] = frame[:,:,1]
-					data[3*ii+2,:,:] = frame[:,:,0]
-			ii += 1
-		fc += 1
+		if frame is not None:
+			if CropIm:
+				# print(f'fc = {fc}, frame.shape = {frame.shape}')
+				frame = frame[CropImDimensions[2]:CropImDimensions[3], CropImDimensions[0]:CropImDimensions[1]]
+			if (fc>=Nstart) and (fc<Nend):
+				if RGB:
+					if Trace:
+						data.append(np.average(frame))
+					else:
+						data[ii] = frame
+				else: ## bgr format
+					if Trace:
+						data.append(np.average(frame[:,:,2]))
+						data.append(np.average(frame[:,:,1]))
+						data.append(np.average(frame[:,:,0]))
+					else:
+						data[3*ii,:,:] = frame[:,:,2]
+						data[3*ii+1,:,:] = frame[:,:,1]
+						data[3*ii+2,:,:] = frame[:,:,0]
+				ii += 1
+			fc += 1
 	cap.release()
 	if Trace:
 		data = np.array(data)
@@ -633,6 +633,9 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 				peak_distance = integer : max distance between detected peaks
 				PlotGradient = True/False
 				PrintPeaks = True/False
+				CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)
+# 					[702,1856, 39,1039] : CCRC Full HD
+# 					[263,695, 99,475] : CCRC standard/smaller canvas
 				
 	Output:
 	
@@ -668,6 +671,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		print(f'			Depends on the repeat number and will impact how well double plateaux are handled')
 		print(f'			Automatically adjusts expected size when plateaux are detected, but needs to be set')
 		print(f'			manually if a full sweep could not be detected automatically.')
+		print(f'	- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)')
 		return 0
 	else:
 		print(f'Add \'Help=True\' in input for a list and description of all optional parameters ')
@@ -712,9 +716,16 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	except KeyError:
 		PlateauSize = 45
 		print(f'Expected plateau size set to default {PlateauSize}')
+
 	
 	## Import trace
-	trace = ImportData(DataPath,Trace=True)
+
+	## If CropImDimensions dimensions have been specified, pass on to import data function
+	try:
+		CropImDimensions = kwargs['CropImDimensions']
+		trace = ImportData(DataPath,Trace=True, CropImDimensions=CropImDimensions)
+	except KeyError: 
+		trace = ImportData(DataPath,Trace=True)
 
 	## Find peaks
 	peaks, SGfilter, SGfilter_grad = FindPeaks(trace, **kwargs)
