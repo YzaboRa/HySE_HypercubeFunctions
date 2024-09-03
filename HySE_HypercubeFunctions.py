@@ -744,7 +744,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	EdgePos, Stats = GetEdgesPos(peaks_dist, DarkMin, 0, len(trace), MaxPlateauSize, PlateauSize, Ncolours, printInfo=True)
 	
 	## Now make figure to make sure all is right
-	SweepColors = ['royalblue', 'indianred', 'limegreen', 'gold', 'darkturquoise', 'magenta', 'orangered']
+	SweepColors = ['royalblue', 'indianred', 'limegreen', 'gold', 'darkturquoise', 'magenta', 'orangered', 'cyan', 'lime', 'hotpink']
 	fs = 4
 	
 	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,4))
@@ -760,7 +760,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 			if i==0:
 				ax.axvline(peaks[i], ls='dotted', c='red', label='Plateau edge')
 			else:
-				ax.axvline(peaks[i], ls='solid', c='red')
+				ax.axvline(peaks[i], ls='dotted', c='red')
 		ax2.set_ylabel('Gradient', c='limegreen', fontsize=fs)
 		ax2.yaxis.label.set_color('limegreen')
 		
@@ -769,7 +769,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		edges = EdgePos[k]
 		for i in range(0,len(edges)):
 			s, ll = edges[i,0], edges[i,1]
-			ax.axvline(s, ls='dotted', c=SweepColors[k])
+			ax.axvline(s, ls='dashed', c=SweepColors[k])
 			if i<7:
 				RGB = wavelength_to_rgb(Wavelengths_list[i])
 				ax.text(s+7, SGfilter[s+10]+3, Wavelengths_list[i], fontsize=fs, c=RGB)
@@ -792,7 +792,16 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	time_now = datetime.now().strftime("%Y%m%d__%I-%M-%S-%p")
 	day_now = datetime.now().strftime("%Y%m%d")
 	
-	plt.savefig(f'{cwd}/{time_now}_Trace.png')
+
+	Name_withExtension = DataPath.split('/')[-1]
+	Name = Name_withExtension.split('.')[0]
+	Path = DataPath.replace(Name_withExtension, '')
+
+	if PlotGradient==False:
+		PathToSave = f'{Path}{time_now}_{Name}_Trace.png'
+		# plt.savefig(f'{cwd}/{time_now}_Trace.png')
+		print(f'Saving figure at this location: \n   {PathToSave }')
+		plt.savefig(PathToSave)
 	plt.show()
 
 	if ReturnPeaks:
@@ -854,7 +863,9 @@ def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, Plate
 				temp = []
 			## If at the end of the trace, check if we have a full sweep
 			elif i==(len(peaks_dist)-1):
+				# print(f'At the end of trace')
 				if len(temp)==(temp_size-1):
+					# print(f'Have full sweep')
 					x0 = peaks_dist[i,0]
 					temp.append([peaks_dist[i,0], PlateauSize])                    
 					temp = np.array(temp)
@@ -867,15 +878,13 @@ def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, Plate
 			else:
 				## Ad hoc to fix white double plateau
 				## Sometimes two neighbouring colours are too similar and the code can't pick up the difference
-				# print(f'Double plateau:  peaks_dist[i, 1] = {peaks_dist[i, 1]}, MaxPlateauSize = {MaxPlateauSize}')
 				if peaks_dist[i, 1]>MaxPlateauSize: 
-					# print(f'Splitting plateau')
-					# x0 = peaks_dist[i,0]
-					# x1 = peaks_dist[i,0]+PlateauSize
+					# print(f'Double plateau:  peaks_dist[i, 1] = {peaks_dist[i, 1]}, MaxPlateauSize = {MaxPlateauSize}')
 					temp.append([peaks_dist[i,0], PlateauSize])
 					temp.append([peaks_dist[i,0]+PlateauSize, (peaks_dist[i, 1])])
 				else:
 					## In the sweep, keep appending
+					# print(f'  Regular sweep, keep appending')
 					temp.append([peaks_dist[i,0], peaks_dist[i, 1]])
 	
 	## Print error message with suggestions if no sweep found
@@ -1029,18 +1038,22 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				ax[j,i].set_yticks([])
 	plt.tight_layout()
 	## Find current path and time to save figure
-	cwd = os.getcwd()
 	time_now = datetime.now().strftime("%Y%m%d__%I-%M-%S-%p")
 	day_now = datetime.now().strftime("%Y%m%d")
+
+	Name_withExtension = DataPath.split('/')[-1]
+	Name = Name_withExtension.split('.')[0]
+	Path = DataPath.replace(Name_withExtension, '')
+	PathToSave = f'{Path}{time_now}_{Name}'
 	
-	plt.savefig(f'{cwd}/{Name}{time_now}_Hypercube.png')
-	np.savez(f'{cwd}/{Name}{time_now}_Hypercube.npz', Hypercube_sorted)
-	np.savez(f'{cwd}/{Name}{time_now}_Dark.npz', Darks)
+	plt.savefig(f'{PathToSave}_Hypercube.png')
+	np.savez(f'{PathToSave}_Hypercube.npz', Hypercube_sorted)
+	np.savez(f'{PathToSave}_Dark.npz', Darks)
 	return Hypercube_sorted, Darks
 
 
 
-def NormaliseHypercube(Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs):
+def NormaliseHypercube(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs):
 	"""
 	Function that normalises the hypercube with the white reference
 	Input:
@@ -1111,12 +1124,17 @@ def NormaliseHypercube(Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwa
 				ax[j,i].set_yticks([])
 	plt.suptitle(f'{Name} Hypercube Normalised - vmax={MM:.2f}')
 	## Find current path and time to save figure
-	cwd = os.getcwd()
 	time_now = datetime.now().strftime("%Y%m%d__%I-%M-%S-%p")
 	day_now = datetime.now().strftime("%Y%m%d")
 	plt.tight_layout()
-	plt.savefig(f'{cwd}/{Name}{time_now}_HypercubeNormalised.png')
-	np.savez(f'{cwd}/{Name}{time_now}_HypercubeNormalised.npz', hypercubeN)
+
+	Name_withExtension = DataPath.split('/')[-1]
+	Name = Name_withExtension.split('.')[0]
+	Path = DataPath.replace(Name_withExtension, '')
+	PathToSave = f'{Path}{time_now}_{Name}'
+	plt.savefig(f'{PathToSave}_HypercubeNormalised.png')
+	np.savez(f'{PathToSave}_HypercubeNormalised.npz', hypercubeN)
+
 	return hypercubeN
 
 
