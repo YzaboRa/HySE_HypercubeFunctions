@@ -50,7 +50,7 @@ EdgePos_White = FindHypercube(vidPath_White, Wavelengths_list, MaxSize=60, DarkM
 Hypercube_White, Dark_White = ComputeHypercube(vidPath_White, EdgePos_White, Wavelengths_list, Name=Name)
 
 ## And finally normalise the hypercube
-HypercubeNormalised = NormaliseHypercube(Hypercube, Hypercube_White, Dark_White, Wavelengths_list)
+HypercubeNormalised = NormaliseHypercube(vidPath, Hypercube, Hypercube_White, Dark_White, Wavelengths_list)
 
 
 ## The hypercubes (saved as npy files) can be visualised with the Hypercube visualiser
