@@ -758,7 +758,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		## Plot peaks
 		for i in range(0,len(peaks)):
 			if i==0:
-				ax.axvline(peaks[i], ls='solid', c='red', label='Plateau edge')
+				ax.axvline(peaks[i], ls='dotted', c='red', label='Plateau edge')
 			else:
 				ax.axvline(peaks[i], ls='solid', c='red')
 		ax2.set_ylabel('Gradient', c='limegreen', fontsize=fs)
