@@ -1171,3 +1171,50 @@ def Rescale(im, PercMax, Crop=True):
 			imrescaled[pos[0][i],pos[1][i]] = 1
 	return imrescaled
 
+
+
+
+####################################################################
+####################################################################
+####################################################################
+####################################################################
+
+
+
+def CoRegisterImages(im_static, im_shifted):
+    t0 = time.time()
+    ## Convert the numpy array to simple elestix format
+    im_static_se = sitk.GetImageFromArray(im_static)
+    im_shifted_se = sitk.GetImageFromArray(im_shifted)
+
+    ## Create object
+    elastixImageFilter = sitk.ElastixImageFilter()
+    
+    ## Turn off console
+    elastixImageFilter.LogToConsoleOff()
+    
+    ## Set image parameters
+    elastixImageFilter.SetFixedImage(im_static_se)
+    elastixImageFilter.SetMovingImage(im_shifted_se)
+    
+    ## Set transform parameters
+    parameterMap = sitk.GetDefaultParameterMap('translation')
+    parameterMap['Transform'] = ['BSplineTransform']
+    ## If required, set maximum number of iterations
+#     parameterMap['MaximumNumberOfIterations'] = ['500']
+    elastixImageFilter.SetParameterMap(parameterMap)
+    
+    ## Execute
+    result = elastixImageFilter.Execute()
+    ## Convert result to numpy array
+    im_coregistered = sitk.GetArrayFromImage(result)
+    t1 = time.time()
+    
+    ## Find time taken:
+    time_taken = t1-t0
+    
+    ## Get an idea of difference
+    shift_val = np.average(np.abs(np.subtract(im_static,im_coregistered)))
+    
+    ## return 
+    return im_coregistered, shift_val, time_taken
