@@ -11,7 +11,8 @@ Python 3 code, requires the following packages:
 - matplotlib
 - ffmpeg
 
-New option: with co-registration (currently on a secondary branch):
+### New option: with co-registration 
+(currently on a secondary branch)
 
 Co-registration is done with simple elastix / simple itk.
 
