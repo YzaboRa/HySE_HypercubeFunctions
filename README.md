@@ -11,6 +11,20 @@ Python 3 code, requires the following packages:
 - matplotlib
 - ffmpeg
 
+New option: with co-registration (currently on a secondary branch):
+Co-registration is done with simple elastix / simple itk.
+Documentation available here:
+https://simpleitk.org/
+https://simpleelastix.readthedocs.io/
+
+NB: The simple elastix documentation includes complicated installation instructions that do not work (on MacOS).
+Try: 
+```python
+pip install SimpleITK
+```
+
+
+
 ## How to use
 ```python
 ## Import functions
