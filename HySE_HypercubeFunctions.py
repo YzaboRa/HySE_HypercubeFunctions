@@ -1494,7 +1494,7 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
     plt.tight_layout()
     if SavePlot:
         if '.png' not in SavingPathWithName:
-            SavingPathWithName = SavingPathWithName+'CoRegistration.png'
+            SavingPathWithName = SavingPathWithName+'_CoRegistration.png'
         print(f'Saving figure @ {SavingPathWithName}')
         print(f'   Set SavingPathWithName=\'path\' to set saving path')
         plt.savefig(f'{SavingPathWithName}')
@@ -1522,6 +1522,85 @@ def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
 	    data = Hypercube[i,:,:].astype('uint8')
 	    out.write(data)
 	out.release()
+
+
+def PlotHypercube(Hypercube, **kwargs):
+	"""
+	Input
+		- Hypercube (np array)
+		- kwargs:
+			- Wavelengths: List of sorted wavelengths (for titles colours, default black)
+			- SavePlot: (default False)
+			- SavingPathWithName: Where to save the plot if SavePlot=True
+			- ShowPlot: (default True)
+
+
+	"""
+
+
+	try:
+		Wavelengths = kwargs['Wavelengths']
+	except KeyError:
+		Wavelengths = 0
+		print(f'Input \'Wavelengths\' list (sorted) for nicer plot')
+
+	try:
+		SavePlot = kwargs['SavePlot']
+	except KeyError:
+		SavePlot = False
+	try: 
+		SavingPathWithName = kwargs['SavingPathWithName']
+	except KeyError:
+		SavingPathWithName = ''
+		if SavePlot==True:
+			print(f'SavePlot is set to True. Please input a SavingPathWithName')
+	try:
+		ShowPlot = kwargs['ShowPlot']
+	except KeyError:
+		ShowPlot = True
+
+
+	nn = 0
+	plt.close()
+	fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
+	for j in range(0,4):
+	    for i in range(0,4):
+	        if nn<NN:
+	        	if Wavelengths==0:
+	        		RGB = (0,0,0) ## Set title to black if no wavelength input
+	        	else:
+		            wav = Wavelengths[nn]
+		            RGB = wavelength_to_rgb(wav)
+	            ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0, vmax=np.amax(Hypercube))
+	            ax[j,i].set_title(f'{wav} nm', c=RGB)
+	            ax[j,i].set_xticks([])
+	            ax[j,i].set_yticks([])
+	            nn = nn+1
+	        else:
+	            ax[j,i].set_xticks([])
+	            ax[j,i].set_yticks([])
+	if SavePlot:
+		if '.png' not in SavingPathWithName:
+			SavingPathWithName = SavingPathWithName+'_Hypercube.png'
+		plt.savefig(f'{SavingPathWithName}')
+	if ShowPlot:
+		plt.show()
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     
