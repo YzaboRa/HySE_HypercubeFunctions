@@ -1185,8 +1185,6 @@ def Rescale(im, PercMax, Crop=True):
 import SimpleITK as sitk
 
 
-
-
 def SweepCoRegister(DataSweep, **kwargs):
 	"""
 	Apply Simple Elastix co-registration to all sweep
@@ -1226,7 +1224,7 @@ def SweepCoRegister(DataSweep, **kwargs):
 	try:
 		ImStatic_Index = kwargs['ImStatic_Index']
 		if ImStatic_Index<5 or ImStatic_Index<Buffer:
-			print(f'Careful! You have set ImStatic_index < 5 or < Buffer ')
+			print(f'Careful! You have set ImStatic_Index < 5 or < Buffer ')
 			print(f'	This is risks being in the range of unreliable frames too close to a colour transition.')
 	except KeyError:
 		ImStatic_Index = 8
@@ -1260,44 +1258,49 @@ def SweepCoRegister(DataSweep, **kwargs):
 				print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
 
 
-	print(f'Static image: plateau {ImStatic_plateau}, index {ImStatic_index}. Use ImStatic_plateau and ImStatic_index to change it.')
+	print(f'Static image: plateau {ImStatic_Plateau}, index {ImStatic_Index}. Use ImStatic_Plateau and ImStatic_Index to change it.')
 	print(f'Buffer set to {Buffer}')
 
 
 	t0 = time.time()
-	Ncolours = len(DataAllC)
-	(_, YY, XX) = DataAllC[1].shape
-	CoRegisteredData_All = []
+	Ncolours = len(DataSweep)
+	(_, YY, XX) = DataSweep[1].shape
 
-	im_static = DataAllC[N0][c0,:,:]
+	Hypercube = []
 
+	## Define static image
+	im_static = DataSweep[ImStatic_Plateau][ImStatic_Index,:,:]
+
+	## Loop through all colours (wavelengths)
 	for c in range(0, Ncolours):
 	    if c==8: ## ignore dark
-	        print(f'DARK')
+	        # print(f'DARK')
+	        pass
 	    else:
-	        t1 = time.time()
-	        (NN, YY, XX) = DataAllC[c].shape
+	        ImagesTemp = []
+	        (NN, YY, XX) = DataSweep[c].shape
 	        for i in range(buffer,NN-buffer):
-	            im_shifted = DataAllC[c][i,:,:]
+	            im_shifted = DataSweep[c][i,:,:]
 	            im_coregistered, shift_val, time_taken = CoRegisterImages(im_static, im_shifted)
-	            CoRegisteredData_All.append(im_coregistered)
-	    #         if i==ct:
-	    #             Path = f'{SavingPath}{Name}_C{c}_ExampleShift_All.png'
-	    #                 PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=Path)
-	    
-	        t2 = time.time()
-	        print(f'  C{c} took {t2-t1:.2f}s for {NN-buffer*2} co-registrations')
-	    
-	    
-	CoRegisteredData_All = np.array(CoRegisteredData_All)
-	time_total = t2-t0
+	            ImagesTemp.append(im_coregistered)
+
+	            ## Plot co-registration is requested
+	            if c in Plot_PlateauList or Plot_PlateauList=='All':
+	            	if i==Plot_Index:
+	            		PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPath)
+	        
+	        ImagesTemp = np.array(ImagesTemp)
+	        ImAvg = np.average(ImagesTemp, axis=0)
+	        Hypercube.append(ImAvg)
+	        
+	tf = time.time()
+	Hypercube = np.array(Hypercube)
+	## Calculate time taken
+	time_total = tf-t0
 	minutes = int(time_total/60)
 	seconds = time_total - minutes*60
-	print(f'\n\n Took {minutes} min and {seconds:.0f} s in total\n')
-	print(CoRegisteredData_All.shape)
-
-
-
+	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
+	return Hypercube
 
 
 
