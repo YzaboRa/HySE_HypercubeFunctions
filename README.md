@@ -26,7 +26,10 @@ Try first:
 pip install SimpleITK
 ```
 
+It also requires those additional libraries:
 
+- time
+- tqdm
 
 ## How to use
 ```python
