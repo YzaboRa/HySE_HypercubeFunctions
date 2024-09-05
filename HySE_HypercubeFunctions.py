@@ -635,6 +635,13 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	
 	"""
 
+		## Check if the user wants to return the peaks
+	try:
+		ReturnPeaks = kwargs['ReturnPeaks']
+		print(f'ATTENTION: ReturnPeaks is set to True. Be careful, the output will have three elements!')
+	except KeyError:
+		ReturnPeaks = False
+
 	## Check if user wants list of optional parameters
 	try:
 		Help = kwargs['Help']
@@ -665,7 +672,10 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		print(f'	- ReturnPeaks = True: if want the list of peaks and peak distances')
 		print(f'			(for manual tests, for example if fewer than 8 colours')
 		print(f'	- Ncolours = integer: if different from 8 (for example, if one FSK was off)')
-		return 0
+		if ReturnPeaks:
+			return 0,0,0
+		else:
+			return 0
 	else:
 		print(f'Add \'Help=True\' in input for a list and description of all optional parameters ')
 	
@@ -709,13 +719,6 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	except KeyError:
 		PlateauSize = 45
 		print(f'Expected plateau size set to default {PlateauSize}')
-
-	## Check if the user wants to return the peaks
-	try:
-		ReturnPeaks = kwargs['ReturnPeaks']
-		print(f'ATTENTION: ReturnPeaks is set to True. Be careful, the output will have three elements!')
-	except KeyError:
-		ReturnPeaks = False
 
 	## Check if the user wants to return the peaks
 	try:
@@ -1179,7 +1182,134 @@ def Rescale(im, PercMax, Crop=True):
 ####################################################################
 ####################################################################
 
+import SimpleITK as sitk
 
+
+
+
+def SweepCoRegister(DataSweep, **kwargs):
+	"""
+	Apply Simple Elastix co-registration to all sweep
+
+	Input:
+		- DataSweep: List of 3D arrays. Each element in the list contains all frames in a plateau (wavelength)
+		- kwargs 
+			- Buffer: sets the numner of frames to ignore on either side of a colour transition
+				Totale number of frames removed = 2*Buffer (default 6)
+			- ImStatic_Plateau: sets the plateau (wavelength) from which the static image is selected (default 1)
+			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
+			- PlotDiff: Whether to plot figure showing the co-registration (default False)
+				If set to True, also expects:
+				- SavingPath: Where to save figure (default '')
+				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul "All")
+				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
+
+
+	Outputs:
+
+	"""
+	AllIndices = [DataSweep[i][0] for i in range(0,len(DataSweep))]
+	MaxIndex = np.amax(AllIndices)
+
+	try:
+		Buffer = kwargs['Buffer']
+	except KeyError:
+		Buffer = 6
+
+	try:
+		ImStatic_Plateau = kwargs['ImStatic_Plateau']
+		if ImStatic_Plateau==8:
+			print(f'Careful! You have set ImStatic_Plateau to 8, which is typically a dark. If this is the case, the co-registration will fail')
+	except KeyError:
+		ImStatic_Plateau = 1
+
+	try:
+		ImStatic_Index = kwargs['ImStatic_Index']
+		if ImStatic_Index<5 or ImStatic_Index<Buffer:
+			print(f'Careful! You have set ImStatic_index < 5 or < Buffer ')
+			print(f'	This is risks being in the range of unreliable frames too close to a colour transition.')
+	except KeyError:
+		ImStatic_Index = 8
+		if MaxIndex>ImStatic_Index:
+			ImStatic_Index = int(MaxIndex/2)
+			print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
+
+	try: 
+		PlotDiff = kwargs['PlotDiff']
+	except KeyError:
+		PlotDiff = False
+
+	if PlotDiff:
+		try: 
+			SavingPath = kwargs['SavingPath']
+		except KeyError:
+			SavingPath = ''
+			print(f'PlotDiff has been set to True. Indicate a SavingPath.')
+		
+		try: 
+			Plot_PlateauList = kwargs['Plot_PlateauList']
+		except:
+			Plot_PlateauList = 'All'
+
+		try: 
+			Plot_Index = kwargs['Plot_Index']
+		except:
+			Plot_Index = 14
+			if MaxIndex>Plot_Index:
+				Plot_Index = int(MaxIndex/2)
+				print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
+
+
+	print(f'Static image: plateau {ImStatic_plateau}, index {ImStatic_index}. Use ImStatic_plateau and ImStatic_index to change it.')
+	print(f'Buffer set to {Buffer}')
+
+
+	t0 = time.time()
+	Ncolours = len(DataAllC)
+	(_, YY, XX) = DataAllC[1].shape
+	CoRegisteredData_All = []
+
+	im_static = DataAllC[N0][c0,:,:]
+
+	for c in range(0, Ncolours):
+	    if c==8: ## ignore dark
+	        print(f'DARK')
+	    else:
+	        t1 = time.time()
+	        (NN, YY, XX) = DataAllC[c].shape
+	        for i in range(buffer,NN-buffer):
+	            im_shifted = DataAllC[c][i,:,:]
+	            im_coregistered, shift_val, time_taken = CoRegisterImages(im_static, im_shifted)
+	            CoRegisteredData_All.append(im_coregistered)
+	    #         if i==ct:
+	    #             Path = f'{SavingPath}{Name}_C{c}_ExampleShift_All.png'
+	    #                 PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=Path)
+	    
+	        t2 = time.time()
+	        print(f'  C{c} took {t2-t1:.2f}s for {NN-buffer*2} co-registrations')
+	    
+	    
+	CoRegisteredData_All = np.array(CoRegisteredData_All)
+	time_total = t2-t0
+	minutes = int(time_total/60)
+	seconds = time_total - minutes*60
+	print(f'\n\n Took {minutes} min and {seconds:.0f} s in total\n')
+	print(CoRegisteredData_All.shape)
+
+
+
+
+
+
+
+def FindPlottingRange(array):
+    array_flat = array.flatten()
+    array_sorted = np.sort(array_flat)    
+    mean = np.average(array_sorted)
+    std = np.std(array_sorted)
+    MM = mean+3*std
+    mm = mean-3*std
+    return mm, MM
 
 def CoRegisterImages(im_static, im_shifted):
     t0 = time.time()
@@ -1200,6 +1330,42 @@ def CoRegisterImages(im_static, im_shifted):
     ## Set transform parameters
     parameterMap = sitk.GetDefaultParameterMap('translation')
     parameterMap['Transform'] = ['BSplineTransform']
+    
+    ## Parameters to play with if co-registration is not optimal:
+    
+#         # Controls how long the optimizer runs
+#     parameterMap['MaximumNumberOfIterations'] = ['500'] 
+#         # You can try different metrics like AdvancedMattesMutualInformation, NormalizedCorrelation, 
+#         # or AdvancedKappaStatistic for different registration scenarios.
+#     parameterMap['Metric'] = ['AdvancedMattesMutualInformation']
+#         # Adjust the number of bins used in mutual information metrics
+#     parameterMap['NumberOfHistogramBins'] = ['32']
+#         # Change the optimizer to AdaptiveStochasticGradientDescent for potentially better convergence
+#     parameterMap['Optimizer'] = ['AdaptiveStochasticGradientDescent']
+#         # Controls the grid spacing for the BSpline transform
+#     parameterMap['FinalGridSpacingInPhysicalUnits'] = ['10.0']
+#         # Refines the BSpline grid at different resolutions.
+#     parameterMap['GridSpacingSchedule'] = ['10.0', '5.0', '2.0']
+#         # Automatically estimate the scales for the transform parameters.
+#     parameterMap['AutomaticScalesEstimation'] = ['true']
+#         # Controls the number of resolutions used in the multi-resolution pyramid. 
+#         # A higher number can lead to better registration at the cost of increased computation time.
+#     parameterMap['NumberOfResolutions'] = ['4']
+#         # Automatically initializes the transform based on the center of mass of the images.
+#     parameterMap['AutomaticTransformInitialization'] = ['true']
+#         # Controls the interpolation order for the final transformation.
+#     parameterMap['FinalBSplineInterpolationOrder'] = ['3']
+    
+# #         # Adjust the maximum step length for the optimizer
+# #     parameterMap['MaximumStepLength'] = ['4.0']
+# #         # Use more samples for computing gradients
+# #     parameterMap['NumberOfSamplesForExactGradient'] = ['10000']
+# #         # Specify the grid spacing in voxels for the final resolution.
+# #     parameterMap['FinalGridSpacingInVoxels'] = ['8.0']
+# #         # Defines the spacing of the sampling grid used during optimization.
+# #     parameterMap['SampleGridSpacing'] = ['2.0']
+        
+    
     ## If required, set maximum number of iterations
 #     parameterMap['MaximumNumberOfIterations'] = ['500']
     elastixImageFilter.SetParameterMap(parameterMap)
@@ -1218,3 +1384,119 @@ def CoRegisterImages(im_static, im_shifted):
     
     ## return 
     return im_coregistered, shift_val, time_taken
+
+class MidpointNormalize(matplotlib.colors.Normalize):
+    def __init__(self, vmin, vmax, midpoint=0, clip=False):
+        self.midpoint = midpoint
+        matplotlib.colors.Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        normalized_min = max(0, 1 / 2 * (1 - abs((self.midpoint - self.vmin) / (self.midpoint - self.vmax))))
+        normalized_max = min(1, 1 / 2 * (1 + abs((self.vmax - self.midpoint) / (self.midpoint - self.vmin))))
+        normalized_mid = 0.5
+        x, y = [self.vmin, self.midpoint, self.vmax], [normalized_min, normalized_mid, normalized_max]
+        return np.ma.masked_array(np.interp(value, x, y))
+    
+    
+def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
+    """
+    
+    kwargs: 
+        - ShowPlot False(True)
+        - SavePlot False(True)
+        - SavingPathWithName (default '')
+    
+    """
+    try:
+        SavingPathWithName = kwargs['SavingPathWithName']
+    except KeyError:
+        SavingPathWithName = ''
+    
+    try:
+        SavePlot = kwargs['SavePlot']
+    except KeyError:
+        SavePlot = False
+        
+    try:
+        ShowPlot = kwargs['ShowPlot']
+    except KeyError:
+        ShowPlot = False
+        
+    images_diff_0 = np.subtract(im_shifted.astype('float64'), im_static.astype('float64'))
+    images_diff_0_avg = np.average(np.abs(images_diff_0))
+#     images_diff_0_std = np.std(np.abs(images_diff_0))
+    images_diff_cr = np.subtract(im_coregistered.astype('float64'), im_static.astype('float64'))
+    images_diff_cr_avg = np.average(np.abs(images_diff_cr))
+#     images_diff_cr_std = np.average(np.std(images_diff_cr))
+    
+    mmm, MMM = 0, 255
+    mm0, MM0 = FindPlottingRange(images_diff_0)
+    mm, MM = FindPlottingRange(images_diff_cr)
+    
+    norm = MidpointNormalize(vmin=mm0, vmax=MM0, midpoint=0)
+    cmap = 'RdBu_r'
+    
+    fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(12,7))
+    im00 = ax[0,0].imshow(im_static, cmap='gray',vmin=mmm, vmax=MMM)
+    ax[0,0].set_title('Static Image')
+    divider = make_axes_locatable(ax[0,0])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im00, cax=cax, orientation='vertical')
+
+    im01 = ax[0,1].imshow(im_shifted, cmap='gray',vmin=mmm, vmax=MMM)
+    ax[0,1].set_title('Shifted Image')
+    divider = make_axes_locatable(ax[0,1])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im01, cax=cax, orientation='vertical')
+
+    im02 = ax[0,2].imshow(images_diff_0, cmap=cmap, norm=norm)
+    ax[0,2].set_title(f'Difference (no registration)\n avg {images_diff_0_avg:.2f}')
+    divider = make_axes_locatable(ax[0,2])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im02, cax=cax, orientation='vertical')
+    
+    im10 = ax[1,0].imshow(im_static, cmap='gray',vmin=mmm, vmax=MMM)
+    ax[1,0].set_title('Static Image')
+    divider = make_axes_locatable(ax[1,0])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im10, cax=cax, orientation='vertical')
+
+    im11 = ax[1,1].imshow(im_coregistered, cmap='gray',vmin=mmm, vmax=MMM)
+    ax[1,1].set_title('Coregistered Image')
+    divider = make_axes_locatable(ax[1,1])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im11, cax=cax, orientation='vertical')
+
+    im12 = ax[1,2].imshow(images_diff_cr, cmap=cmap, norm=norm_shift)
+    ax[1,2].set_title(f'Difference (with registration)\n avg {images_diff_cr_avg:.2f}')
+    divider = make_axes_locatable(ax[1,2])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im12, cax=cax, orientation='vertical')
+
+    ## Add grid to help see changes in images
+    (YY, XX) = im_static.shape
+    xm, ym = int(XX/2), int(YY/2)
+    xmm, ymm = int(xm/2), int(ym/2)
+    x_points = [xmm, xm, xm+xmm, 3*xmm]
+    y_points = [ymm, ym, ym+ymm, 3*ymm]
+    for i in range(0,3):
+        for j in range(0,2):
+            ax[j,i].set_xticks([])
+            ax[j,i].set_yticks([])
+            for k in range(0,4):
+                ax[j,i].axvline(x_points[k], c='limegreen', ls='dotted')
+                ax[j,i].axhline(y_points[k], c='limegreen', ls='dotted')
+
+    plt.tight_layout()
+    if SavePlot:
+        if '.png' not in SavingPathWithName:
+            SavingPathWithName = SavingPathWithName+'CoRegistration.png'
+        print(f'Saving figure @ {SavingPathWithName}')
+        print(f'   Set SavingPathWithName=\'path\' to set saving path')
+        plt.savefig(f'{SavingPathWithName}')
+    if ShowPlot:
+        plt.show()
+    else:
+        plt.close()
+
+    
