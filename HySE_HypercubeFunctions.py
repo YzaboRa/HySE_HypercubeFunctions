@@ -635,6 +635,14 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	
 	"""
 
+	
+		## Check if the user wants to return the peaks
+	try:
+		ReturnPeaks = kwargs['ReturnPeaks']
+		print(f'ATTENTION: ReturnPeaks is set to True. Be careful, the output will have three elements!')
+	except KeyError:
+		ReturnPeaks = False
+
 	## Check if user wants list of optional parameters
 	try:
 		Help = kwargs['Help']
@@ -665,7 +673,10 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		print(f'	- ReturnPeaks = True: if want the list of peaks and peak distances')
 		print(f'			(for manual tests, for example if fewer than 8 colours')
 		print(f'	- Ncolours = integer: if different from 8 (for example, if one FSK was off)')
-		return 0
+		if ReturnPeaks:
+			return 0,0,0
+		else:
+			return 0
 	else:
 		print(f'Add \'Help=True\' in input for a list and description of all optional parameters ')
 	
@@ -709,13 +720,6 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	except KeyError:
 		PlateauSize = 45
 		print(f'Expected plateau size set to default {PlateauSize}')
-
-	## Check if the user wants to return the peaks
-	try:
-		ReturnPeaks = kwargs['ReturnPeaks']
-		print(f'ATTENTION: ReturnPeaks is set to True. Be careful, the output will have three elements!')
-	except KeyError:
-		ReturnPeaks = False
 
 	## Check if the user wants to return the peaks
 	try:
