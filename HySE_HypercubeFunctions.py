@@ -1287,7 +1287,8 @@ def SweepCoRegister(DataSweep, **kwargs):
 	            ## Plot co-registration is requested
 	            if c in Plot_PlateauList or Plot_PlateauList=='All':
 	            	if i==Plot_Index:
-	            		PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPath)
+	            		Name = f'Plateau{c}_Index{i}_CoRegistration.png'
+	            		PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPath+Name)
 	        
 	        ImagesTemp = np.array(ImagesTemp)
 	        ImAvg = np.average(ImagesTemp, axis=0)
@@ -1501,5 +1502,26 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
         plt.show()
     else:
         plt.close()
+
+
+
+def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
+	try:
+		fps = kwargs['fps']
+	except KeyError:
+		fps = 10
+
+
+	(NN, YY, XX) = Hypercube.shape
+
+	if '.mp4' not in SavingPathWithName:
+		SavingPathWithName = SavingPathWithName+'.mp4'
+
+	out = cv2.VideoWriter(SavingPathWithName, cv2.VideoWriter_fourcc(*'mp4v'), fps, (XX, YY), False)
+	for i in range(NN):
+	    data = Hypercube[i,:,:].astype('uint8')
+	    out.write(data)
+	out.release()
+
 
     
