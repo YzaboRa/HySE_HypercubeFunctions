@@ -20,8 +20,8 @@ Documentation available here:
 https://simpleitk.org/
 https://simpleelastix.readthedocs.io/
 
-NB: The simple elastix documentation includes complicated installation instructions that do not work (on MacOS).
-Try: 
+NB: The simple elastix documentation includes complicated installation instructions that (on MacOS) always crash.
+Try first: 
 ```python
 pip install SimpleITK
 ```
