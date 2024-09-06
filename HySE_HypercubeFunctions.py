@@ -1187,7 +1187,7 @@ import time
 from tqdm.notebook import trange, tqdm, tnrange
 
 
-def SweepCoRegister(DataSweep, **kwargs):
+def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	"""
 	Apply Simple Elastix co-registration to all sweep
 
@@ -1272,6 +1272,10 @@ def SweepCoRegister(DataSweep, **kwargs):
 	Ncolours = len(DataSweep)
 	(_, YY, XX) = DataSweep[1].shape
 
+	## Sort Wavelengths
+	order_list = np.argsort(Wavelengths_list)
+	Wavelengths_sorted = Wavelengths_list[order_list]
+
 	Hypercube = []
 
 	## Define static image
@@ -1314,7 +1318,15 @@ def SweepCoRegister(DataSweep, **kwargs):
 	minutes = int(time_total/60)
 	seconds = time_total - minutes*60
 	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
-	return Hypercube
+
+	## Sort hypercube according to the order_list
+	## Ensures wavelenghts are ordered from blue to red
+	Hypercube_sorted = []
+	for k in range(0,Hypercube.shape[0]):
+		Hypercube_sorted.append(Hypercube[order_list[k]])
+	Hypercube_sorted = np.array(Hypercube_sorted)
+	
+	return Hypercube_sorted
 
 
 
@@ -1546,6 +1558,7 @@ def PlotHypercube(Hypercube, **kwargs):
 			- SavePlot: (default False)
 			- SavingPathWithName: Where to save the plot if SavePlot=True
 			- ShowPlot: (default True)
+			- SameScale (default False)
 
 
 	"""
@@ -1554,8 +1567,8 @@ def PlotHypercube(Hypercube, **kwargs):
 	try:
 		Wavelengths = kwargs['Wavelengths']
 	except KeyError:
-		Wavelengths = 0
-		print(f'Input \'Wavelengths\' list (sorted) for nicer plot')
+		Wavelengths = [0]
+		print(f'Input \'Wavelengths\' list for better plot')
 
 	try:
 		SavePlot = kwargs['SavePlot']
@@ -1572,6 +1585,13 @@ def PlotHypercube(Hypercube, **kwargs):
 	except KeyError:
 		ShowPlot = True
 
+	try:
+		SameScale = kwargs['SameScale']
+	except KeyError:
+		SameScale = False
+
+	Wavelengths_sorted = np.sort(Wavelengths)
+
 
 	NN, YY, XX = Hypercube.shape
 
@@ -1581,13 +1601,16 @@ def PlotHypercube(Hypercube, **kwargs):
 	for j in range(0,4):
 		for i in range(0,4):
 			if nn<NN:
-				if Wavelengths==0:
+				if Wavelengths[0]==0:
 					wav = 0
 					RGB = (0,0,0) ## Set title to black if no wavelength input
 				else:
-					wav = Wavelengths[nn]
+					wav = Wavelengths_sorted[nn]
 					RGB = wavelength_to_rgb(wav)
-				ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0, vmax=np.amax(Hypercube))
+				if SameScale:
+					ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0, vmax=np.amax(Hypercube))
+				else:
+					ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0)
 				if wav==0:
 					ax[j,i].set_title(f'{nn} wavelength', c=RGB)
 				else:
