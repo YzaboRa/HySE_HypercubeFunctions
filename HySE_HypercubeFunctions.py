@@ -1187,6 +1187,37 @@ import time
 from tqdm.notebook import trange, tqdm, tnrange
 
 
+def SweepCoRegister_FromPath(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs)
+	## Get the data for the selected sweep
+	DataSweep = GetSweepPath(vidPath, EdgePos, Nsweep, kwargs)
+	## Compute the hypercube
+	Hypercube = SweepCoRegister(DataSweep, Wavelengths_list, kwargs)
+	return Hyeprcube
+	
+
+
+def GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs):
+	## Check if the user has specificed the image crop dimensions
+	try:
+		CropImDimensions = kwargs['CropImDimensions']
+		CropImDimensions_input = True
+	except KeyError:
+		CropImDimensions_input = False
+
+	## Import all the data
+	if CropImDimensions_input:
+		DataAll = HySE_HypercubeFunctions.ImportData(vidPath, CropImDimensions=CropImDimensions)
+	else:
+		DataAll = HySE_HypercubeFunctions.ImportData(vidPath)
+
+	DataSweep = []
+	for Nc in range(0,len(EdgePos[Nsweep])):
+		Data_c = DataAll[EdgePos[Nsweep][Nc,0]:EdgePos[Nsweep][Nc,0]+EdgePos[Nsweep][Nc,1], :,:]
+		DataSweep.append(Data_c)
+
+	return DataSweep
+
+
 def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	"""
 	Apply Simple Elastix co-registration to all sweep
