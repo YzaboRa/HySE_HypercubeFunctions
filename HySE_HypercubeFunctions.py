@@ -1225,7 +1225,7 @@ def GetDark(DataAll, EdgePos, **kwargs):
 		frames = DataAll[start:end, :,:]
 		m, M = np.amin(frames), np.amax(frames)
 		avg, std = np.average(frames), np.std(frames)
-		print(f'min = {m:.2f}, max = {M:.2f}, avg = {avg:.2f}, std = {std:.2f}')
+		print(f'	min = {m:.2f}, max = {M:.2f}, avg = {avg:.2f}, std = {std:.2f}')
 
 		## Add extra step to make sure we are not including non-dark frames
 		if (std>std_Max or avg>avg_Max):
