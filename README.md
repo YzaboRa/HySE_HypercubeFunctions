@@ -101,6 +101,9 @@ A general help statement can be obtained for all functions by executing the foll
 help(HySE.FUNCTION)
 ```
 
+
+### Here are some examples of outputs:
+
 Output from FindHypercube:
 <img width="452" alt="FindHypercubeOutput" src="https://github.com/user-attachments/assets/b6d45c7a-b74b-455e-97e9-ff4649ad153e">
 
@@ -111,5 +114,4 @@ Output from NormaliseHypercube:
 <img width="296" alt="NormaliseHypercubeOutput" src="https://github.com/user-attachments/assets/42648e4a-8a94-481b-9727-0c1ae76998be">
 
 ## Comments
-- The data and plots will be saved where this main code is located (not where the 
 - If the functions cannote be loaded, try adding an empty __init__.py file in the same folder
