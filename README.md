@@ -79,9 +79,8 @@ vidPath_White = SavingPath+Name_White+'.mp4'
 ##   # Note that the parameters are different for the white reference in this example because the repeat number is different
 EdgePos_White = HySE.FindHypercube(vidPath_White, Wavelengths_list, MaxSize=60, DarkMin=150, PeakHeight=0.1, PlateauSize=54)
 
-## The hypercubes (saved as npy files) can be visualised with the Hypercube visualiser
 ```
-
+The hypercubes (saved as npy files) can be visualised with the Hypercube visualiser
 
 Alternatively, if coregistration is not required, the hypercube can be computed in the following way: 
 
