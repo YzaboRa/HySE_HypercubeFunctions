@@ -42,8 +42,8 @@ def FindPlottingRange(array):
 	return mm, MM
 
 def wavelength_to_rgb(wavelength, gamma=0.8):
-	(R/256.0, G/256.0, B/256.0) = HySE_UserTools.wavelength_to_rgb(wavelength, gamma=0.8)
-	return (R/256.0, G/256.0, B/256.0)
+	(R, G, B) = HySE_UserTools.wavelength_to_rgb(wavelength, gamma=0.8)
+	return (R, G, B)
 
 def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 	HySE_UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs)

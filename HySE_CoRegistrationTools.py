@@ -24,6 +24,8 @@ matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
 
+import HySE_UserTools
+
 def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	"""
 	Apply Simple Elastix co-registration to all sweep
@@ -166,7 +168,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 							if c==ImStatic_Plateau and i==ImStatic_Index:
 								print(f'Skipping plot for plateau={c}, index={i} because it is the static image')
 							else:
-								PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+								HySE_UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
 
 			
 			ImagesTemp = np.array(ImagesTemp)
