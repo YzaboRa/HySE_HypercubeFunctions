@@ -25,7 +25,26 @@ plt.rcParams["font.family"] = "arial"
 
 
 
+def GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs):
+	## Check if the user has specificed the image crop dimensions
+	try:
+		CropImDimensions = kwargs['CropImDimensions']
+		CropImDimensions_input = True
+	except KeyError:
+		CropImDimensions_input = False
 
+	## Import all the data
+	if CropImDimensions_input:
+		DataAll = ImportData(vidPath, CropImDimensions=CropImDimensions)
+	else:
+		DataAll = ImportData(vidPath)
+
+	DataSweep = []
+	for Nc in range(0,len(EdgePos[Nsweep])):
+		Data_c = DataAll[EdgePos[Nsweep][Nc,0]:EdgePos[Nsweep][Nc,0]+EdgePos[Nsweep][Nc,1], :,:]
+		DataSweep.append(Data_c)
+
+	return DataSweep
 
 
 def ImportData(Path, *Coords, **Info):

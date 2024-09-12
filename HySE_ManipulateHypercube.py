@@ -20,176 +20,8 @@ matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
 
-
-
-
-def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
-	"""
-	Apply Simple Elastix co-registration to all sweep
-
-	Input:
-		- DataSweep: List of 3D arrays. Each element in the list contains all frames in a plateau (wavelength)
-		- kwargs 
-			- Buffer: sets the numner of frames to ignore on either side of a colour transition
-				Totale number of frames removed = 2*Buffer (default 6)
-			- ImStatic_Plateau: sets the plateau (wavelength) from which the static image is selected (default 1)
-			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
-			- PlotDiff: Whether to plot figure showing the co-registration (default False)
-				If set to True, also expects:
-				- SavingPath: Where to save figure (default '')
-				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul 5)
-				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
-
-
-	Outputs:
-
-	"""
-	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
-	MaxIndex = np.amax(AllIndices)
-	MinIndex = np.amin(AllIndices)
-	# print(AllIndices)
-	# print(MaxIndex)
-
-	try:
-		Buffer = kwargs['Buffer']
-	except KeyError:
-		Buffer = 6
-
-	try:
-		ImStatic_Plateau = kwargs['ImStatic_Plateau']
-		if ImStatic_Plateau==8:
-			print(f'Careful! You have set ImStatic_Plateau to 8, which is typically a dark. If this is the case, the co-registration will fail')
-	except KeyError:
-		ImStatic_Plateau = 1
-
-	try:
-		ImStatic_Index = kwargs['ImStatic_Index']
-		if ImStatic_Index<5 or ImStatic_Index<Buffer:
-			print(f'Careful! You have set ImStatic_Index < 5 or < Buffer ')
-			print(f'	This is risks being in the range of unreliable frames too close to a colour transition.')
-		if ImStatic_Index>(MinIndex-Buffer):
-			print(f'Careful! You have set ImStatic_Index  > (MinIndex - Buffer')
-			print(f'	This is risks being in the range of unreliable frames too close to a colour transition.')
-	except KeyError:
-		ImStatic_Index = 8
-		if MinIndex>ImStatic_Index:
-			ImStatic_Index = int(MinIndex/2)
-			print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
-
-	try: 
-		PlotDiff = kwargs['PlotDiff']
-	except KeyError:
-		PlotDiff = False
-
-	if PlotDiff:
-		print(f'PlotDiff set to True. Use \'Plot_PlateauList=[]\' or \'All\' and Plot_Index=int to set')
-		try: 
-			SavingPath = kwargs['SavingPath']
-		except KeyError:
-			SavingPath = ''
-			print(f'PlotDiff has been set to True. Indicate a SavingPath.')
-	try: 
-		Plot_PlateauList = kwargs['Plot_PlateauList']
-		if isinstance(Plot_PlateauList, int):
-			Plot_PlateauList = [Plot_PlateauList]
-	except:
-		Plot_PlateauList = [5]
-	
-
-	try: 
-		Plot_Index = kwargs['Plot_Index']
-		if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
-			print(f'PlotIndex is outside the range of indices that will be analyse ({Buffer}, {MinIndex-Buffer})')
-			Plot_Index = int(MinIndex/2)
-			print(f'	Seeting it to {PlotIndex}')
-	except:
-		Plot_Index = 14
-		print(f'MinIndex = {MinIndex}, MinIndex-Buffer = {MinIndex-Buffer}')
-		if Plot_Index>(MinIndex-Buffer):
-			Plot_Index = int(MinIndex/2)
-			print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
-
-
-	print(f'Static image: plateau {ImStatic_Plateau}, index {ImStatic_Index}. Use ImStatic_Plateau and ImStatic_Index to change it.')
-	print(f'Buffer set to {Buffer}')
-
-
-	t0 = time.time()
-	Ncolours = len(DataSweep)
-	(_, YY, XX) = DataSweep[1].shape
-
-	## Deal with special cases when plateau list is input as string
-	if isinstance(Plot_PlateauList, str):
-		if Plot_PlateauList=='All':
-			Plot_PlateauList = [i for i in range(0,Ncolours)]
-		elif Plot_PlateauList=='None':
-			Plot_PlateauList = []
-
-
-	## Sort Wavelengths
-	order_list = np.argsort(Wavelengths_list)
-	Wavelengths_sorted = Wavelengths_list[order_list]
-
-	Hypercube = []
-
-	## Define static image
-	im_static = DataSweep[ImStatic_Plateau][ImStatic_Index,:,:]
-
-	## Loop through all colours (wavelengths)
-	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')
-	for c in tnrange(0, Ncolours):
-		if c==8: ## ignore dark
-			# print(f'DARK')
-			pass
-		else:
-			ImagesTemp = []
-			(NN, YY, XX) = DataSweep[c].shape
-			for i in range(Buffer,NN-Buffer):
-				im_shifted = DataSweep[c][i,:,:]
-				im_coregistered, shift_val, time_taken = CoRegisterImages(im_static, im_shifted)
-				ImagesTemp.append(im_coregistered)
-
-				## Plot co-registration is requested
-				if PlotDiff:
-					# print(f'c={c}, i={i}')
-					if c in Plot_PlateauList:
-						if '.png' in SavingPath:
-							NameTot = SavingPath.split('/')[-1]
-							Name = NameTot.replace('.png', '')+f'_Plateau{c}_Index{i}.png'
-							SavingPathWithName = SavingPath.replace(NameTot, Name)
-						else:
-							Name = f'Plateau{c}_Plateau{c}_Index{i}_CoRegistration.png'
-							SavingPathWithName = SavingPath+Name
-
-						if i==Plot_Index:
-							if c==ImStatic_Plateau and i==ImStatic_Index:
-								print(f'Skipping plot for plateau={c}, index={i} because it is the static image')
-							else:
-								PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
-
-			
-			ImagesTemp = np.array(ImagesTemp)
-			ImAvg = np.average(ImagesTemp, axis=0)
-			Hypercube.append(ImAvg)
-			
-	tf = time.time()
-	Hypercube = np.array(Hypercube)
-	## Calculate time taken
-	time_total = tf-t0
-	minutes = int(time_total/60)
-	seconds = time_total - minutes*60
-	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
-
-	## Sort hypercube according to the order_list
-	## Ensures wavelenghts are ordered from blue to red
-	Hypercube_sorted = []
-	for k in range(0,Hypercube.shape[0]):
-		Hypercube_sorted.append(Hypercube[order_list[k]])
-	Hypercube_sorted = np.array(Hypercube_sorted)
-
-	return Hypercube_sorted
-
-
+import HySE_ImportData
+import HySE_UserTools
 
 
 
@@ -242,7 +74,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		Name = ''
 		
 	## Import data
-	data = ImportData(DataPath)
+	data = HySE_ImportData.ImportData(DataPath)
 	
 	## Sort Wavelengths
 	order_list = np.argsort(Wavelengths_list)
@@ -411,7 +243,7 @@ def NormaliseHypercube(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_l
 		for i in range(0,4):
 			if nn<17:
 				wav = Wavelengths_sorted[nn]
-				RGB = wavelength_to_rgb(wav)
+				RGB = HySE_UserTools.wavelength_to_rgb(wav)
 				ax[j,i].imshow(hypercubeN[nn,:,:], cmap='gray', vmin=0, vmax=MM) ##vmax=np.amax(hypercubeN)
 				ax[j,i].set_title(f'{wav} nm', c=RGB)
 				ax[j,i].set_xticks([])
