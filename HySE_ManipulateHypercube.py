@@ -270,6 +270,22 @@ def NormaliseHypercube(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_l
 
 
 
+def NormaliseFrames(image, image_white, image_dark):
+
+	## Convert to float to avoid numerical errors
+	im = image.astype('float64')
+	white = image_white.astype('float64')
+	dark = image_dark.astype('float64')
+	# Subtract dark
+	im_d = np.subtract(im, dark)
+	white_d = np.subtract(white, dark)
+	## Divide image by white, avoiding /0 errors
+	im_n = np.divide(im_d, white_d, out=np.zeros_like(im_d), where=white_d!=0)
+
+	return im_n
+
+
+
 
 
 def Rescale(im, PercMax, Crop=True):
