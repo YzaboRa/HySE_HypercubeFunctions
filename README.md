@@ -2,7 +2,7 @@
 Functions to compute hypercube from endoscope videos 
 
 ## Installation
-Python 3 code, requires the following packages:
+This is a python 3 code, it requires the following packages:
 
 - numpy
 - opencv-python
@@ -11,10 +11,7 @@ Python 3 code, requires the following packages:
 - matplotlib
 - ffmpeg
 
-### New option: with co-registration 
-(currently on a secondary branch)
-
-Co-registration is done with simple elastix / simple itk.
+The co-registration is done with simple elastix / simple itk.
 
 Documentation available here:
 https://simpleitk.org/
@@ -27,7 +24,6 @@ pip install SimpleITK
 ```
 
 It also requires those additional libraries:
-
 - time
 - tqdm
 
@@ -37,7 +33,7 @@ It also requires those additional libraries:
 import sys
 PathToFunctions = '{Path to where the HySE_HypercubeFunctions.py code is located}'
 sys.path.append(PathToFunctions)
-from HySE_HypercubeFunctions import *
+import Hyse
 
 ## Indicate which wavelengths were used (Panel4, Panel2), in nm
 Wavelengths_list = np.array([486,572,478,646,584,511,617,540, 643,606,563,498,594,526,630,553])
@@ -51,11 +47,28 @@ vidPath = DataPath+Name+'.mp4'
 ## Start with Help=True to have a list and descriptions of all the
 ## parameters to play with, and then with PlotGradient=True
 ## to help optimising
-EdgePos = FindHypercube(vidPath, Wavelengths_list, PeakHeight=0.045)
+EdgePos = HySE.FindHypercube(vidPath, Wavelengths_list, PeakHeight=0.045)
 
 
 ## Once the sweeps have been properly identified, compute the hypercube
-Hypercube, Dark = ComputeHypercube(vidPath, EdgePos, Wavelengths_list, Name=Name)
+## Select the sweep (currently can only co-register a single sweep)
+Nsweep = 5
+## Define where and how the data will be saved
+SP = f'{SavingPath}{Name}_NSweep{Nsweep}'
+
+Hypercube = HySE.GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, ImStatic_Plateau=1, ImStatic_Index=8, Buffer=6, SavingPath=SP)
+## Optional inputs include Plot_PlateauList='None'/'All'/[1,2, ..], Plot_Index=7, PlotDiff=True
+
+
+## Plot
+HySE.PlotHypercube(Hypercube, Wavelengths=Wavelengths_list)
+## Make video
+HySE.MakeHypercubeVideo(Hypercube, SP)
+
+
+## Get Dark:
+Dark = HySE.GetDark(vidPath, EdgePos)
+## Optional inputs include Buffer=6, DarkRepeat=3, CropImDimensions=[x0,xe, y0,ye]
 
 
 ## Obtain the white reference hypercube to be used to normalise the illumination profile
@@ -64,14 +77,20 @@ Hypercube, Dark = ComputeHypercube(vidPath, EdgePos, Wavelengths_list, Name=Name
 Name_White = 'White_5x_OD_2cm'
 vidPath_White = SavingPath+Name_White+'.mp4'
 ##   # Note that the parameters are different for the white reference in this example because the repeat number is different
-EdgePos_White = FindHypercube(vidPath_White, Wavelengths_list, MaxSize=60, DarkMin=150, PeakHeight=0.1, PlateauSize=54)
+EdgePos_White = HySE.FindHypercube(vidPath_White, Wavelengths_list, MaxSize=60, DarkMin=150, PeakHeight=0.1, PlateauSize=54)
 
-## When happy with the identified sweeps
-Hypercube_White, Dark_White = ComputeHypercube(vidPath_White, EdgePos_White, Wavelengths_list, Name=Name)
+```
+The hypercubes (saved as npy files) can be visualised with the Hypercube visualiser
 
-## And finally normalise the hypercube
-HypercubeNormalised = NormaliseHypercube(vidPath, Hypercube, Hypercube_White, Dark_White, Wavelengths_list)
+Alternatively, if coregistration is not required, the hypercube can be computed in the following way: 
 
+```python
+
+Hypercube, Dark = HySE.ComputeHypercube(vidPath, EdgePos, Wavelengths_list, Name=Name)
+Hypercube_White, Dark_White = HySE.ComputeHypercube(vidPath_White, EdgePos_White, Wavelengths_list, Name=Name)
+
+## And then normalised
+HypercubeNormalised = HySE.NormaliseHypercube(vidPath, Hypercube, Hypercube_White, Dark_White, Wavelengths_list)
 
 ## The hypercubes (saved as npy files) can be visualised with the Hypercube visualiser
 ```
