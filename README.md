@@ -95,6 +95,12 @@ HypercubeNormalised = HySE.NormaliseHypercube(vidPath, Hypercube, Hypercube_Whit
 ## The hypercubes (saved as npy files) can be visualised with the Hypercube visualiser
 ```
 
+Some functions have a specific help flag that print a full description of inputs, outputs and constraints. 
+A general help statement can be obtained for all functions by executing the following:
+```python
+help(HySE.FUNCTION)
+```
+
 Output from FindHypercube:
 <img width="452" alt="FindHypercubeOutput" src="https://github.com/user-attachments/assets/b6d45c7a-b74b-455e-97e9-ff4649ad153e">
 
