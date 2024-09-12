@@ -1,5 +1,6 @@
 """
 
+Functions that help finding the frames of interest to calculate the hypercube from the raw data
 
 
 """

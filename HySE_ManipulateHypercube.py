@@ -1,5 +1,6 @@
 """
 
+Functions used to calculate and manipulate the hypercube data (compute hypercube, get the dark, normalise, etc.)
 
 
 """

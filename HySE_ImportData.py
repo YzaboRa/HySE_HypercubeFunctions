@@ -1,5 +1,6 @@
 """
 
+Functions to import the data (full, just a sweep, different reader)
 
 
 """

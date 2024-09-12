@@ -1,5 +1,6 @@
 """
 
+Functions that relate to co-registration
 
 
 """

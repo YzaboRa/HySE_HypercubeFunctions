@@ -1,6 +1,6 @@
 """
 
-
+Functions that represent tools for the user (plotting, saving, help, etc.)
 
 """
 
