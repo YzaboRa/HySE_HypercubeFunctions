@@ -1178,72 +1178,6 @@ def Rescale(im, PercMax, Crop=True):
 
 
 
-def GetDark(DataAll, EdgePos, **kwargs):
-	try:
-		Buffer = kwargs['Buffer']
-		print(f'Buffer set to {Buffer}.')
-	except KeyError:
-		Buffer = 6
-		print(f'Buffer not specified. Set to default 6.')
-
-	try:
-		DarkRepeat = kwargs['DarkRepeat']
-		print(f'DarkRepeat set to {DarkRepeat}.')
-	except KeyError:
-		DarkRepeat = 3
-		print(f'Assuming DarkRepeat = 3,')
-
-	## Automatic dark checks parameters
-	std_Max = 5
-	avg_Max = 25
-
-
-	## Number of sweeps
-	NNsweeps = len(EdgePos)
-
-	## Size of the dataset
-	(NN, YY, XX) = DataAll.shape
-
-	AllDarks = []
-	## Loop through all of the sweeps
-	for n in range(0,NNsweeps):
-		start = EdgePos[n][-1][0] + EdgePos[n][-1][1] + Buffer
-
-		if n==(NNsweeps-1):
-			# print(f'	n={n}, (NN-2)={NNsweeps-2}')
-			## If this is the last sweep, check if we need to go to end of the sweep
-			## or estimate the size of a long dark (to avoid start of unfinished sweep)
-			end_estimate = start+ np.amin(EdgePos[n][:,1])*DarkRepeat
-			end_sweep = NN
-			# print(f'	end_estimate={end_estimate}, end_sweep={end_sweep}')
-			end = min(end_estimate, end_sweep)
-		else:
-			# print(f'	n={n}')
-			end = EdgePos[n+1][0][0] - Buffer
-
-		# print(f'	n={n}, start={start}, end={end}')
-
-		## Select frames from the long dark
-		frames = DataAll[start:end, :,:]
-		m, M = np.amin(frames), np.amax(frames)
-		avg, std = np.average(frames), np.std(frames)
-		print(f'min = {m:.2f}, max = {M:.2f}, avg = {avg:.2f}, std = {std:.2f}')
-
-		## Add extra step to make sure we are not including non-dark frames
-		if (std>std_Max or avg>avg_Max):
-			print(f'It seems like there are outlier parameters in the dark frames')
-			print(f'	min = {m:.2f}, max = {M:.2f}, avg = {avg:.2f}, std = {std:.2f}')
-			print(f'	Use \'DarkRepeat\' and \'Buffer\' to adjust the dark selection')
-
-
-		dark = np.average(frames,axis=0)
-		# print(f'dark.shape = {dark.shape}')
-		AllDarks.append(dark)
-
-	AllDarks = np.array(AllDarks)
-	DarkAvg = np.average(AllDarks,axis=0)
-	return DarkAvg
-
 
 ####################################################################
 ####################################################################
@@ -1255,12 +1189,21 @@ import time
 from tqdm.notebook import trange, tqdm, tnrange
 
 
+<<<<<<< HEAD
 # def SweepCoRegister_FromPath(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
 # 	## Get the data for the selected sweep
 # 	DataSweep = GetSweepPath(vidPath, EdgePos, Nsweep, kwargs)
 # 	## Compute the hypercube
 # 	Hypercube = SweepCoRegister(DataSweep, Wavelengths_list, kwargs)
 # 	return Hyeprcube
+=======
+def SweepCoRegister_FromPath(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs)
+	## Get the data for the selected sweep
+	DataSweep = GetSweepPath(vidPath, EdgePos, Nsweep, kwargs)
+	## Compute the hypercube
+	Hypercube = SweepCoRegister(DataSweep, Wavelengths_list, kwargs)
+	return Hyeprcube
+>>>>>>> parent of ce130fc (GetDark function)
 	
 
 
