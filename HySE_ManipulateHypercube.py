@@ -191,7 +191,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 
 
 
-	
+
 
 
 def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
@@ -351,7 +351,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 
 
-ef NormaliseHypercube(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs):
+def NormaliseHypercube(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs):
 	"""
 	Function that normalises the hypercube with the white reference
 	Input:
