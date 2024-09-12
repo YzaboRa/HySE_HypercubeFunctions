@@ -33,6 +33,42 @@ PythonEnvironment = get_ipython().__class__.__name__
 
 
 def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
+	"""
+	This function imports the raw data from a single sweep and computes the co-registered
+	hypercube from it.
+	Inputs:
+		- vidPath: where to find the data
+		- EdgePos: Positions indicating where each sections of frames is for each wavelength  
+			for all sweeps in the dataset  (output from FindHypercube)
+		- Nsweep: number of the sweep to look at
+		- Wavelnegths_list: list of the wavelengths (unsorted, as done in experiment)
+		- kwargs: optional inputs
+			- CropImDimensions = [xstart, xend, ystart, yend] : where to crop frames to just keep the image 
+				(default values from CCRC HD video)
+			- Buffer: sets the numner of frames to ignore on either side of a colour transition
+				Totale number of frames removed = 2*Buffer (default 6)
+			- ImStatic_Plateau: sets the plateau (wavelength) from which the static image is selected (default 1)
+			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
+			- PlotDiff: Whether to plot figure showing the co-registration (default False)
+				If set to True, also expects:
+				- SavingPath: Where to save figure (default '')
+				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul 5)
+				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
+			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
+				(default True)
+
+	Output:
+	- Hypercube: Sorted hypercube
+
+		Saved:
+		if SaveHypercube=True
+		- Hypercube (as npz file) for hypercube visualiser
+		- Sorted Wavelengths (as npz file) for hypercube visualiser
+
+		if PlotDiff=True
+		- plots of the coregistration for wavelengths in Plot_PlateauList and indices=Plot_Index
+
+	"""
 
 	## ImportDatafor the sweep
 	DataSweep = HySE_ImportData.GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs)
@@ -59,6 +95,8 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 				- SavingPath: Where to save figure (default '')
 				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul 5)
 				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
+			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
+				(default True)
 
 
 	Outputs:

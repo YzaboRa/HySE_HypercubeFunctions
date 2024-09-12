@@ -307,6 +307,28 @@ def Rescale(im, PercMax, Crop=True):
 
 
 def GetDark(vidPath, EdgePos, **kwargs):
+	'''
+	Function that computes the dark from the long darks that seperate individual sweeps
+	Inputs:
+		- vidPath: where to find the data
+		- EdgePos: Positions indicating where each sections of frames is for each wavelength  
+			for all sweeps in the dataset  (output from FindHypercube)
+		-kwargs: optional input
+			- CropImDimensions = [xstart, xend, ystart, yend] : where to crop frames to just keep the image 
+				(default values from CCRC HD video)
+			- Buffer: sets the numner of frames to ignore on either side of a colour transition
+				Total number of frames removed = 2*Buffer (default 6)
+			- DarkRepeat: Number of extra repeat for long darks
+				(default 3)
+			- SaveDark: whether or not to save the dark
+			- SavePath: where to save the dark
+
+	Outputs:
+		- Dark
+		Saved:
+			Dark
+
+	'''
 	DataAll = HySE_ImportData.ImportData(vidPath, **kwargs)
 	DarkAvg = GetDark_FromData(DataAll, EdgePos, **kwargs)
 	return DarkAvg
@@ -326,6 +348,20 @@ def GetDark_FromData(DataAll, EdgePos, **kwargs):
 	except KeyError:
 		DarkRepeat = 3
 		print(f'Assuming DarkRepeat = 3,')
+
+	try:
+		SaveDark = kwargs['SaveDark']
+		print(f'SaveDark set to {SaveDark}.')
+	except KeyError:
+		SaveDark = True
+
+	try: 
+		SavePath = kwargs['SavePath']
+		print(f'SavePath set to {SavePath}.')
+	except KeyError:
+		SavePath = ''
+		if SaveDark:
+			print(f'Please input a saving path with SavePath=\'\'')
 
 	## Automatic dark checks parameters
 	std_Max = 5
@@ -376,4 +412,11 @@ def GetDark_FromData(DataAll, EdgePos, **kwargs):
 
 	AllDarks = np.array(AllDarks)
 	DarkAvg = np.average(AllDarks,axis=0)
+
+	if SaveDark:
+		if '.npz' not in SavePath:
+			SavePath_Dark = SavePath+'_Dark.npz'
+		else:
+			SavePath_Dark.replace('.npz','_Dark.npz')
+		np.savez(SavePath_Dark, DarkAvg)
 	return DarkAvg
