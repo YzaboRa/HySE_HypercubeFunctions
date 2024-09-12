@@ -74,6 +74,10 @@ def ImportData_imageio(Path, *Coords, **Info):
 
 ## Functions from HySE_CoRegistrationTools
 
+def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
+	Hypercube = HySE_CoRegistrationTools.GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs)
+	return Hypercube
+
 def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	Hypercube_sorted = HySE_CoRegistrationTools.SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
 	return Hypercube_sorted

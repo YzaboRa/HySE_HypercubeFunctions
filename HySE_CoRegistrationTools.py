@@ -18,13 +18,30 @@ import imageio
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import SimpleITK as sitk
 import time
-from tqdm.notebook import trange, tqdm, tnrange
+# from tqdm.notebook import trange, tqdm, tnrange
+from tqdm import trange
 
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
 
 import HySE_UserTools
+import HySE_ImportData
+
+
+PythonEnvironment = get_ipython().__class__.__name__
+
+
+def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
+
+	## ImportDatafor the sweep
+	DataSweep = HySE_ImportData.GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs)
+	## Compute Hypercube
+	Hypercube = SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
+	return Hypercube
+
+
+
 
 def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	"""
@@ -86,11 +103,13 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 
 	if PlotDiff:
 		print(f'PlotDiff set to True. Use \'Plot_PlateauList=[]\' or \'All\' and Plot_Index=int to set')
-		try: 
-			SavingPath = kwargs['SavingPath']
-		except KeyError:
-			SavingPath = ''
-			print(f'PlotDiff has been set to True. Indicate a SavingPath.')
+	
+	try: 
+		SavingPath = kwargs['SavingPath']
+	except KeyError:
+		SavingPath = ''
+		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
+	
 	try: 
 		Plot_PlateauList = kwargs['Plot_PlateauList']
 		if isinstance(Plot_PlateauList, int):
@@ -112,6 +131,11 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 			Plot_Index = int(MinIndex/2)
 			print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
 
+	try:
+		SaveHypercube = kwargs['SaveHypercube']
+		print(f'SaveHypercube set to {SaveHypercube}')
+	except:
+		SaveHypercube = True
 
 	print(f'Static image: plateau {ImStatic_Plateau}, index {ImStatic_Index}. Use ImStatic_Plateau and ImStatic_Index to change it.')
 	print(f'Buffer set to {Buffer}')
@@ -140,7 +164,8 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 
 	## Loop through all colours (wavelengths)
 	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')
-	for c in tnrange(0, Ncolours):
+
+	for c in range(0, Ncolours):
 		if c==8: ## ignore dark
 			# print(f'DARK')
 			pass
@@ -189,6 +214,23 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	for k in range(0,Hypercube.shape[0]):
 		Hypercube_sorted.append(Hypercube[order_list[k]])
 	Hypercube_sorted = np.array(Hypercube_sorted)
+
+
+	if SaveHypercube:
+		if '.png' in SavingPath:
+			NameTot = SavingPath.split('/')[-1]
+			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
+			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
+			SavingPathHypercube = SavingPath.replace(NameTot, Name)
+			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
+		else:
+			Name = f'_CoregisteredHypercube.npz'
+			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
+			SavingPathHypercube = SavingPath+Name
+			SavingPathWavelengths = SavingPath+Name_wav
+
+		np.savez(f'{SavingPathHypercube}', Hypercube)
+		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
 
 	return Hypercube_sorted
 
