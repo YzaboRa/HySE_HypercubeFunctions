@@ -100,6 +100,14 @@ def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwarg
 	Hypercube = HySE_CoRegistrationTools.GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs)
 	return Hypercube
 
+def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
+	"""
+	kwargs = Buffer (6), ImStatic_Plateau (1), ImStatic_Index (8), SaveHypercube (True)
+			 PlotDiff (False), SavingPath (''), Plot_PlateauList ('All'), Plot_Index (14)
+	"""
+	HypercubeNormalised = HySE_CoRegistrationTools.SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
+	return HypercubeNormalised
+
 def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	"""
 	kwargs = Buffer (6), ImStatic_Plateau (1), ImStatic_Index (8), SaveHypercube (True)

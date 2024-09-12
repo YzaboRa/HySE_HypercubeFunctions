@@ -203,7 +203,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 
 	## Define static image
 	im_static = DataSweep[ImStatic_Plateau][ImStatic_Index,:,:]
-	im_staticN = HySE_ManipulateHypercube.normalise(im_static, WhiteHypercube[ImStatic_Index,:,:])
+	im_staticN = HySE_ManipulateHypercube.NormaliseFrames(im_static, WhiteHypercube[ImStatic_Index,:,:], Dark)
 
 	## Loop through all colours (wavelengths)
 	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')

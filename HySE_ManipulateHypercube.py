@@ -73,9 +73,17 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		Name = kwargs['Name']+'_'
 	except KeyError:
 		Name = ''
+
+	try:
+		CropImDimensions = kwargs['CropImDimensions']
+		## [702,1856, 39,1039] ## xmin, xmax, ymin, ymax - CCRC SDI full canvas
+		## [263,695, 99,475] ## xmin, xmax, ymin, ymax  - CCRC standard canvas
+		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}],y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
+	except KeyError:
+		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
 		
 	## Import data
-	data = HySE_ImportData.ImportData(DataPath)
+	data = HySE_ImportData.ImportData(DataPath, CropImDimensions=CropImDimensions)
 	
 	## Sort Wavelengths
 	order_list = np.argsort(Wavelengths_list)
@@ -157,8 +165,8 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		for i in range(0,4):
 			if nn<17:
 				wav = Wavelengths_sorted[nn]
-				RGB = wavelength_to_rgb(wav)
-				ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0, vmax=MM)
+				RGB = HySE_UserTools.wavelength_to_rgb(wav)
+				ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray')
 				ax[j,i].set_title(f'{wav} nm', c=RGB)
 				ax[j,i].set_xticks([])
 				ax[j,i].set_yticks([])
