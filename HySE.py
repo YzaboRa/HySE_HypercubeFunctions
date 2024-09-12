@@ -137,7 +137,11 @@ def Rescale(im, PercMax, Crop=True):
 	return imrescaled
 
 
-def GetDark(DataAll, EdgePos, **kwargs):
+def GetDark(vidPath, EdgePos, **kwargs):
+	DarkAvg = HySE_ManipulateHypercube.GetDark(vidPath, EdgePos, **kwargs)
+	return DarkAvg
+
+def GetDark_FromData(DataAll, EdgePos, **kwargs):
 	DarkAvg = HySE_ManipulateHypercube.GetDark(DataAll, EdgePos, **kwargs)
 	return DarkAvg
 

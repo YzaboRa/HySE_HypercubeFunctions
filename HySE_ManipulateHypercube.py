@@ -306,8 +306,13 @@ def Rescale(im, PercMax, Crop=True):
 
 
 
+def GetDark(vidPath, EdgePos, **kwargs):
+	DataAll = HySE_ImportData.ImportData(vidPath, **kwargs)
+	DarkAvg = GetDark_FromData(DataAll, EdgePos, **kwargs)
+	return DarkAvg
 
-def GetDark(DataAll, EdgePos, **kwargs):
+
+def GetDark_FromData(DataAll, EdgePos, **kwargs):
 	try:
 		Buffer = kwargs['Buffer']
 		print(f'Buffer set to {Buffer}.')
