@@ -157,6 +157,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 		if isinstance(Plot_PlateauList, int):
 			Plot_PlateauList = [Plot_PlateauList]
 	except:
+		print(f'Set Plot_PlateauList and Plot_Index to set images to plot')
 		Plot_PlateauList = [5]
 	
 
