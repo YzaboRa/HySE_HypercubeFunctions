@@ -31,7 +31,7 @@ It also requires those additional libraries:
 ```python
 ## Import functions
 import sys
-PathToFunctions = '{Path to where the HySE_HypercubeFunctions.py code is located}'
+PathToFunctions = '{Path to where the HySE_HypercubeFunctions files are located}'
 sys.path.append(PathToFunctions)
 import Hyse
 
