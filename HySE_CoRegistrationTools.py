@@ -221,6 +221,13 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 
 				im_shiftedN = HySE_ManipulateHypercube.NormaliseFrames(im_shifted, im_white, Dark)
 
+				fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(5,5))
+				ax.imshow(im_shiftedN)
+				plt.colorbar()
+				ax.set_title(f'Min: {np.amin(im_shiftedN):.2f}, Avg: {np.average(im_shiftedN):.2f}, Max: {np.amax(im_shiftedN):.2f}')
+				plt.show()
+
+
 				im_coregistered, shift_val, time_taken = CoRegisterImages(im_staticN, im_shiftedN)
 				ImagesTemp.append(im_coregistered)
 

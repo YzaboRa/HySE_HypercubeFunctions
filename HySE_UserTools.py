@@ -527,7 +527,7 @@ def PlotHypercube(Hypercube, **kwargs):
 				if SameScale:
 					ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0, vmax=np.amax(Hypercube))
 				else:
-					ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0)
+					ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0, vmax=np.average(Hypercube[nn,:,:])*3)
 				if wav==0:
 					ax[j,i].set_title(f'{nn} wavelength', c=RGB)
 				else:
