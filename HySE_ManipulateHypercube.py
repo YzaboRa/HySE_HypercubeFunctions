@@ -287,6 +287,11 @@ def NormaliseFrames(image, image_white, image_dark):
 	# Subtract dark
 	im_d = np.subtract(im, dark)
 	white_d = np.subtract(white, dark)
+	## avoid negative
+	## NB: the value subtracted rounds up to 0, but avoids
+	## running into huge numerical errors when dividing
+    im_d = im_d - np.amin(im_d)
+    white_d = white_d - np.amin(white_d)
 	## Divide image by white, avoiding /0 errors
 	im_n = np.divide(im_d, white_d, out=np.zeros_like(im_d), where=white_d!=0)
 

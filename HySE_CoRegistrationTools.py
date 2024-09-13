@@ -217,16 +217,14 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 			(NN, YY, XX) = DataSweep[c].shape
 			for i in range(Buffer,NN-Buffer):
 				im_shifted = DataSweep[c][i,:,:]
-				im_white = WhiteHypercube[c,:,:]
+				if c>=8: ## the hypercube does not include dark in the middle
+					hypercube_index = order_list[c-1] ## hypercube is already sorted
+					im_white = WhiteHypercube[hypercube_index,:,:]
+				else:
+					hypercube_index = order_list[c]
+					im_white = WhiteHypercube[hypercube_index,:,:]
 
 				im_shiftedN = HySE_ManipulateHypercube.NormaliseFrames(im_shifted, im_white, Dark)
-
-				fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(5,5))
-				ax.imshow(im_shiftedN)
-				plt.colorbar()
-				ax.set_title(f'Min: {np.amin(im_shiftedN):.2f}, Avg: {np.average(im_shiftedN):.2f}, Max: {np.amax(im_shiftedN):.2f}')
-				plt.show()
-
 
 				im_coregistered, shift_val, time_taken = CoRegisterImages(im_staticN, im_shiftedN)
 				ImagesTemp.append(im_coregistered)
@@ -511,8 +509,16 @@ def CoRegisterImages(im_static, im_shifted):
 	
 	## Set transform parameters
 	parameterMap = sitk.GetDefaultParameterMap('translation')
+	## Select metric robust to intensity differences (non uniform)
+	parameterMap['Metric'] = ['AdvancedMattesMutualInformation'] 
+	## Select Bspline transform, which allows for non rigid and non uniform deformations
 	parameterMap['Transform'] = ['BSplineTransform']
 	
+#     parameterMap['AutomaticTransformInitialization'] = ['true']
+#     parameterMap['AutomaticTransformInitializationMethod'] = ['CenterOfGravity']
+#     parameterMap['HistogramMatch'] = ['true']
+#     parameterMap['BSplineRegularizationOrder'] = ['11'] ## default 3
+#     parameterMap['Optimizer'] = ['AdaptiveStochasticGradientDescent']
 	## Parameters to play with if co-registration is not optimal:
 	
 #         # Controls how long the optimizer runs
