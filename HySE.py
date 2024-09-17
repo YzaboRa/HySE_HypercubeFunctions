@@ -96,6 +96,14 @@ def ImportData_imageio(Path, *Coords, **kwargs):
 
 ## Functions from HySE_CoRegistrationTools
 
+def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
+	"""
+	kwargs = Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), PlotDiff (False), SavingPath (''), Plot_PlateauList ([5])
+			 Plot_Index (14), SaveHypercube (False), Help (False)
+	"""
+	Hypercube = HySE_CoRegistrationTools.SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
+	return Hypercube
+
 def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
 	"""
 	kwargs = CropImDimensions (CCRC HD video), Buffer (6), ImStatic_Plateau (1), ImStatic_Index (8), SaveHypercube (True)
