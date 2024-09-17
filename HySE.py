@@ -41,6 +41,10 @@ def FindPlottingRange(array):
 	mm, MM = HySE_UserTools.FindPlottingRange(array)
 	return mm, MM
 
+def find_closest(arr, val):
+	idx = HySE_UserTools.find_closest(arr, val)
+	return idx
+
 def wavelength_to_rgb(wavelength, gamma=0.8):
 	(R, G, B) = HySE_UserTools.wavelength_to_rgb(wavelength, gamma=0.8)
 	return (R, G, B)
@@ -116,8 +120,11 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	Hypercube_sorted = HySE_CoRegistrationTools.SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
 	return Hypercube_sorted
 
-def CoRegisterImages(im_static, im_shifted):
-	im_coregistered, shift_val, time_taken = HySE_CoRegistrationTools.CoRegisterImages(im_static, im_shifted)
+def CoRegisterImages(im_static, im_shifted, **kwargs):
+	"""
+	kwargs = Affine (False)
+	"""
+	im_coregistered, shift_val, time_taken = HySE_CoRegistrationTools.CoRegisterImages(im_static, im_shifted, **kwargs)
 	return im_coregistered, shift_val, time_taken
 
 

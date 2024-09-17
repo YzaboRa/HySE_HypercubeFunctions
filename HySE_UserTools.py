@@ -28,41 +28,41 @@ def Help():
 	info='''
 	Available functions: 
 	  
-	 	FindHypercube(DataPath, Wavelengths_list, **kwargs) 
-	 		Primary function that is called by the user to identify each wavelength in the dataset from 
-	 		the raw video in order to compute the hypercube 
-	 		Inputs: 
-	 			- DataPath: Path to the raw vide 
-	 			- kwargs: Paramters to tweak for optimal results 
-	 				- Help = True: to print help message 
-	 				- PlotGradient = True: To plot gratient of smoothed trace and detected peaks 
-	 					To see effect of other parameters when optimising 
-	 				- PrintPeaks = True: To print the list of all detected peaks and their positions 
-	 				- MaxPlateauSize = Integer: Set the maximal expected size for a plateau. 
-	 				- WindowLength = Integer: Window over which the smoothing of the trace is performed 
-	 					If the data consists of NxRGB cycles, this number should be a factor of 3 
-	 				- PolyOrder = Integer: Order of the polynomial used in smoothing (Savitzky-Golay) 
-	 				- PeakHeight = Float: Detection threshold applied to the gradient of the smoothed trace 
-	 					to find edges between neighbouring colours 
-	 				- PeakDistance = Integer: Minimal distance between neightbouring peaks/plateaux 
-	 					Depends on the repeat number, and will impact the detection of double plateaux 
-	 				- DarkMin = Integer: Set the minimal size of the long dark between succesive sweeps 
-	 					Depends on the repeat numbner, and will impact the detection of individial sweeps 
-	 				- PlateauSize = Integer: Set the expected average size for a plateau (in frame number) 
-	 					Depends on the repeat number and will impact how well double plateaux are handled 
-	 					Automatically adjusts expected size when plateaux are detected, but needs to be set 
-	 					manually if a full sweep could not be detected automatically. 
-	 				- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD) 
-	 				- ReturnPeaks = True: if want the list of peaks and peak distances 
-	 					(for manual tests, for example if fewer than 8 colours 
-	 				- Ncolours = integer: if different from 8 (for example, if one FSK was off) 
-	 		Outputs: 
-	 			- EdgePos: Positions indicating where each sections of frames is for each wavelength  
-	 				for all sweeps in the dataset 
+		FindHypercube(DataPath, Wavelengths_list, **kwargs) 
+			Primary function that is called by the user to identify each wavelength in the dataset from 
+			the raw video in order to compute the hypercube 
+			Inputs: 
+				- DataPath: Path to the raw vide 
+				- kwargs: Paramters to tweak for optimal results 
+					- Help = True: to print help message 
+					- PlotGradient = True: To plot gratient of smoothed trace and detected peaks 
+						To see effect of other parameters when optimising 
+					- PrintPeaks = True: To print the list of all detected peaks and their positions 
+					- MaxPlateauSize = Integer: Set the maximal expected size for a plateau. 
+					- WindowLength = Integer: Window over which the smoothing of the trace is performed 
+						If the data consists of NxRGB cycles, this number should be a factor of 3 
+					- PolyOrder = Integer: Order of the polynomial used in smoothing (Savitzky-Golay) 
+					- PeakHeight = Float: Detection threshold applied to the gradient of the smoothed trace 
+						to find edges between neighbouring colours 
+					- PeakDistance = Integer: Minimal distance between neightbouring peaks/plateaux 
+						Depends on the repeat number, and will impact the detection of double plateaux 
+					- DarkMin = Integer: Set the minimal size of the long dark between succesive sweeps 
+						Depends on the repeat numbner, and will impact the detection of individial sweeps 
+					- PlateauSize = Integer: Set the expected average size for a plateau (in frame number) 
+						Depends on the repeat number and will impact how well double plateaux are handled 
+						Automatically adjusts expected size when plateaux are detected, but needs to be set 
+						manually if a full sweep could not be detected automatically. 
+					- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD) 
+					- ReturnPeaks = True: if want the list of peaks and peak distances 
+						(for manual tests, for example if fewer than 8 colours 
+					- Ncolours = integer: if different from 8 (for example, if one FSK was off) 
+			Outputs: 
+				- EdgePos: Positions indicating where each sections of frames is for each wavelength  
+					for all sweeps in the dataset 
 
 
-	 	GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs)
-	 		This function imports the raw data from a single sweep and computes the co-registered
+		GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs)
+			This function imports the raw data from a single sweep and computes the co-registered
 			hypercube from it.
 			Inputs:
 				- vidPath: where to find the data
@@ -98,8 +98,8 @@ def Help():
 
 
 
-	 	GetDark(vidPath, EdgePos, **kwargs)
-	 		Function that computes the dark from the long darks that seperate individual sweeps
+		GetDark(vidPath, EdgePos, **kwargs)
+			Function that computes the dark from the long darks that seperate individual sweeps
 			Inputs:
 				- vidPath: where to find the data
 				- EdgePos: Positions indicating where each sections of frames is for each wavelength  
@@ -121,8 +121,8 @@ def Help():
 
 
 
-	 	PlotHypercube(Hypercube, **kwargs)
-	 		Function to plot the hypercube.
+		PlotHypercube(Hypercube, **kwargs)
+			Function to plot the hypercube.
 			Input
 				- Hypercube (np array)
 				- kwargs:
@@ -139,8 +139,8 @@ def Help():
 					Figure
 
 
-	 	MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs)
-	 		Function that saves a mp4 video of the hypercube
+		MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs)
+			Function that saves a mp4 video of the hypercube
 			Input:
 				- Hypercube
 				- SavingPathWithName
@@ -151,128 +151,128 @@ def Help():
 					mp4 video
 	  
 	  
-	 	ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs) 
-	 		Primary function to compute the hypercube. It inputs the path to the data and the EdgePos output from the 
-	 		FindHypercube function (which indicates whereto find the start for each wavelenght for each identified sweep 
-	 		Input: 
-	 			- DataPath: Path to the data 
-	 			- EdgePos: Position of the start of each colour for each sweep, output of FindHypercube 
-	 				Functions are separated to allow tweaking of parameters to properly identify  
-	 				individual sweeps 	   
-	 			- Wavelengths_list: List of wavelengths as measured in the data (panel 4 - panel 2) 
-	 			- kwargs (optional): Optional parameters 
-	 			- BufferSize = integer : Number of frames to ignore between neighbouring colours to avoid 
-	 				contamination by transition frames. Might need to be adjusted for very short or very 
-	 				large repetitions. Default to 10 							 
-	 			- Name = strin 
-	 		Output: 
-	 			- Hypercube_sorted: Hypercube contained in a 3D array, with wavelengths sorted according 
-	 				to order_list. Shape (Nwavelengths, 1080, 1920) for HD format 					
-	 			- Dark: Dark average contained in 2D array 
+		ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs) 
+			Primary function to compute the hypercube. It inputs the path to the data and the EdgePos output from the 
+			FindHypercube function (which indicates whereto find the start for each wavelenght for each identified sweep 
+			Input: 
+				- DataPath: Path to the data 
+				- EdgePos: Position of the start of each colour for each sweep, output of FindHypercube 
+					Functions are separated to allow tweaking of parameters to properly identify  
+					individual sweeps 	   
+				- Wavelengths_list: List of wavelengths as measured in the data (panel 4 - panel 2) 
+				- kwargs (optional): Optional parameters 
+				- BufferSize = integer : Number of frames to ignore between neighbouring colours to avoid 
+					contamination by transition frames. Might need to be adjusted for very short or very 
+					large repetitions. Default to 10 							 
+				- Name = strin 
+			Output: 
+				- Hypercube_sorted: Hypercube contained in a 3D array, with wavelengths sorted according 
+					to order_list. Shape (Nwavelengths, 1080, 1920) for HD format 					
+				- Dark: Dark average contained in 2D array 
 	  
 	  
-	 	NormaliseHypercube(Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs) 
-	 			Primary function that normalises the hypercube with the white reference 
-	 			Input: 
-	 				- Hypercube : Computed from data (3D array) 
-	 				- Hypercube White: Computed from white reference (3D array) 
-	 				- Dark : Ideally Extracted from white reference (2D array) 
-	 				- Wavelengths_list : List of wavelengths as implemented in the data gathering (not ordered) 
-	 				- kwargs: optional arguments 
-	 					- Name: String, used for plotting and saving data 
-	 			Output: 
-	 				- Normalised Hypercube 
+		NormaliseHypercube(Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs) 
+				Primary function that normalises the hypercube with the white reference 
+				Input: 
+					- Hypercube : Computed from data (3D array) 
+					- Hypercube White: Computed from white reference (3D array) 
+					- Dark : Ideally Extracted from white reference (2D array) 
+					- Wavelengths_list : List of wavelengths as implemented in the data gathering (not ordered) 
+					- kwargs: optional arguments 
+						- Name: String, used for plotting and saving data 
+				Output: 
+					- Normalised Hypercube 
 	  
 	  
 	 ---------------------------- Other additional functions ----------------------------
 	  
 	  
-	 	ImportData(Path, *Coords, **Info) 
-	 		Function to impport data. 
-	 		Inputs: 
-	 			- Coords = Nstart, Nend 
-	 			- Infos: default(optional) 
-	 				- RGB = False(True): Keep RGB format (3D size) 
-	 				- Trace = False(True): Calculate trace (frame avg) 
-	 				- CropIm = True(False): Crop the patient info 
-	 				- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD) 
-	 					[702,1856, 39,1039] : CCRC Full HD 
-	 					[263,695, 99,475] : CCRC standard/smaller canvas 
-	 		Outputs: 
-	 			- data (array) 
+		ImportData(Path, *Coords, **Info) 
+			Function to impport data. 
+			Inputs: 
+				- Coords = Nstart, Nend 
+				- Infos: default(optional) 
+					- RGB = False(True): Keep RGB format (3D size) 
+					- Trace = False(True): Calculate trace (frame avg) 
+					- CropIm = True(False): Crop the patient info 
+					- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD) 
+						[702,1856, 39,1039] : CCRC Full HD 
+						[263,695, 99,475] : CCRC standard/smaller canvas 
+			Outputs: 
+				- data (array) 
 	  
-	 	
-	 	ImportData_imageio(Path, *Coords, **Info) 
-	 		Same input/Output as ImportData, using imageio reader 
-	  
-	  
-	 	
-	 	FindPeaks(trace, **kwargs) 
-	 		Inputs: 
-	 			- trace: Trace of the data (1D) 
-	 			- kwargs: 
-	 				- window_length = integer(6):(factor 3) over which the smoothing is done 
-	 				- polyorder = integer(1): for smoothing (<window_length) 
-	 				- peak_height(0.03) = float: detection threshold for plateau edge 
-	 				- peak_distance(14) = interger: min distance between detected edges 
-	 				- PlotGradient = False(True): Plot trace gradient to help set parameters for edge detection 
-	 		Outputs: 
-	 			- peaks 
-	 			- SGfilter (for plotting) 
+		
+		ImportData_imageio(Path, *Coords, **Info) 
+			Same input/Output as ImportData, using imageio reader 
 	  
 	  
-	 	
-	 	GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, printInfo=True) 
-	 		Function that identify sweeps from the detected peaks. 
-	 		Input: 
-	 			- Peaks_dist: outut from GetPeakDist 
-	 			- DarkMin: Minimal size for a long dark marking transition between successive sweeps 
-	 			- FrameStart: (No longer used) Allows to only consider a subsection of the dataset 
-	 				starting after FrameStart instead of 0 
-	 			- FrameEnd: (No longer used) Allows to only consider a subsectino of the dataset 
-	 				ending at FrameEnd instead of -1 
-	 			- MaxPlateauSize: Maximal expected size for a normal pleateau. Helps handle double plateau that  
-	 				occur when two neightbouring colours have poor contrast and the transition 
-	 				cannot be detected by the peak threshold. 
-	 				Should be smaller than DarkMin. 
-	 			- PleateauSize: Expected plateay size. Helps handle double plateau that  
-	 				occur when two neightbouring colours have poor contrast and the transition 
-	 				cannot be detected by the peak threshold. 
-	 			- PrintInfo: (default True): prints details about each sweep 
-	  
-	 		Output: 
-	 			- EdgePos: Array containing the coordinates for each sweep and each plateau/wavelength within each sweep. 
-	 				Used to identify appropriate frames and then compute the hypercube. 
-	 			- Stats: (No longer used) Statistics about the identified sweeps. Useful for debugging. 
+		
+		FindPeaks(trace, **kwargs) 
+			Inputs: 
+				- trace: Trace of the data (1D) 
+				- kwargs: 
+					- window_length = integer(6):(factor 3) over which the smoothing is done 
+					- polyorder = integer(1): for smoothing (<window_length) 
+					- peak_height(0.03) = float: detection threshold for plateau edge 
+					- peak_distance(14) = interger: min distance between detected edges 
+					- PlotGradient = False(True): Plot trace gradient to help set parameters for edge detection 
+			Outputs: 
+				- peaks 
+				- SGfilter (for plotting) 
 	  
 	  
-	 	Rescale(im, PercMax, Crop=True 
-	 				Function used to crop a certain percentage of pixel values (saturated pixels for example). 
-	 				Sometimes handy for data visualisation. 
-	 				Input: 
-	 					- Image  
-	 					- Maximal percentage (pixels at this value are set to 1) 
-	 					- Crop: If True, all pixels above max pixel are set to 1 
-	 							If False, the image is simply rescaled with pixels higher than 1 
-	 								(will be cropped in plotting) 
-	 				Output: 
-	 					- Rescaled image 
+		
+		GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, printInfo=True) 
+			Function that identify sweeps from the detected peaks. 
+			Input: 
+				- Peaks_dist: outut from GetPeakDist 
+				- DarkMin: Minimal size for a long dark marking transition between successive sweeps 
+				- FrameStart: (No longer used) Allows to only consider a subsection of the dataset 
+					starting after FrameStart instead of 0 
+				- FrameEnd: (No longer used) Allows to only consider a subsectino of the dataset 
+					ending at FrameEnd instead of -1 
+				- MaxPlateauSize: Maximal expected size for a normal pleateau. Helps handle double plateau that  
+					occur when two neightbouring colours have poor contrast and the transition 
+					cannot be detected by the peak threshold. 
+					Should be smaller than DarkMin. 
+				- PleateauSize: Expected plateay size. Helps handle double plateau that  
+					occur when two neightbouring colours have poor contrast and the transition 
+					cannot be detected by the peak threshold. 
+				- PrintInfo: (default True): prints details about each sweep 
+	  
+			Output: 
+				- EdgePos: Array containing the coordinates for each sweep and each plateau/wavelength within each sweep. 
+					Used to identify appropriate frames and then compute the hypercube. 
+				- Stats: (No longer used) Statistics about the identified sweeps. Useful for debugging. 
 	  
 	  
-	 	GetPeakDist(peaks, FrameStart, FrameEnd) 
-	 		Function that calculates the distance between neightbouring peaks 
-	 		Inputs: 
-	 			- peaks (output from FindPeaks 
-	 			- FrameStart, FrameEnd: window over which to look at distance between peaks 
-	 		Outputs: 
-	 			- peak_dist (array 
+		Rescale(im, PercMax, Crop=True 
+					Function used to crop a certain percentage of pixel values (saturated pixels for example). 
+					Sometimes handy for data visualisation. 
+					Input: 
+						- Image  
+						- Maximal percentage (pixels at this value are set to 1) 
+						- Crop: If True, all pixels above max pixel are set to 1 
+								If False, the image is simply rescaled with pixels higher than 1 
+									(will be cropped in plotting) 
+					Output: 
+						- Rescaled image 
 	  
-	 	wavelength_to_rgb(wavelength, gamma=0.8) 
-	 		Inputs: 
-	 			- wavelength: in nm 
-	 			- gamma: transparacy 
-	 		Outputs: 
-	 			- (r, g, b): colour values corresponding to the wavelength 
+	  
+		GetPeakDist(peaks, FrameStart, FrameEnd) 
+			Function that calculates the distance between neightbouring peaks 
+			Inputs: 
+				- peaks (output from FindPeaks 
+				- FrameStart, FrameEnd: window over which to look at distance between peaks 
+			Outputs: 
+				- peak_dist (array 
+	  
+		wavelength_to_rgb(wavelength, gamma=0.8) 
+			Inputs: 
+				- wavelength: in nm 
+				- gamma: transparacy 
+			Outputs: 
+				- (r, g, b): colour values corresponding to the wavelength 
 
 
 	'''
@@ -288,6 +288,11 @@ def FindPlottingRange(array):
 	MM = mean+3*std
 	mm = mean-3*std
 	return mm, MM
+
+
+def find_closest(arr, val):
+	idx = np.abs(arr - val).argmin()
+	return idx
 
 
 
@@ -358,42 +363,42 @@ class MidpointNormalize(matplotlib.colors.Normalize):
 
 def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 	"""
-	
+
 	kwargs: 
 		- ShowPlot False(True)
 		- SavePlot False(True)
 		- SavingPathWithName (default '')
-	
+
 	"""
 	try:
 		SavingPathWithName = kwargs['SavingPathWithName']
 	except KeyError:
 		SavingPathWithName = ''
-	
+
 	try:
 		SavePlot = kwargs['SavePlot']
 	except KeyError:
 		SavePlot = False
-		
+
 	try:
 		ShowPlot = kwargs['ShowPlot']
 	except KeyError:
 		ShowPlot = False
-		
+
 	images_diff_0 = np.subtract(im_shifted.astype('float64'), im_static.astype('float64'))
 	images_diff_0_avg = np.average(np.abs(images_diff_0))
 #     images_diff_0_std = np.std(np.abs(images_diff_0))
 	images_diff_cr = np.subtract(im_coregistered.astype('float64'), im_static.astype('float64'))
 	images_diff_cr_avg = np.average(np.abs(images_diff_cr))
 #     images_diff_cr_std = np.average(np.std(images_diff_cr))
-	
+
 	mmm, MMM = 0, 255
 	mm0, MM0 = FindPlottingRange(images_diff_0)
 	mm, MM = FindPlottingRange(images_diff_cr)
-	
+
 	norm = MidpointNormalize(vmin=mm0, vmax=MM0, midpoint=0)
 	cmap = 'RdBu_r'
-	
+
 	fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(12,7))
 	im00 = ax[0,0].imshow(im_static, cmap='gray',vmin=mmm, vmax=MMM)
 	ax[0,0].set_title('Static Image')
@@ -412,7 +417,7 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 	divider = make_axes_locatable(ax[0,2])
 	cax = divider.append_axes('right', size='5%', pad=0.05)
 	cbar = fig.colorbar(im02, cax=cax, orientation='vertical')
-	
+
 	im10 = ax[1,0].imshow(im_static, cmap='gray',vmin=mmm, vmax=MMM)
 	ax[1,0].set_title('Static Image')
 	divider = make_axes_locatable(ax[1,0])
