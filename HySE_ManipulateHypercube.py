@@ -28,7 +28,7 @@ import HySE_UserTools
 
 
 def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
-	"""
+	info="""
 	Function to compute the hypercube. It inputs the path to the data and
 	the EdgePos output from the FindHypercube function (which indicates where
 	to find the start for each wavelenght for each identified sweep)
@@ -43,13 +43,14 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	- Wavelengths_list: List of wavelengths as measured in the data (panel 4 - panel 2)
 	
 	- kwargs (optional): Optional parameters
-				- BufferSize = integer : Number of frames to ignore between neighbouring 
-										 colours to avoid contamination by transition frames.
-										 Might need to be adjusted for very short or very large
-										 repetitions.
-										 Default to 10
-										 
+				- Help = False 
+				- Buffer = integer : Number of frames to ignore between neighbouring 
+					colours to avoid contamination by transition frames.
+					Might need to be adjusted for very short or very large repetitions.
+					Default to 6 
 				- Name = string
+				- SaveFig = True
+				- SaveArray = True
 										 
 	
 	Output:
@@ -63,16 +64,38 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	"""
 	## Check if the user has set the Buffer size
 	try: 
-		BufferSize = kwargs['BufferSize']
-		print(f'Buffer of frames to ignore between neighbouring wavelenghts set to {BufferSize}')
+		Buffer = kwargs['Buffer']
+		print(f'Buffer of frames to ignore between neighbouring wavelenghts set to 2x{Buffer}')
 	except KeyError:
-		BufferSize = 10
-		print(f'Buffer of frames to ignore between neighbouring wavelenghts set to default {BufferSize}')
+		Buffer = 6
+		print(f'Buffer of frames to ignore between neighbouring wavelenghts set to default 2x{Buffer}')
+
+	BufferSize = 2*Buffer
 	
 	try: 
 		Name = kwargs['Name']+'_'
 	except KeyError:
 		Name = ''
+
+	try: 
+		SaveFig = kwargs['SaveFig']+'_'
+	except KeyError:
+		SaveFig = True
+
+	try: 
+		SaveArray = kwargs['SaveArray']+'_'
+	except KeyError:
+		SaveArray = True
+
+	try: 
+		Help = kwargs['Help']+'_'
+	except KeyError:
+		Help = False
+
+	if Help:
+		print(info)
+		return 0, 0
+
 
 	try:
 		CropImDimensions = kwargs['CropImDimensions']
@@ -183,10 +206,12 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	Name = Name_withExtension.split('.')[0]
 	Path = DataPath.replace(Name_withExtension, '')
 	PathToSave = f'{Path}{time_now}_{Name}'
-	
-	plt.savefig(f'{PathToSave}_Hypercube.png')
-	np.savez(f'{PathToSave}_Hypercube.npz', Hypercube_sorted)
-	np.savez(f'{PathToSave}_Dark.npz', Darks)
+	if SaveFig:
+		plt.savefig(f'{PathToSave}_Hypercube.png')
+
+	if SaveArray:
+		np.savez(f'{PathToSave}_Hypercube.npz', Hypercube_sorted)
+		np.savez(f'{PathToSave}_AutoDark.npz', Darks)
 	return Hypercube_sorted, Darks
 
 

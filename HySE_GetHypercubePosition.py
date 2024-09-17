@@ -28,15 +28,36 @@ import HySE_UserTools
 
 
 def FindHypercube(DataPath, Wavelengths_list, **kwargs):
-	"""
+	info="""
 	Input: 
 	
 	- DataPath: Path to the data
 	
 	- kwargs: Parameters for the smoothing of the data (savgol filter) and finding peaks
 			  Sets to default numbers that typically give decent results if nothing is input
-			  
-			  See help for list of accepted kwargs
+				- Help = True: to print this help message')
+				- PlotGradient = True: To plot gratient of smoothed trace and detected peaks')
+					To see effect of other parameters when optimising')
+				- PrintPeaks = True: To print the list of all detected peaks and their positions')
+				- MaxPlateauSize = Integer: Set the maximal expected size for a plateau.')
+				- WindowLength = Integer: Window over which the smoothing of the trace is performed')
+						If the data consists of NxRGB cycles, this number should be a factor of 3')
+				- PolyOrder = Integer: Order of the polynomial used in smoothing (Savitzky-Golay)')
+				- PeakHeight = Float: Detection threshold applied to the gradient of the smoothed trace')
+						to find edges between neighbouring colours')
+				- PeakDistance = Integer: Minimal distance between neightbouring peaks/plateaux')
+						Depends on the repeat number, and will impact the detection of double plateaux')
+				- DarkMin = Integer: Set the minimal size of the long dark between succesive sweeps')
+						Depends on the repeat numbner, and will impact the detection of individial sweeps')
+				- PlateauSize = Integer: Set the expected average size for a plateau (in frame number)')
+						Depends on the repeat number and will impact how well double plateaux are handled')
+						Automatically adjusts expected size when plateaux are detected, but needs to be set')
+						manually if a full sweep could not be detected automatically.')
+				- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)')
+				- ReturnPeaks = True: if want the list of peaks and peak distances')
+						(for manual tests, for example if fewer than 8 colours')
+				- Ncolours = integer: if different from 8 (for example, if one FSK was off)')
+				- SaveFig = True: Whether to save figure
 				
 	Output:
 	
@@ -59,30 +80,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	except KeyError:
 		Help = False
 	if Help:
-		print(f'List of optional parameters:')
-		print(f'If none input, the code with set a default value for each.')
-		print(f'	- Help = True: to print this help message')
-		print(f'	- PlotGradient = True: To plot gratient of smoothed trace and detected peaks')
-		print(f'			To see effect of other parameters when optimising')
-		print(f'	- PrintPeaks = True: To print the list of all detected peaks and their positions')
-		print(f'	- MaxPlateauSize = Integer: Set the maximal expected size for a plateau.')
-		print(f'	- WindowLength = Integer: Window over which the smoothing of the trace is performed')
-		print(f'			If the data consists of NxRGB cycles, this number should be a factor of 3')
-		print(f'	- PolyOrder = Integer: Order of the polynomial used in smoothing (Savitzky-Golay)')
-		print(f'	- PeakHeight = Float: Detection threshold applied to the gradient of the smoothed trace')
-		print(f'			to find edges between neighbouring colours')
-		print(f'	- PeakDistance = Integer: Minimal distance between neightbouring peaks/plateaux')
-		print(f'			Depends on the repeat number, and will impact the detection of double plateaux')
-		print(f'	- DarkMin = Integer: Set the minimal size of the long dark between succesive sweeps')
-		print(f'			Depends on the repeat numbner, and will impact the detection of individial sweeps')
-		print(f'	- PlateauSize = Integer: Set the expected average size for a plateau (in frame number)')
-		print(f'			Depends on the repeat number and will impact how well double plateaux are handled')
-		print(f'			Automatically adjusts expected size when plateaux are detected, but needs to be set')
-		print(f'			manually if a full sweep could not be detected automatically.')
-		print(f'	- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)')
-		print(f'	- ReturnPeaks = True: if want the list of peaks and peak distances')
-		print(f'			(for manual tests, for example if fewer than 8 colours')
-		print(f'	- Ncolours = integer: if different from 8 (for example, if one FSK was off)')
+		print(info)
 		if ReturnPeaks:
 			return 0,0,0
 		else:
@@ -95,6 +93,12 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		PlotGradient = kwargs['PlotGradient']
 	except KeyError:
 		PlotGradient = False
+
+	## Check if SaveFig
+	try:
+		SaveFig = kwargs['SaveFig']
+	except KeyError:
+		SaveFig = True
 		
 	## Check if user wants to print the list of peaks and distances 
 	## between them (to optimise parameters)
@@ -211,7 +215,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	Name = Name_withExtension.split('.')[0]
 	Path = DataPath.replace(Name_withExtension, '')
 
-	if PlotGradient==False:
+	if SaveFig:
 		PathToSave = f'{Path}{time_now}_{Name}_Trace.png'
 		# plt.savefig(f'{cwd}/{time_now}_Trace.png')
 		print(f'Saving figure at this location: \n   {PathToSave }')

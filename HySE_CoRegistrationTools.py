@@ -42,6 +42,7 @@ def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wa
 		- DataSweep: List of 3D arrays. Each element in the list contains all frames in a plateau (wavelength)
 		- WhiteHypercube: White reference hypercube (3D array, assumed sorted)
 		- Dark: 2D array
+		- Wavelengths_list: not sorted
 		- kwargs 
 			- Buffer: sets the numner of frames to ignore on either side of a colour transition
 				Total number of frames removed = 2*Buffer (default 6)
@@ -201,7 +202,6 @@ def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wa
 	## Starting from static image to higher wavelengths
 	for u in range(StaticWav_index_sorted, Ncolours):
 		wav = Wavelengths_sorted[u]
-		print(f'  Wavelength = {wav} nm, u = {u} (going up)')
 		## Set static image for this wavelength
 		im_staticN = im_staticN_0
 		## Find wavelnegth index in raw data frame
@@ -236,7 +236,7 @@ def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wa
 						SavingPathWithName = SavingPath+Name
 
 					if i==Plot_Index:
-						HySe_UserTools.PlotCoRegistered(Nim_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+						HySE_UserTools.PlotCoRegistered(im_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
 
 		ImagesTemp = np.array(ImagesTemp)
 		ImAvg = np.average(ImagesTemp, axis=0)
@@ -285,7 +285,7 @@ def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wa
 						SavingPathWithName = SavingPath+Name
 
 					if i==Plot_Index:
-						HySe_UserTools.PlotCoRegistered(im_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+						HySE_UserTools.PlotCoRegistered(im_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
 
 		ImagesTemp = np.array(ImagesTemp)
 		ImAvg = np.average(ImagesTemp, axis=0)

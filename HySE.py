@@ -164,6 +164,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		- ReturnPeaks = True: if want the list of peaks and peak distances 
 			(for manual tests, for example if fewer than 8 colours 
 		- Ncolours = integer: if different from 8 (for example, if one FSK was off) 
+		- SaveFig = True
 	"""
 	try:
 		ReturnPeaks = kwargs['ReturnPeaks']
@@ -200,7 +201,7 @@ def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, Plate
 
 def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	"""
-	kwargs = BufferSize (10), Name ('')
+	kwargs = Help, BufferSize (10), Name (''), SaveFig, SaveArray
 	"""
 	Hypercube_sorted, Darks = HySE_ManipulateHypercube.ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs)
 	return Hypercube_sorted, Darks

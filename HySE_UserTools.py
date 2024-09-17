@@ -362,106 +362,111 @@ class MidpointNormalize(matplotlib.colors.Normalize):
 
 
 def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
-	"""
+    """
 
-	kwargs: 
-		- ShowPlot False(True)
-		- SavePlot False(True)
-		- SavingPathWithName (default '')
+    kwargs: 
+        - ShowPlot False(True)
+        - SavePlot False(True)
+        - SavingPathWithName (default '')
 
-	"""
-	try:
-		SavingPathWithName = kwargs['SavingPathWithName']
-	except KeyError:
-		SavingPathWithName = ''
+    """
+    try:
+        SavingPathWithName = kwargs['SavingPathWithName']
+    except KeyError:
+        SavingPathWithName = ''
 
-	try:
-		SavePlot = kwargs['SavePlot']
-	except KeyError:
-		SavePlot = False
+    try:
+        SavePlot = kwargs['SavePlot']
+    except KeyError:
+        SavePlot = False
 
-	try:
-		ShowPlot = kwargs['ShowPlot']
-	except KeyError:
-		ShowPlot = False
+    try:
+        ShowPlot = kwargs['ShowPlot']
+    except KeyError:
+        ShowPlot = False
 
-	images_diff_0 = np.subtract(im_shifted.astype('float64'), im_static.astype('float64'))
-	images_diff_0_avg = np.average(np.abs(images_diff_0))
+    images_diff_0 = np.subtract(im_shifted.astype('float64'), im_static.astype('float64'))
+    images_diff_0_avg = np.average(np.abs(images_diff_0))
 #     images_diff_0_std = np.std(np.abs(images_diff_0))
-	images_diff_cr = np.subtract(im_coregistered.astype('float64'), im_static.astype('float64'))
-	images_diff_cr_avg = np.average(np.abs(images_diff_cr))
+    images_diff_cr = np.subtract(im_coregistered.astype('float64'), im_static.astype('float64'))
+    images_diff_cr_avg = np.average(np.abs(images_diff_cr))
 #     images_diff_cr_std = np.average(np.std(images_diff_cr))
 
-	mmm, MMM = 0, 255
-	mm0, MM0 = FindPlottingRange(images_diff_0)
-	mm, MM = FindPlottingRange(images_diff_cr)
+#     mmm, MMM = 0, 255
+    mmm = min(np.amin(im_static), np.amin(im_shifted), np.amin(im_coregistered))
+    MMM = max(np.amax(im_static), np.amax(im_shifted), np.amax(im_coregistered))
+    mm0, MM0 = FindPlottingRange(images_diff_0)
+    mm, MM = FindPlottingRange(images_diff_cr)
 
-	norm = MidpointNormalize(vmin=mm0, vmax=MM0, midpoint=0)
-	cmap = 'RdBu_r'
+    norm = MidpointNormalize(vmin=mm0, vmax=MM0, midpoint=0)
+    cmap = 'RdBu_r'
 
-	fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(12,7))
-	im00 = ax[0,0].imshow(im_static, cmap='gray',vmin=mmm, vmax=MMM)
-	ax[0,0].set_title('Static Image')
-	divider = make_axes_locatable(ax[0,0])
-	cax = divider.append_axes('right', size='5%', pad=0.05)
-	cbar = fig.colorbar(im00, cax=cax, orientation='vertical')
+    m, M = FindPlottingRange(im_static)
+    fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(12,7))
+    im00 = ax[0,0].imshow(im_static, cmap='gray',vmin=m, vmax=M)
+    ax[0,0].set_title('Static Image')
+    divider = make_axes_locatable(ax[0,0])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im00, cax=cax, orientation='vertical')
 
-	im01 = ax[0,1].imshow(im_shifted, cmap='gray',vmin=mmm, vmax=MMM)
-	ax[0,1].set_title('Shifted Image')
-	divider = make_axes_locatable(ax[0,1])
-	cax = divider.append_axes('right', size='5%', pad=0.05)
-	cbar = fig.colorbar(im01, cax=cax, orientation='vertical')
+    m, M = FindPlottingRange(im_shifted)
+    im01 = ax[0,1].imshow(im_shifted, cmap='gray',vmin=m, vmax=M)
+    ax[0,1].set_title('Shifted Image')
+    divider = make_axes_locatable(ax[0,1])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im01, cax=cax, orientation='vertical')
 
-	im02 = ax[0,2].imshow(images_diff_0, cmap=cmap, norm=norm)
-	ax[0,2].set_title(f'Difference (no registration)\n avg {images_diff_0_avg:.2f}')
-	divider = make_axes_locatable(ax[0,2])
-	cax = divider.append_axes('right', size='5%', pad=0.05)
-	cbar = fig.colorbar(im02, cax=cax, orientation='vertical')
+    im02 = ax[0,2].imshow(images_diff_0, cmap=cmap, norm=norm)
+    ax[0,2].set_title(f'Difference (no registration)\n avg {images_diff_0_avg:.2f}')
+    divider = make_axes_locatable(ax[0,2])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im02, cax=cax, orientation='vertical')
 
-	im10 = ax[1,0].imshow(im_static, cmap='gray',vmin=mmm, vmax=MMM)
-	ax[1,0].set_title('Static Image')
-	divider = make_axes_locatable(ax[1,0])
-	cax = divider.append_axes('right', size='5%', pad=0.05)
-	cbar = fig.colorbar(im10, cax=cax, orientation='vertical')
+    m, M = FindPlottingRange(im_static)
+    im10 = ax[1,0].imshow(im_static, cmap='gray',vmin=m, vmax=M)
+    ax[1,0].set_title('Static Image')
+    divider = make_axes_locatable(ax[1,0])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im10, cax=cax, orientation='vertical')
 
-	im11 = ax[1,1].imshow(im_coregistered, cmap='gray',vmin=mmm, vmax=MMM)
-	ax[1,1].set_title('Coregistered Image')
-	divider = make_axes_locatable(ax[1,1])
-	cax = divider.append_axes('right', size='5%', pad=0.05)
-	cbar = fig.colorbar(im11, cax=cax, orientation='vertical')
+    m, M = FindPlottingRange(im_coregistered)
+    im11 = ax[1,1].imshow(im_coregistered, cmap='gray',vmin=m, vmax=M)
+    ax[1,1].set_title('Coregistered Image')
+    divider = make_axes_locatable(ax[1,1])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im11, cax=cax, orientation='vertical')
 
-	im12 = ax[1,2].imshow(images_diff_cr, cmap=cmap, norm=norm)
-	ax[1,2].set_title(f'Difference (with registration)\n avg {images_diff_cr_avg:.2f}')
-	divider = make_axes_locatable(ax[1,2])
-	cax = divider.append_axes('right', size='5%', pad=0.05)
-	cbar = fig.colorbar(im12, cax=cax, orientation='vertical')
+    im12 = ax[1,2].imshow(images_diff_cr, cmap=cmap, norm=norm)
+    ax[1,2].set_title(f'Difference (with registration)\n avg {images_diff_cr_avg:.2f}')
+    divider = make_axes_locatable(ax[1,2])
+    cax = divider.append_axes('right', size='5%', pad=0.05)
+    cbar = fig.colorbar(im12, cax=cax, orientation='vertical')
 
-	## Add grid to help see changes in images
-	(YY, XX) = im_static.shape
-	xm, ym = int(XX/2), int(YY/2)
-	xmm, ymm = int(xm/2), int(ym/2)
-	x_points = [xmm, xm, xm+xmm, 3*xmm]
-	y_points = [ymm, ym, ym+ymm, 3*ymm]
-	for i in range(0,3):
-		for j in range(0,2):
-			ax[j,i].set_xticks([])
-			ax[j,i].set_yticks([])
-			for k in range(0,4):
-				ax[j,i].axvline(x_points[k], c='limegreen', ls='dotted')
-				ax[j,i].axhline(y_points[k], c='limegreen', ls='dotted')
+    ## Add grid to help see changes in images
+    (YY, XX) = im_static.shape
+    xm, ym = int(XX/2), int(YY/2)
+    xmm, ymm = int(xm/2), int(ym/2)
+    x_points = [xmm, xm, xm+xmm, 3*xmm]
+    y_points = [ymm, ym, ym+ymm, 3*ymm]
+    for i in range(0,3):
+        for j in range(0,2):
+            ax[j,i].set_xticks([])
+            ax[j,i].set_yticks([])
+            for k in range(0,4):
+                ax[j,i].axvline(x_points[k], c='limegreen', ls='dotted')
+                ax[j,i].axhline(y_points[k], c='limegreen', ls='dotted')
 
-	plt.tight_layout()
-	if SavePlot:
-		if '.png' not in SavingPathWithName:
-			SavingPathWithName = SavingPathWithName+'_CoRegistration.png'
-		print(f'Saving figure @ {SavingPathWithName}')
-		# print(f'   Set SavingPathWithName=\'path\' to set saving path')
-		plt.savefig(f'{SavingPathWithName}')
-	if ShowPlot:
-		plt.show()
-	else:
-		plt.close()
-
+    plt.tight_layout()
+    if SavePlot:
+        if '.png' not in SavingPathWithName:
+            SavingPathWithName = SavingPathWithName+'_CoRegistration.png'
+        print(f'Saving figure @ {SavingPathWithName}')
+        # print(f'   Set SavingPathWithName=\'path\' to set saving path')
+        plt.savefig(f'{SavingPathWithName}')
+    if ShowPlot:
+        plt.show()
+    else:
+        plt.close()
 
 
 
