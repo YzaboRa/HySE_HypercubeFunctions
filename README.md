@@ -115,11 +115,12 @@ Output from NormaliseHypercube:
 
 ## To do
 - [ ] Mask images
-    - [ ] Mask specular reflections
-    - [ ] Mask areas/edges missing because of movement (co-registration)
+    - [x] Mask specular reflections
+    - [x] Mask areas/edges missing because of movement (co-registration)
 - [ ] Add function to brute force plateau detection with just plateau expected size (for when automatic detection doesn't work)
-- [ ] Add rotating co-registration (set static image as co-registrated image with closest wavelength, to avoid extra distortions)
+- [x] Add rotating co-registration (set static image as co-registrated image with closest wavelength, to avoid extra distortions)
 - [ ] Co-register + normalise multiple sweeps (combine/average frames)
+- [ ] Consider varying intensity for normalisation
 - [ ] Try rewritting as a class (see if it makes use more straightforward)
 
 ## Comments
