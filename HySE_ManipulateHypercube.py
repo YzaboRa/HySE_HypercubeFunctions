@@ -73,22 +73,22 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	BufferSize = 2*Buffer
 	
 	try: 
-		Name = kwargs['Name']+'_'
+		Name = kwargs['Name']
 	except KeyError:
 		Name = ''
 
 	try: 
-		SaveFig = kwargs['SaveFig']+'_'
+		SaveFig = kwargs['SaveFig']
 	except KeyError:
 		SaveFig = True
 
 	try: 
-		SaveArray = kwargs['SaveArray']+'_'
+		SaveArray = kwargs['SaveArray']
 	except KeyError:
 		SaveArray = True
 
 	try: 
-		Help = kwargs['Help']+'_'
+		Help = kwargs['Help']
 	except KeyError:
 		Help = False
 
@@ -217,7 +217,9 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 
 
-def NormaliseHypercube(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs):
+
+
+def NormaliseHypercube_Old(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs):
 	"""
 	Function that normalises the hypercube with the white reference
 	Input:

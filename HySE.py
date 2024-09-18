@@ -29,6 +29,7 @@ import HySE_ImportData
 import HySE_CoRegistrationTools
 import HySE_GetHypercubePosition
 import HySE_ManipulateHypercube
+import HySE_Mask
 
 
 
@@ -234,6 +235,9 @@ def GetDark_FromData(DataAll, EdgePos, **kwargs):
 	DarkAvg = HySE_ManipulateHypercube.GetDark(DataAll, EdgePos, **kwargs)
 	return DarkAvg
 
+def NormaliseFrames(image, image_white, image_dark):
+	imageN = HySE_ManipulateHypercube.NormaliseFrames(image, image_white, image_dark)
+	return imageN
 
 
 
@@ -241,6 +245,25 @@ def GetDark_FromData(DataAll, EdgePos, **kwargs):
 
 
 
+## Functions from HySE_Mask
+
+def ConvertMaskToBinary(mask):
+	binary_mask = HySE_Mask.ConvertMaskToBinary(mask)
+	return binary_mask
+
+def GetMask(frame, **kwargs):
+	"""
+	kwargs: LowCutoff, HighCutoff, PlotMask, Help
+	"""
+	combined_mask = HySE_Mask.GetMask(frame, **kwargs)
+	return combined_mask
+
+def CoRegisterImages_WithMask(im_static, im_moving, **kwargs):
+	"""
+	kwargs: StaticMask, MovingMask, Affine, Verbose, Help
+	"""
+	im_coregistered = HySE_Mask.CoRegisterImages_WithMask(im_static, im_moving, **kwargs)
+	return im_coregistered
 
 
 

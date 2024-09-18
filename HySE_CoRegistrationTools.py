@@ -785,6 +785,11 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 		Affine = kwargs['Affine']
 	except KeyError:
 		Affine = False
+
+	try: 
+		Verbose = kwargs['Verbose']
+	except KeyError:
+		Verbose = False
 		
 		
 	t0 = time.time()
@@ -796,7 +801,8 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	elastixImageFilter = sitk.ElastixImageFilter()
 
 	## Turn off console
-	elastixImageFilter.LogToConsoleOff()
+	if Verbose==False:
+		elastixImageFilter.LogToConsoleOff()
 
 	## Set image parameters
 	elastixImageFilter.SetFixedImage(im_static_se)
