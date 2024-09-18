@@ -123,4 +123,4 @@ Output from NormaliseHypercube:
 - [ ] Try rewritting as a class (see if it makes use more straightforward)
 
 ## Comments
-- If the functions cannote be loaded, try adding an empty \__init__\.py file in the same folder
+- If the functions cannote be loaded, try adding an empty \__init__.py file in the same folder
