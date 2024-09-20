@@ -120,8 +120,8 @@ Output from NormaliseHypercube:
 - [ ] Add function to brute force plateau detection with just plateau expected size (for when automatic detection doesn't work)
 - [x] Add rotating co-registration (set static image as co-registrated image with closest wavelength, to avoid extra distortions)
 - [ ] Co-register + normalise multiple sweeps (combine/average frames)
-- [ ] Consider varying intensity for normalisation
-- [ ] Try rewritting as a class (see if it makes use more straightforward)
+- [ ] Fine-tune normalisation to account for intensity oscillations (3-frame cycle)
+- [ ] Investitgate dark subtraction
 
 ## Comments
 - If the functions cannote be loaded, try adding an empty \__init__.py file in the same folder
