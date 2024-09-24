@@ -29,6 +29,7 @@ plt.rcParams["font.family"] = "arial"
 
 # import HySE_ImportData
 import HySE_UserTools
+import HySE_ManipulateHypercube
 
 def ConvertMaskToBinary(mask):
 	mask_binary = 1-mask*1
