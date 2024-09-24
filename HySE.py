@@ -95,49 +95,6 @@ def ImportData_imageio(Path, *Coords, **kwargs):
 
 
 
-## Functions from HySE_CoRegistrationTools
-
-def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
-	"""
-	kwargs = Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), PlotDiff (False), SavingPath (''), Plot_PlateauList ([5])
-			 Plot_Index (14), SaveHypercube (False), Help (False)
-	"""
-	Hypercube = HySE_CoRegistrationTools.SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
-	return Hypercube
-
-def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
-	"""
-	kwargs = CropImDimensions (CCRC HD video), Buffer (6), ImStatic_Plateau (1), ImStatic_Index (8), SaveHypercube (True)
-			 PlotDiff (False), SavingPath (''), Plot_PlateauList ('All'), Plot_Index (14)
-	"""
-	Hypercube = HySE_CoRegistrationTools.GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs)
-	return Hypercube
-
-def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
-	"""
-	kwargs = Buffer (6), ImStatic_Plateau (1), ImStatic_Index (8), SaveHypercube (True)
-			 PlotDiff (False), SavingPath (''), Plot_PlateauList ('All'), Plot_Index (14)
-	"""
-	HypercubeNormalised = HySE_CoRegistrationTools.SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
-	return HypercubeNormalised
-
-def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
-	"""
-	kwargs = Buffer (6), ImStatic_Plateau (1), ImStatic_Index (8), SaveHypercube (True)
-			 PlotDiff (False), SavingPath (''), Plot_PlateauList ('All'), Plot_Index (14)
-	"""
-	Hypercube_sorted = HySE_CoRegistrationTools.SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
-	return Hypercube_sorted
-
-def CoRegisterImages(im_static, im_shifted, **kwargs):
-	"""
-	kwargs = Affine (False)
-	"""
-	im_coregistered, shift_val, time_taken = HySE_CoRegistrationTools.CoRegisterImages(im_static, im_shifted, **kwargs)
-	return im_coregistered, shift_val, time_taken
-
-
-
 ## Functions from HySE_GetHypercubePosition
 
 def FindHypercube(DataPath, Wavelengths_list, **kwargs):
@@ -241,7 +198,46 @@ def NormaliseFrames(image, image_white, image_dark):
 
 
 
+## Functions from HySE_CoRegistrationTools
 
+def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
+	"""
+	kwargs = Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), PlotDiff (False), SavingPath (''), Plot_PlateauList ([5])
+			 Plot_Index (14), SaveHypercube (False), Help (False)
+	"""
+	Hypercube = HySE_CoRegistrationTools.SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
+	return Hypercube
+
+def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
+	"""
+	kwargs = CropImDimensions (CCRC HD video), Buffer (6), ImStatic_Plateau (1), ImStatic_Index (8), SaveHypercube (True)
+			 PlotDiff (False), SavingPath (''), Plot_PlateauList ('All'), Plot_Index (14)
+	"""
+	Hypercube = HySE_CoRegistrationTools.GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs)
+	return Hypercube
+
+def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
+	"""
+	kwargs = Buffer (6), ImStatic_Plateau (1), ImStatic_Index (8), SaveHypercube (True)
+			 PlotDiff (False), SavingPath (''), Plot_PlateauList ('All'), Plot_Index (14)
+	"""
+	HypercubeNormalised = HySE_CoRegistrationTools.SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
+	return HypercubeNormalised
+
+def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
+	"""
+	kwargs = Buffer (6), ImStatic_Plateau (1), ImStatic_Index (8), SaveHypercube (True)
+			 PlotDiff (False), SavingPath (''), Plot_PlateauList ('All'), Plot_Index (14)
+	"""
+	Hypercube_sorted = HySE_CoRegistrationTools.SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
+	return Hypercube_sorted
+
+def CoRegisterImages(im_static, im_shifted, **kwargs):
+	"""
+	kwargs = Affine (False)
+	"""
+	im_coregistered, shift_val, time_taken = HySE_CoRegistrationTools.CoRegisterImages(im_static, im_shifted, **kwargs)
+	return im_coregistered, shift_val, time_taken
 
 
 
@@ -250,6 +246,18 @@ def NormaliseFrames(image, image_white, image_dark):
 def ConvertMaskToBinary(mask):
 	binary_mask = HySE_Mask.ConvertMaskToBinary(mask)
 	return binary_mask
+
+def BooleanMaskOperation(bool_white, bool_wav):
+	bool_result = HySE_Mask.BooleanMaskOperation(bool_white, bool_wav)
+	return bool_result
+
+def TakeWavMaskDiff(mask_white, mask_shifted):
+	result = HySE_Mask.TakeWavMaskDiff(mask_white, mask_shifted)
+	return result
+
+def CombineMasks(mask_white, mask_shifted):
+	mask = HySE_Mask.CombineMasks(mask_white, mask_shifted)
+	return mask
 
 def GetMask(frame, **kwargs):
 	"""
@@ -265,6 +273,22 @@ def CoRegisterImages_WithMask(im_static, im_moving, **kwargs):
 	im_coregistered = HySE_Mask.CoRegisterImages_WithMask(im_static, im_moving, **kwargs)
 	return im_coregistered
 
+def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
+	"""
+	kwargs: Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), LowCutoff (False), HighCutoff (False), SavingPath (''), 
+	SaveHypercube (True), PlotDiff (False), Plot_PlateauList (5, 'All'/'None'), Plot_Index (14), Help
+	"""
+	Hypercube = HySE_Mask.SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
+	return Hypercube
+
+
+def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
+	"""
+	kwargs: Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), LowCutoff (False), HighCutoff (False), SavingPath (''), 
+	SaveHypercube (True), PlotDiff (False), Plot_PlateauList (5, 'All'/'None'), Plot_Index (14), Help
+	"""
+	Hypercube = HySE_Mask.SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
+	return Hypercube
 
 
 
