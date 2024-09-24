@@ -36,76 +36,85 @@ def ConvertMaskToBinary(mask):
 	
 
 def GetMask(frame, **kwargs):
-	info='''
-	Inputs:
-		- frame (2D array)
-		- kwargs
-			- LowCutoff: noise level, default 0.8
-			- HighCutoff: specular reflection, default none
-			- PlotMask: plotting masks and image, default False
-			- Help
-	
-	Outputs:
-		- Combined masks
-	
-	'''
-	try:
-		Help = kwargs['Help']
-	except KeyError:
-		Help = False
-	if Help:
-		print(info)
-		return 0
-		
-	try:
-		LowCutoff = kwargs['LowCutoff']
-	except KeyError:
-		LowCutoff = 0.8
-		
-	try:
-		HighCutoff = kwargs['HighCutoff']
-	except KeyError:
-		HighCutoff = np.nanmax(frame)+1
-	
-	try:
-		PlotMasks = kwargs['PlotMasks']
-	except KeyError:
-		PlotMasks = False
-		
-	frame_masqued_low = np.ma.masked_less_equal(frame, LowCutoff)
-	mask_low = np.ma.getmaskarray(frame_masqued_low)
-	
-	frame_masqued_high = np.ma.masked_greater_equal(frame, HighCutoff)
-	mask_high = np.ma.getmaskarray(frame_masqued_high)
-	
-	mask_combined = np.ma.mask_or(mask_low, mask_high)
+    info='''
+    Inputs:
+        - frame (2D array)
+        - kwargs
+            - LowCutoff: noise level, default 0.8
+            - HighCutoff: specular reflection, default none
+            - PlotMask: plotting masks and image, default False
+            - Help
 
-	if PlotMasks:
-		fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(13,3.5))
+    Outputs:
+        - Combined masks
 
-		m, M = HySE_UserTools.FindPlottingRange(frame)
-		im0 = ax[0].imshow(frame, vmin=m, vmax=M)
-		ax[0].set_title('frame')
-		divider = make_axes_locatable(ax[0])
-		cax = divider.append_axes('right', size='5%', pad=0.05)
-		plt.colorbar(im0, cax=cax)
+    '''
+    try:
+        Help = kwargs['Help']
+    except KeyError:
+        Help = False
+    if Help:
+        print(info)
+        return 0
 
-		im1 = ax[1].imshow(frame_masqued_low, vmin=m, vmax=M)
-		ax[1].set_title('frame_masqued - Low values')
-		divider = make_axes_locatable(ax[1])
-		cax = divider.append_axes('right', size='5%', pad=0.05)
-		plt.colorbar(im1, cax=cax)
+    try:
+        LowCutoff = kwargs['LowCutoff']
+    except KeyError:
+        LowCutoff = False
 
-		im2 = ax[2].imshow(frame_masqued_high, vmin=m, vmax=M)
-		ax[2].set_title('frame_masqued - High values')
-		divider = make_axes_locatable(ax[2])
-		cax = divider.append_axes('right', size='5%', pad=0.05)
-		plt.colorbar(im2, cax=cax)
+    try:
+        HighCutoff = kwargs['HighCutoff']
+    except KeyError:
+        HighCutoff = False
 
-		plt.tight_layout()
-		plt.show()
-	return mask_combined
+    try:
+        PlotMasks = kwargs['PlotMasks']
+    except KeyError:
+        PlotMasks = False
+        
+    if isinstance(LowCutoff, bool):
+    	## If no cutoff input, don't mask anything
+        mask_low = np.zeros(frame.shape).astype('bool')
+    else:
+        frame_masqued_low = np.ma.masked_less_equal(frame, LowCutoff)
+        mask_low = np.ma.getmaskarray(frame_masqued_low)
 
+    if isinstance(HighCutoff, bool):
+    	## If no cutoff input, don't mask anything
+        mask_high = np.zeros(frame.shape).astype('bool')
+    else:
+        frame_masqued_high = np.ma.masked_greater_equal(frame, HighCutoff)
+        mask_high = np.ma.getmaskarray(frame_masqued_high)
+
+    ## Combine low and high cutoff masks. 
+    ## Make sure that the shape of the array is conserved even if no mask
+    mask_combined = np.ma.mask_or(mask_low, mask_high, shrink=False)
+
+    if PlotMasks:
+        fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(13,3.5))
+
+        m, M = HySE_UserTools.FindPlottingRange(frame)
+        im0 = ax[0].imshow(frame, vmin=m, vmax=M)
+        ax[0].set_title('frame')
+        divider = make_axes_locatable(ax[0])
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        plt.colorbar(im0, cax=cax)
+
+        im1 = ax[1].imshow(frame_masqued_low, vmin=m, vmax=M)
+        ax[1].set_title('frame_masqued - Low values')
+        divider = make_axes_locatable(ax[1])
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        plt.colorbar(im1, cax=cax)
+
+        im2 = ax[2].imshow(frame_masqued_high, vmin=m, vmax=M)
+        ax[2].set_title('frame_masqued - High values')
+        divider = make_axes_locatable(ax[2])
+        cax = divider.append_axes('right', size='5%', pad=0.05)
+        plt.colorbar(im2, cax=cax)
+
+        plt.tight_layout()
+        plt.show()
+    return mask_combined
 
 
 def CoRegisterImages_WithMask(im_static, im_moving, **kwargs):
