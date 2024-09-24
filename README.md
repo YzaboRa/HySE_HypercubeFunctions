@@ -122,7 +122,6 @@ Output from NormaliseHypercube:
 - [x] Add rotating co-registration (set static image as co-registrated image with closest wavelength, to avoid extra distortions)
 - [ ] Co-register + normalise multiple sweeps (combine/average frames)
 - [ ] Fine-tune normalisation to account for intensity oscillations (3-frame cycle)
-- [ ] Investitgate dark subtraction
 
 ## Comments
 - If the functions cannote be loaded, try adding an empty \__init__.py file in the same folder
