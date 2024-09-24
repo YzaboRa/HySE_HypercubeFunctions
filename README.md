@@ -54,6 +54,7 @@ EdgePosWhite = HySE.FindHypercube(vidPathWhite, Wavelengths_list, PlotGradient=T
 
 ## We can also at this stage compute the average dark frame between the sweeps:
 Dark = HySE.GetDark(vidPath, EdgePos)
+## Optional inputs include Buffer=6, DarkRepeat=3, CropImDimensions=[x0,xe, y0,ye]
 
 ```
 Once the sweeps have been properly identified, we can compute the hypercube. There are several options.
@@ -100,10 +101,10 @@ HySE.PlotHypercube(Hypercube, Wavelengths=Wavelengths_list, SavePlot=False)
 
 ```
 
-### Option 2: Co-registration with Normalisation
+### Option 2: Co-registration only
 
 ```python
-## Select the sweep (currently can only co-register a single sweep)
+## Select the sweep
 Nsweep = 5
 ## Define where and how the data will be saved
 SP = f'{SavingPath}{Name}_NSweep{Nsweep}'
@@ -112,43 +113,36 @@ Hypercube = HySE.GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_
 ## Optional inputs include Plot_PlateauList='None'/'All'/[1,2, ..], Plot_Index=7, PlotDiff=True
 
 
-## Plot
-HySE.PlotHypercube(Hypercube, Wavelengths=Wavelengths_list)
-## Make video
-HySE.MakeHypercubeVideo(Hypercube, SP)
-
-
-## Get Dark:
-Dark = HySE.GetDark(vidPath, EdgePos)
-## Optional inputs include Buffer=6, DarkRepeat=3, CropImDimensions=[x0,xe, y0,ye]
-
-
-## Obtain the white reference hypercube to be used to normalise the illumination profile
-## By performing the same steps on the white reference data
-
-Name_White = 'White_5x_OD_2cm'
-vidPath_White = SavingPath+Name_White+'.mp4'
-##   # Note that the parameters are different for the white reference in this example because the repeat number is different
-EdgePos_White = HySE.FindHypercube(vidPath_White, Wavelengths_list, MaxSize=60, DarkMin=150, PeakHeight=0.1, PlateauSize=54)
-
 ```
-The hypercubes (saved as npy files) can be visualised with the Hypercube visualiser
+
+### Option 3: Normalisation only  (no co-registration, no masking)
 
 Alternatively, if coregistration is not required, the hypercube can be computed in the following way: 
 
 ```python
-
 Hypercube, Dark = HySE.ComputeHypercube(vidPath, EdgePos, Wavelengths_list, Name=Name)
 Hypercube_White, Dark_White = HySE.ComputeHypercube(vidPath_White, EdgePos_White, Wavelengths_list, Name=Name)
 
 ## And then normalised
 HypercubeNormalised = HySE.NormaliseHypercube(vidPath, Hypercube, Hypercube_White, Dark_White, Wavelengths_list)
 
-## The hypercubes (saved as npy files) can be visualised with the Hypercube visualiser
+```
+The hypercubes and list of wavelengths (saved as npy files) can be visualised with the HypercubeVisualiser.
+Plots and videos can also be generated the following way:
+
+```python
+## Define where and how the data will be saved
+SP = f'{SavingPath}{Name}_NSweep{Nsweep}'
+## Plot
+HySE.PlotHypercube(Hypercube, Wavelengths=Wavelengths_list)
+## Make video
+HySE.MakeHypercubeVideo(Hypercube, SP)
 ```
 
-Some functions have a specific help flag that print a full description of inputs, outputs and constraints. 
-A general help statement can be obtained for all functions by executing the following:
+
+Some functions have a specific help flag that print a full description of inputs, outputs and constraints (Help=True). 
+A succint general help statement listing optional inputs and default values can be obtained for all functions by executing the following:
+
 ```python
 help(HySE.FUNCTION)
 ```
@@ -170,6 +164,7 @@ Output from NormaliseHypercube:
     - [x] Mask specular reflections
     - [x] Mask areas/edges missing because of movement (co-registration)
     - [ ] Mask images in plots
+    - [ ] Implement option to automatically asjust masking for specular reflection
 - [ ] Add function to brute force plateau detection with just plateau expected size (for when automatic detection doesn't work)
 - [x] Add rotating co-registration (set static image as co-registrated image with closest wavelength, to avoid extra distortions)
 - [ ] Co-register + normalise multiple sweeps (combine/average frames)
