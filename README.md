@@ -49,8 +49,60 @@ vidPath = DataPath+Name+'.mp4'
 ## to help optimising
 EdgePos = HySE.FindHypercube(vidPath, Wavelengths_list, PeakHeight=0.045)
 
+## We will need to to do the same thing for the white reference data:
+EdgePosWhite = HySE.FindHypercube(vidPathWhite, Wavelengths_list, PlotGradient=True)
 
-## Once the sweeps have been properly identified, compute the hypercube
+## We can also at this stage compute the average dark frame between the sweeps:
+Dark = HySE.GetDark(vidPath, EdgePos)
+
+```
+Once the sweeps have been properly identified, we can compute the hypercube. There are several options.
+
+### Option 1: Co-registration with Normalisation and masking 
+
+This option offers to mask in each frame the regions where there is not enoug light (as determined with the white reference) 
+and those where there is too much (for example, to get rid of specular reflections).
+Each frame is then normalised according to the white reference and then co-registered.
+The co-registration can either be done according to a fixed static image (defined by wavelength), or a rolling method can be implemented
+where the co-registration is propagated outwards from the static image. This is an attempt to limit drastic changes in the relative intensities 
+between the static and moving image, which the co-registration algorithm doesn't always handle properly. 
+
+Note that the rolling co-registration method, because it uses previously co-registered images as static images, can propagate and 
+amplify distortions. Use with care.
+
+```python
+## We need to identify which sweeps to analyse (the option to do them all at once is not yet available):
+Nsweep = 3
+NsweepWhite = 3
+
+## And then we can import the full data for those selected sweep:
+DataSweep = HySE.GetSweepData_FromPath(vidPath, EdgePos, Nsweep)
+DataSweepWhite = HySE.GetSweepData_FromPath(vidPathWhite, EdgePosWhite, NsweepWhite)
+
+## We can average the white reference for the normalisation by computing the hypercube:
+HypercubeWhite, _ = HySE.ComputeHypercube(vidPathWhite, EdgePosWhite, Wavelengths_list)
+
+## Defining Cutoffs for Masking:
+HC = 255 ## HighCutoff (saturation)
+LC = 0.5 ## LowCutoff (if there is not enough light -> amplify noise)
+
+## Now we have everything we need to compute the normalise, masked hypercube
+## If required, Help=True prints a detailed description of both functions
+
+## For the standard implementation:
+Hypercube = HySE.SweepCoRegister_MaskedWithNormalisation(DataSweep, HypercubeWhite, Dark, Wavelengths_list, ImStatic_Index=7, LowCutoff=LC, HighCutoff=HC)
+
+## And for the rolling co-registration implentation:
+Hypercube = HySE.SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, HypercubeWhite, Dark_Hypercube, Wavelengths_list, ImStatic_Index=7, LowCutoff=LC, HighCutoff=HC)
+
+## Can plot result
+HySE.PlotHypercube(Hypercube, Wavelengths=Wavelengths_list, SavePlot=False)
+
+```
+
+### Option 2: Co-registration with Normalisation
+
+```python
 ## Select the sweep (currently can only co-register a single sweep)
 Nsweep = 5
 ## Define where and how the data will be saved
