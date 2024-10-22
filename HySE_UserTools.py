@@ -471,16 +471,18 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 
 
 def PlotHypercube(Hypercube, **kwargs):
-	"""
+	info="""
 	Function to plot the hypercube.
 	Input
 		- Hypercube (np array)
 		- kwargs:
 			- Wavelengths: List of sorted wavelengths (for titles colours, default black)
+			- Masks
 			- SavePlot: (default False)
 			- SavingPathWithName: Where to save the plot if SavePlot=True
 			- ShowPlot: (default True)
 			- SameScale (default False)
+			- Help
 
 	Output:
 		- Figure (4x4, one wavelength per subfigure)
@@ -490,6 +492,13 @@ def PlotHypercube(Hypercube, **kwargs):
 
 	"""
 
+	try:
+		Help = kwargs['Help']
+	except KeyError:
+		Help = False
+	if Help:
+		print(info)
+		return 
 
 	try:
 		Wavelengths = kwargs['Wavelengths']
@@ -517,6 +526,12 @@ def PlotHypercube(Hypercube, **kwargs):
 	except KeyError:
 		SameScale = False
 
+	try:
+		Masks = kwargs['Masks']
+		MaskPlots = True
+	except KeyError:
+		MaskPlots = False
+
 	Wavelengths_sorted = np.sort(Wavelengths)
 
 
@@ -534,10 +549,18 @@ def PlotHypercube(Hypercube, **kwargs):
 				else:
 					wav = Wavelengths_sorted[nn]
 					RGB = wavelength_to_rgb(wav)
-				if SameScale:
-					ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0, vmax=np.amax(Hypercube))
+
+				if MaskPlots:
+					array = Hypercube[nn,:,:]
+					mask = Masks[nn,:,:]
+					ArrayToPlot = np.ma.array(array, mask=mask)
 				else:
-					ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray', vmin=0, vmax=np.average(Hypercube[nn,:,:])*3)
+					ArrayToPlot = Hypercube[nn,:,:]
+
+				if SameScale:
+					ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=np.amax(Hypercube))
+				else:
+					ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=np.average(ArrayToPlot)*3)
 				if wav==0:
 					ax[j,i].set_title(f'{nn} wavelength', c=RGB)
 				else:

@@ -58,7 +58,7 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 
 def PlotHypercube(Hypercube, **kwargs):
 	"""
-	kwargs = Wavelengths, SavePlot (False), SavingPathWithName (''), ShowPlot (True), SameScale (False)
+	kwargs = Wavelengths, Masks, SavePlot (False), SavingPathWithName (''), ShowPlot (True), SameScale (False), Help
 	"""
 	HySE_UserTools.PlotHypercube(Hypercube, **kwargs)
 
@@ -275,20 +275,20 @@ def CoRegisterImages_WithMask(im_static, im_moving, **kwargs):
 
 def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
 	"""
-	kwargs: Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), LowCutoff (False), HighCutoff (False), SavingPath (''), 
-	SaveHypercube (True), PlotDiff (False), Plot_PlateauList (5, 'All'/'None'), Plot_Index (14), Help
+	kwargs: Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), LowCutoff (False), HighCutoff (False), Mask_CombinedAvgCutoff (0.01),
+	SavingPath (''), SaveHypercube (True), PlotDiff (False), Plot_PlateauList (5, 'All'/'None'), Plot_Index (14), Help
 	"""
-	Hypercube = HySE_Mask.SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
-	return Hypercube
+	Hypercube, hypercube_masks = HySE_Mask.SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
+	return Hypercube, hypercube_masks
 
 
 def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
 	"""
-	kwargs: Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), LowCutoff (False), HighCutoff (False), SavingPath (''), 
-	SaveHypercube (True), PlotDiff (False), Plot_PlateauList (5, 'All'/'None'), Plot_Index (14), Help
+	kwargs: Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), LowCutoff (False), HighCutoff (False), Mask_CombinedAvgCutoff (0.01),
+	SavingPath (''), SaveHypercube (True), PlotDiff (False), Plot_PlateauList (5, 'All'/'None'), Plot_Index (14), Help
 	"""
-	Hypercube = HySE_Mask.SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
-	return Hypercube
+	Hypercube, hypercube_masks = HySE_Mask.SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
+	return Hypercube, hypercube_masks
 
 
 

@@ -236,106 +236,6 @@ def CoRegisterImages_WithMask(im_static, im_moving, **kwargs):
 	return im_coregistered
 
 
-# def CoRegisterImages_WithMask(im_static, im_moving, **kwargs):
-# 	info='''
-# 	Function to co-register two images. Allows the option to mask some regions of both images.
-# 	Input:
-# 		- im_static: 2D numpy array
-# 		- im_moving: 23 numpy array, same size as im_static
-	# 	- kwargs:
-	# 		- StaticMask: 2d numpy array, same size as im_static. Type uint8 or bool_
-	# 		- MovingMask: 2d numpy array, same size as im_static. Type uint8 or bool_
-	# 		- Affine: whether to apply affine transform instead of Bspline (default False)
-	# 		- Verbose: wheter to enable the console output from elastix (default False)
-	# 			NB: signficant output. Do no enable executing in a loop
-	# 		- Help
-	# Output:
-	# 	- im_coregistered
-	
-	# '''
-	# try: 
-	# 	Help = kwargs['Help']
-	# except KeyError:
-	# 	Help = False
-	# if Help:
-	# 	print(info)
-	# 	return 0
-		
-	# try: 
-	# 	Affine = kwargs['Affine']
-	# except KeyError:
-	# 	Affine = False
-
-	# try: 
-	# 	Verbose = kwargs['Verbose']
-	# except KeyError:
-	# 	Verbose = False
-		
-	# ## Convert the numpy array to simple elestix format
-	# im_static_se = sitk.GetImageFromArray(im_static)
-	# im_moving_se = sitk.GetImageFromArray(im_moving)
-	
-	# ## Create object
-	# elastixImageFilter = sitk.ElastixImageFilter()
-
-	# ## Turn off console
-	# if Verbose==False:
-	# 	elastixImageFilter.LogToConsoleOff()
-
-	# ## Set image parameters
-	# elastixImageFilter.SetFixedImage(im_static_se)
-	# elastixImageFilter.SetMovingImage(im_moving_se)
-
-	# ## Check if user has set a mask for the stating image
-# 	try: 
-# 		StaticMask = kwargs['StaticMask']
-# 		if type(StaticMask[0,0])==np.bool_:
-# 			print(f'Boolean mask. Converting to binary')
-# 			StaticMask = ConvertMaskToBinary(StaticMask)
-# 		elif type(StaticMask[0,0])!=np.uint8:
-# 			print(f'StaticMask is neither in uint8 or boolean format, code won\'t run')
-# 		StaticMask_se = sitk.GetImageFromArray(StaticMask)
-# 		elastixImageFilter.SetFixedMask(StaticMask_se)
-# 	except KeyError:
-# 		pass
-	
-# 	## Check if user has set a mask for the moving image
-# 	try: 
-# 		MovingMask = kwargs['MovingMask']
-# 		if type(MovingMask[0,0])==np.bool_:
-# 			print(f'Boolean mask. Converting to binary')
-# 			MovingMask = ConvertMaskToBinary(MovingMask)
-# 		elif type(MovingMask[0,0])!=np.uint8:
-# 			print(f'MovingMask is neither in uint8 or boolean format, code won\'t run')
-# 		MovingMask_se = sitk.GetImageFromArray(MovingMask)
-# 		elastixImageFilter.SetFixedMask(MovingMask)
-# 	except KeyError:
-# 		pass
-	
-
-# 	## Set transform parameters
-# 	if Affine:
-# 		parameterMap = sitk.GetDefaultParameterMap('affine')
-# 	else:
-# 		parameterMap = sitk.GetDefaultParameterMap('translation')
-# 		## Select metric robust to intensity differences (non uniform)
-# 		parameterMap['Metric'] = ['AdvancedMattesMutualInformation'] 
-# 		## Select Bspline transform, which allows for non rigid and non uniform deformations
-# 		parameterMap['Transform'] = ['BSplineTransform']
-		
-# #     parameterMap["UseFixedMask"] = ["true"]
-# #     parameterMap["UseMovingMask"] = ["true"]
-
-# 	elastixImageFilter.SetParameterMap(parameterMap)
-
-# 	## Execute
-# 	result = elastixImageFilter.Execute()
-# 	## Convert result to numpy array
-# 	im_coregistered = sitk.GetArrayFromImage(result)
-# 	return im_coregistered
-
-
-
 
 
 def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
@@ -354,6 +254,8 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
 			- LowCutoff: For masking (default False)
 			- HighCutoff: For masking (default False)
+			- Mask_CombinedAvgCutoff (default 0.01): when the average value of the combined masks is above this cutoff, only high
+				cutoff is used for the moving mask in the coregistration
 			- SavingPath: Where to save figure (default '')
 			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
 				(default True)
@@ -369,7 +271,6 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 
 	"""
 	
-	mask_combined_avg_cutoff = 0.01
 
 	try:
 		Help = kwargs['Help']
@@ -377,7 +278,7 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 		Help = False
 	if Help:
 		print(info)
-		return 0
+		return 0, 0
 
 	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
 	MaxIndex = np.amax(AllIndices)
@@ -386,6 +287,11 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 	## Sort Wavelengths
 	order_list = np.argsort(Wavelengths_list)
 	Wavelengths_sorted = Wavelengths_list[order_list]
+
+	try:
+		mask_combined_avg_cutoff = kwargs['Mask_CombinedAvgCutoff']
+	except KeyError:
+		mask_combined_avg_cutoff = 0.01
 
 	try:
 		Buffer = kwargs['Buffer']
@@ -514,6 +420,7 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')
 
 	Hypercube = np.zeros(WhiteHypercube.shape)
+	Hypercube_Masks = np.zeros(WhiteHypercube.shape)
 
 	## Starting from static image to higher wavelengths
 	for u in range(0, Ncolours):
@@ -530,6 +437,7 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 		
 		## Now co-register all frames
 		ImagesTemp = []
+		MasksTemp = []
 		(NN, YY, XX) = DataSweep[c].shape
 #         print(f'Index range: {Buffer}, {NN-Buffer}')
 		for i in range(Buffer,NN-Buffer):
@@ -538,6 +446,7 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 			mask_white = GetMask(im_white, LowCutoff=LowCutoff, HighCutoff=HighCutoff)
 			mask_shifted = GetMask(im_shifted, LowCutoff=0, HighCutoff=HighCutoff)
 			mask_combined = TakeWavMaskDiff(mask_white, mask_shifted)
+			MasksTemp.append(mask_combined*1)
 			mask_combined_avg = np.average(mask_combined)
 			
 			## Normalise before co-registration
@@ -573,8 +482,13 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 						HySE_UserTools.PlotCoRegistered(im_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
 
 		ImagesTemp = np.array(ImagesTemp)
+		MasksTemp = np.array(MasksTemp)
 		ImAvg = np.average(ImagesTemp, axis=0)
+		MasksAvg = np.round(np.average(MasksTemp, axis=0),0)
+		MasksAvg = MasksAvg.astype('uint8')
+
 		Hypercube[u,:,:] = ImAvg
+		Hypercube_Masks[u,:,:] = MasksAvg
 
 
 	## Calculate time taken
@@ -589,18 +503,23 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 			NameTot = SavingPath.split('/')[-1]
 			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
 			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
+			Name_mask = NameTot.replace('.png', '')+f'_CoregisteredHypercube_masks.npz'
 			SavingPathHypercube = SavingPath.replace(NameTot, Name)
 			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
+			SavingPathMasks = SavingPath.replace(NameTot, Name_mask)
 		else:
 			Name = f'_CoregisteredHypercube.npz'
 			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
+			Name_mask = f'_CoregisteredHypercube_masks.npz'
 			SavingPathHypercube = SavingPath+Name
 			SavingPathWavelengths = SavingPath+Name_wav
+			SavingPathMasks = SavingPath+Name_mask
 
 		np.savez(f'{SavingPathHypercube}', Hypercube)
 		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
+		np.savez(f'{SavingPathMasks}', Hypercube_Masks)
 
-	return Hypercube
+	return Hypercube, Hypercube_Masks
 
 
 def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
@@ -625,6 +544,8 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
 			- LowCutoff: For masking (default False)
 			- HighCutoff: For masking (default False)
+			- Mask_CombinedAvgCutoff (default 0.01): when the average value of the combined masks is above this cutoff, only high
+				cutoff is used for the moving mask in the coregistration
 			- SavingPath: Where to save figure (default '')
 			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
 				(default True)
@@ -640,7 +561,6 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 
 	"""
 	
-	mask_combined_avg_cutoff = 0.01
 
 	try:
 		Help = kwargs['Help']
@@ -648,7 +568,7 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 		Help = False
 	if Help:
 		print(info)
-		return 0
+		return 0, 0
 
 	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
 	MaxIndex = np.amax(AllIndices)
@@ -661,9 +581,14 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 	Wavelengths_sorted = Wavelengths_list[order_list]
 
 	try:
-		Buffer = kwargs['Buffer']
+		mask_combined_avg_cutoff = kwargs['Mask_CombinedAvgCutoff']
 	except KeyError:
-		Buffer = 6
+		mask_combined_avg_cutoff = 0.01
+
+	try:
+		mask_combined_avg_cutoff = kwargs['Buffer']
+	except KeyError:
+		mask_combined_avg_cutoff = 6
 		
 	try:
 		LowCutoff = kwargs['LowCutoff']
@@ -787,6 +712,7 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')
 
 	Hypercube = np.zeros(WhiteHypercube.shape)
+	Hypercube_Masks = np.zeros(WhiteHypercube.shape)
 
 	## Starting from static image to higher wavelengths
 	for u in range(StaticWav_index_sorted, Ncolours):
@@ -802,6 +728,7 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 		
 		## Now co-register all frames
 		ImagesTemp = []
+		MasksTemp = []
 		(NN, YY, XX) = DataSweep[c].shape
 		for i in range(Buffer,NN-Buffer):
 			im_shifted = DataSweep[c][i,:,:]
@@ -809,6 +736,7 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 			mask_white = GetMask(im_white, LowCutoff=LowCutoff, HighCutoff=HighCutoff)
 			mask_shifted = GetMask(im_shifted, LowCutoff=LowCutoff, HighCutoff=HighCutoff)
 			mask_combined = TakeWavMaskDiff(mask_white, mask_shifted)
+			MasksTemp.append(mask_combined)
 			mask_combined_avg = np.average(mask_combined)
 #             PlotMasksAndIm(mask_white, mask_shifted, mask_combined, im_shifted)
 			
@@ -844,8 +772,13 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 						HySE_UserTools.PlotCoRegistered(im_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
 
 		ImagesTemp = np.array(ImagesTemp)
+		MasksTemp = np.array(MasksTemp)
 		ImAvg = np.average(ImagesTemp, axis=0)
+		MasksAvg = np.round(np.average(MasksTemp, axis=0),0)
+		MasksAvg = MasksAvg.astype('uint8')
+
 		Hypercube[u,:,:] = ImAvg
+		Hypercube_Masks[u,:,:] = MasksAvg
 
 
 	im_staticN_0 = im_staticN_init
@@ -925,17 +858,22 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 			NameTot = SavingPath.split('/')[-1]
 			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
 			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
+			Name_mask = NameTot.replace('.png', '')+f'_CoregisteredHypercube_masks.npz'
 			SavingPathHypercube = SavingPath.replace(NameTot, Name)
 			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
+			SavingPathMasks = SavingPath.replace(NameTot, Name_mask)
 		else:
 			Name = f'_CoregisteredHypercube.npz'
 			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
+			Name_mask = f'_CoregisteredHypercube_masks.npz'
 			SavingPathHypercube = SavingPath+Name
 			SavingPathWavelengths = SavingPath+Name_wav
+			SavingPathMasks = SavingPath+Name_mask
 
 		np.savez(f'{SavingPathHypercube}', Hypercube)
 		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
+		np.savez(f'{SavingPathMasks}', Hypercube_Masks)
 
-	return Hypercube
+	return Hypercube, Hypercube_Masks
 
 
