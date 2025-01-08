@@ -57,6 +57,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 				- ReturnPeaks = True: if want the list of peaks and peak distances')
 						(for manual tests, for example if fewer than 8 colours')
 				- Ncolours = integer: if different from 8 (for example, if one FSK was off)')
+				- fps = integer (frame per second)
 				- SaveFig = True: Whether to save figure
 				
 	Output:
@@ -106,6 +107,12 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		PrintPeaks = kwargs['PrintPeaks']
 	except KeyError:
 		PrintPeaks = False
+
+	## Check if user is setting fps
+	try:
+		fps = kwargs['fps']
+	except KeyError:
+		fps = 60*3
 		
 	## Check if user has set the max plateau size
 	## Used to handle double plateaux when neighbouring wavelengths
@@ -165,7 +172,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	SweepColors = ['royalblue', 'indianred', 'limegreen', 'gold', 'darkturquoise', 'magenta', 'orangered', 'cyan', 'lime', 'hotpink']
 	fs = 4
 	
-	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,4))
+	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,5))
 	ax.plot(trace, '.-', color='gray', label='Dazzle - White')
 	ax.plot(SGfilter, '-', color='black', label='Savitzky-Golay filter')
 	
@@ -179,7 +186,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 				ax.axvline(peaks[i], ls='dotted', c='red', label='Plateau edge')
 			else:
 				ax.axvline(peaks[i], ls='dotted', c='red')
-		ax2.set_ylabel('Gradient', c='limegreen', fontsize=fs)
+		ax2.set_ylabel('Gradient', c='limegreen', fontsize=16)
 		ax2.yaxis.label.set_color('limegreen')
 		
 		
@@ -197,9 +204,24 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 				RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i-2])
 				ax.text(s+7, SGfilter[s+10]+3, np.round(Wavelengths_list[i-2],0), fontsize=fs, c=RGB)
 
-
 	# ax.legend()
+	## Add time label
 	ax.set_xlabel('Frame', fontsize=16)
+	ax3 = ax.twiny()
+	ax3.set_xlim(ax.get_xlim())
+	NN = len(trace)
+	Nticks = 10
+	# new_tick_locations = np.array([NN/5, 2*NN/5, 3*NN/5, 4*NN/5, NN-1])
+	new_tick_locations = np.array([k*NN/Nticks for k in range(0,Nticks+1)])
+	def tick_function(x):
+		V = x/fps
+		return ["%.0f" % z for z in V]
+
+	ax3.set_xticks(new_tick_locations)
+	ax3.set_xticklabels(tick_function(new_tick_locations))
+
+	ax3.set_xlabel('Time [s]', fontsize=16)
+
 	ax.set_ylabel('Average image intensity', fontsize=16)
 
 	ax.set_title('Trace and Detected Sweeps', fontsize=20)
