@@ -36,6 +36,11 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	- kwargs: Parameters for the smoothing of the data (savgol filter) and finding peaks
 			  Sets to default numbers that typically give decent results if nothing is input
 				- Help = True: to print this help message')
+				- Blind = False: Ignores automatic edge detection if sets to true, and only uses 
+						expected plateau/dark sizes to find the frames for each wavelength.
+						To use when the data is too noisy to clearly see edges (~brute force method)
+						Expects: PlateauSize,
+						         StartFrame
 				- PlotGradient = True: To plot gratient of smoothed trace and detected peaks')
 					To see effect of other parameters when optimising')
 				- PrintPeaks = True: To print the list of all detected peaks and their positions')
@@ -53,6 +58,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 						Depends on the repeat number and will impact how well double plateaux are handled')
 						Automatically adjusts expected size when plateaux are detected, but needs to be set')
 						manually if a full sweep could not be detected automatically.')
+				- StartFrame = Integer: Indicates where the sweep begins, when using the blind method
 				- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)')
 				- ReturnPeaks = True: if want the list of peaks and peak distances')
 						(for manual tests, for example if fewer than 8 colours')
@@ -123,7 +129,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		print(f'Max plateau size set to {MaxPlateauSize}')
 	except KeyError:
 		MaxPlateauSize = 40
-		print(f'Max plateay size set to default of {MaxPlateauSize}')
+		print(f'Max plateau size set to default of {MaxPlateauSize}')
 	  
 	## Check if user has set the minimum size of long dark (separating sweeps)
 	## Will vary with repeat number, should be larger than MaxPlateauSize
@@ -149,6 +155,12 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	except KeyError:
 		Ncolours = 8
 
+	## Check if Blind
+	try:
+		Blind = kwargs['Blind']
+	except KeyError:
+		Blind = False
+
 	
 	## Import trace
 
@@ -165,8 +177,24 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	peaks_dist = GetPeakDist(peaks, 0, len(trace))
 	if PrintPeaks:
 		print(peaks_dist) 
-	## Find sweep positions, will print edges for each identified sweep
-	EdgePos, Stats = GetEdgesPos(peaks_dist, DarkMin, 0, len(trace), MaxPlateauSize, PlateauSize, Ncolours, printInfo=True)
+
+	if Blind:
+		try:
+			StartFrame = kwargs['StartFrame']
+		except KeyError:
+			StartFrame = 0
+			print(f'Using the blind method. Set StartFrame to indicate where the sweep begins')
+		
+		EdgePos = []
+		for i in range(0,2*Ncolours+1): ## 0 to 16 + dark
+			EdgePos.append([StartFrame+PlateauSize*(i+1), PlateauSize])
+		EdgePos=np.array([EdgePos])
+
+		print(EdgePos)
+
+	else:
+		## Find sweep positions, will print edges for each identified sweep
+		EdgePos, Stats = GetEdgesPos(peaks_dist, DarkMin, 0, len(trace), MaxPlateauSize, PlateauSize, Ncolours, printInfo=True)
 	
 	## Now make figure to make sure all is right
 	SweepColors = ['royalblue', 'indianred', 'limegreen', 'gold', 'darkturquoise', 'magenta', 'orangered', 'cyan', 'lime', 'hotpink']
@@ -201,8 +229,8 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 			elif (i==8):
 				ax.text(s, SGfilter[s+10]-3, 'DARK', fontsize=fs, c='black')
 			else:
-				RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i-2])
-				ax.text(s+7, SGfilter[s+10]+3, np.round(Wavelengths_list[i-2],0), fontsize=fs, c=RGB)
+				RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i-1])
+				ax.text(s+8, SGfilter[s+10]+3, np.round(Wavelengths_list[i-1],0), fontsize=fs, c=RGB)
 
 	# ax.legend()
 	## Add time label
