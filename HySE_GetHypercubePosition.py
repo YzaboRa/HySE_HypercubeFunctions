@@ -187,7 +187,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		
 		EdgePos = []
 		for i in range(0,2*Ncolours+1): ## 0 to 16 + dark
-			EdgePos.append([StartFrame+PlateauSize*(i+1), PlateauSize])
+			EdgePos.append([int(StartFrame+PlateauSize*(i+1)), int(PlateauSize)])
 		EdgePos=np.array([EdgePos])
 
 		print(EdgePos)

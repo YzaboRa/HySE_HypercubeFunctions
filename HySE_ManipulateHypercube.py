@@ -111,8 +111,8 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	## Sort Wavelengths
 	order_list = np.argsort(Wavelengths_list)
 	Wavelengths_sorted = Wavelengths_list[order_list]
-	print(f'Wavelengths_list: \n{Wavelengths_list}\n\n')
-	print(f'Wavelengths_sorted: \n{Wavelengths_sorted}\n\n')
+	# print(f'Wavelengths_list: \n{Wavelengths_list}\n\n')
+	# print(f'Wavelengths_sorted: \n{Wavelengths_sorted}\n\n')
 
 	
 	## Set parameters
@@ -139,14 +139,18 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		Hypercube_n = []
 		for i in range(0,Nplateaux):
 			if i not in DarkN: ## Skip the middle
-				if Nsweep==1:
-					framestart = EdgePos[i,0]
-					plateau_size = EdgePos[i,1]
-				else:
-					framestart = EdgePos[n,i,0]
-					plateau_size = EdgePos[n,i,1]
+				# if Nsweep==1:
+				# 	framestart = EdgePos[i,0]
+				# 	plateau_size = EdgePos[i,1]
+				# else:
+				framestart = EdgePos[n,i,0]
+				plateau_size = EdgePos[n,i,1]
+				
 				s = framestart+bs
 				e = framestart+plateau_size-bs
+				# print(f's: {s}, e: {e}')
+				s = int(s)
+				e = int(e)
 				## Print how many frames are averaged
 				## React if number unreasonable (too small or too large)
 				if i==0: 
@@ -155,12 +159,13 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				data_avg = np.average(data_sub, axis=0)
 				Hypercube_n.append(data_avg)
 			else: ## Dark
-				if Nsweep==1:
-					framestart = EdgePos[i,0]
-					plateau_size = EdgePos[i,1]
-				else:
-					framestart = EdgePos[n,i,0]
-					plateau_size = EdgePos[n,i,1]
+				# if Nsweep==1:
+				# 	framestart = EdgePos[i,0]
+				# 	plateau_size = EdgePos[i,1]
+				# else:
+				framestart = EdgePos[n,i,0]
+				plateau_size = EdgePos[n,i,1]
+
 				s = framestart+bs
 				e = framestart+plateau_size-bs
 				data_sub = data[s:e,:,:]
