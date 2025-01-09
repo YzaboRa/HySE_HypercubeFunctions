@@ -170,7 +170,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	
 	## Now make figure to make sure all is right
 	SweepColors = ['royalblue', 'indianred', 'limegreen', 'gold', 'darkturquoise', 'magenta', 'orangered', 'cyan', 'lime', 'hotpink']
-	fs = 4
+	fs = 9
 	
 	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,5))
 	ax.plot(trace, '.-', color='gray', label='Dazzle - White')
@@ -195,10 +195,10 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		for i in range(0,len(edges)):
 			s, ll = edges[i,0], edges[i,1]
 			ax.axvline(s, ls='dashed', c=SweepColors[k])
-			if i<7:
+			if i<8:
 				RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i])
 				ax.text(s+7, SGfilter[s+10]+3, Wavelengths_list[i], fontsize=fs, c=RGB)
-			elif (i==7 or i==8):
+			elif (i==8):
 				ax.text(s, SGfilter[s+10]-3, 'DARK', fontsize=fs, c='black')
 			else:
 				RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i-2])

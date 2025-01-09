@@ -111,6 +111,8 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	## Sort Wavelengths
 	order_list = np.argsort(Wavelengths_list)
 	Wavelengths_sorted = Wavelengths_list[order_list]
+	print(f'Wavelengths_list: \n{Wavelengths_list}\n\n')
+	print(f'Wavelengths_sorted: \n{Wavelengths_sorted}\n\n')
 
 	
 	## Set parameters
@@ -171,17 +173,20 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	Hypercube = np.average(Hypercube,axis=0)
 	Darks = np.average(Darks,axis=0)
 	
-	## Sort hypercube according to the order_list
-	## Ensures wavelenghts are ordered from blue to red
+	# Sort hypercube according to the order_list
+	# Ensures wavelenghts are ordered from blue to red
 	Hypercube_sorted = []
 	for k in range(0,Hypercube.shape[0]):
 		Hypercube_sorted.append(Hypercube[order_list[k]])
 	Hypercube_sorted = np.array(Hypercube_sorted)
+
+	# Hypercube_sorted = Hypercube
+	# print(f'order_list: \n{order_list}')
 	
 	## MakeFigure
 	nn = 0
-	Mavg = np.average(Hypercube)
-	Mstd = np.std(Hypercube)
+	Mavg = np.average(Hypercube_sorted)
+	Mstd = np.std(Hypercube_sorted)
 	MM = Mavg+5*Mstd
 	fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
 	for j in range(0,4):
@@ -189,7 +194,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 			if nn<17:
 				wav = Wavelengths_sorted[nn]
 				RGB = HySE_UserTools.wavelength_to_rgb(wav)
-				ax[j,i].imshow(Hypercube[nn,:,:], cmap='gray')
+				ax[j,i].imshow(Hypercube_sorted[nn,:,:], cmap='gray')
 				ax[j,i].set_title(f'{wav} nm', c=RGB)
 				ax[j,i].set_xticks([])
 				ax[j,i].set_yticks([])
