@@ -710,6 +710,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 			# print(f'DARK')
 			pass
 		else:
+			print(f'Working on: {c} /{Ncolours}')
 			ImagesTemp = []
 			(NN, YY, XX) = DataSweep[c].shape
 			for i in range(Buffer,NN-Buffer):
