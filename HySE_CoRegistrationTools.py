@@ -738,6 +738,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 
 			
 			ImagesTemp = np.array(ImagesTemp)
+			print(f'  Averaging {len(ImagesTemp)} frames')
 			ImAvg = np.average(ImagesTemp, axis=0)
 			Hypercube.append(ImAvg)
 			

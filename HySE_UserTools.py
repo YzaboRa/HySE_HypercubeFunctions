@@ -571,6 +571,8 @@ def PlotHypercube(Hypercube, **kwargs):
 			else:
 				ax[j,i].set_xticks([])
 				ax[j,i].set_yticks([])
+
+	plt.tight_layout()
 	if SavePlot:
 		if '.png' not in SavingPathWithName:
 			SavingPathWithName = SavingPathWithName+'_Hypercube.png'

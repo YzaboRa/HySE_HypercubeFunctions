@@ -179,20 +179,25 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		print(peaks_dist) 
 
 	if Blind:
+		print(f'Finding sweeps - Blind method')
 		try:
 			StartFrame = kwargs['StartFrame']
+			print(f'   StartFrame: {StartFrame}')
 		except KeyError:
 			StartFrame = 0
 			print(f'Using the blind method. Set StartFrame to indicate where the sweep begins')
 		
 		EdgePos = []
 		for i in range(0,2*Ncolours+1): ## 0 to 16 + dark
-			EdgePos.append([int(StartFrame+PlateauSize*(i+1)), int(PlateauSize)])
+			startpos = int(StartFrame+PlateauSize*(i))
+			# print(f'.    i={i}, startpos= {startpos}')
+			EdgePos.append([startpos, int(PlateauSize)])
 		EdgePos=np.array([EdgePos])
 
 		print(EdgePos)
 
 	else:
+		print(f'Finding sweeps - Automatic method')
 		## Find sweep positions, will print edges for each identified sweep
 		EdgePos, Stats = GetEdgesPos(peaks_dist, DarkMin, 0, len(trace), MaxPlateauSize, PlateauSize, Ncolours, printInfo=True)
 	
