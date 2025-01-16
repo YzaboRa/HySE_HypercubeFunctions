@@ -200,6 +200,19 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		print(f'Finding sweeps - Automatic method')
 		## Find sweep positions, will print edges for each identified sweep
 		EdgePos, Stats = GetEdgesPos(peaks_dist, DarkMin, 0, len(trace), MaxPlateauSize, PlateauSize, Ncolours, printInfo=True)
+
+	# Averages = []
+	# for k in range(0,len(EdgePos)):
+	# 	Averages_sub = []
+	# 	EdgePos_sub = EdgePos[k,:,:]
+	# 	WW, _ = EdgePos_sub.shape
+	# 	for w in range(0,WW):
+	# 		start = EdgePos_sub[w,0]
+	# 		end = EdgePos_sub[w,0]+EdgePos_sub[w,1]
+	# 		Averages_sub.append(np.average(trace[start:end]))
+	# 	Averages.append(Averages_sub)
+	# Averages = np.array(Averages)
+
 	
 	## Now make figure to make sure all is right
 	SweepColors = ['royalblue', 'indianred', 'limegreen', 'gold', 'darkturquoise', 'magenta', 'orangered', 'cyan', 'lime', 'hotpink']

@@ -586,9 +586,9 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 		mask_combined_avg_cutoff = 0.01
 
 	try:
-		mask_combined_avg_cutoff = kwargs['Buffer']
+		Buffer = kwargs['Buffer']
 	except KeyError:
-		mask_combined_avg_cutoff = 6
+		Buffer = 6
 		
 	try:
 		LowCutoff = kwargs['LowCutoff']
