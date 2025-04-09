@@ -51,11 +51,12 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				- Name = string
 				- SaveFig = True
 				- SaveArray = True
+				- Order = True. Set to False if doing wavelength unmixing
 										 
 	
 	Output:
 	- Hypercube_sorted: Hypercube contained in a 3D array, with wavelengths sorted according
-						to order_list
+						to order_list (if Order=True)
 						Shape (Nwavelengths, 1080, 1920) for HD format
 						
 	- Dark: Dark average contained in 2D array
@@ -81,6 +82,14 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		SaveFig = kwargs['SaveFig']
 	except KeyError:
 		SaveFig = True
+
+	try: 
+		Order = kwargs['Order']
+	except KeyError:
+		Order = True
+
+	if Order==False:
+		print(f'Order set to False: the hypercube output will be out of order. Use for spectral unmixing.')
 
 	try: 
 		SaveArray = kwargs['SaveArray']
@@ -145,7 +154,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				# else:
 				framestart = EdgePos[n,i,0]
 				plateau_size = EdgePos[n,i,1]
-				
+
 				s = framestart+bs
 				e = framestart+plateau_size-bs
 				# print(f's: {s}, e: {e}')
@@ -180,10 +189,13 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	
 	# Sort hypercube according to the order_list
 	# Ensures wavelenghts are ordered from blue to red
-	Hypercube_sorted = []
-	for k in range(0,Hypercube.shape[0]):
-		Hypercube_sorted.append(Hypercube[order_list[k]])
-	Hypercube_sorted = np.array(Hypercube_sorted)
+	if Order:
+		Hypercube_sorted = []
+		for k in range(0,Hypercube.shape[0]):
+			Hypercube_sorted.append(Hypercube[order_list[k]])
+		Hypercube_sorted = np.array(Hypercube_sorted)
+	else:
+		Hypercube_sorted = Hypercube
 
 	# Hypercube_sorted = Hypercube
 	# print(f'order_list: \n{order_list}')
@@ -200,7 +212,10 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				wav = Wavelengths_sorted[nn]
 				RGB = HySE_UserTools.wavelength_to_rgb(wav)
 				ax[j,i].imshow(Hypercube_sorted[nn,:,:], cmap='gray')
-				ax[j,i].set_title(f'{wav} nm', c=RGB)
+				if Order:
+					ax[j,i].set_title(f'{wav} nm', c=RGB)
+				else:
+					ax[j,i].set_title(f'im {nn}')
 				ax[j,i].set_xticks([])
 				ax[j,i].set_yticks([])
 				nn = nn+1
