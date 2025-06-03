@@ -68,28 +68,14 @@ def GetMask(frame, **kwargs):
 		- Combined masks
 
 	'''
-	try:
-		Help = kwargs['Help']
-	except KeyError:
-		Help = False
+	Help = kwargs.get('Help', False)
 	if Help:
 		print(info)
 		return 0
 
-	try:
-		LowCutoff = kwargs['LowCutoff']
-	except KeyError:
-		LowCutoff = False
-
-	try:
-		HighCutoff = kwargs['HighCutoff']
-	except KeyError:
-		HighCutoff = False
-
-	try:
-		PlotMasks = kwargs['PlotMasks']
-	except KeyError:
-		PlotMasks = False
+	LowCutoff = kwargs.get('LowCutoff', False)
+	HighCutoff = kwargs.get('HighCutoff', False)
+	PlotMasks = kwargs.get('PlotMasks', False)
 		
 	if isinstance(LowCutoff, bool):
 		## If no cutoff input, don't mask anything
@@ -154,23 +140,13 @@ def CoRegisterImages_WithMask(im_static, im_moving, **kwargs):
 		- im_coregistered
 
 	'''
-	try: 
-		Help = kwargs['Help']
-	except KeyError:
-		Help = False
+	Help = kwargs.get('Help', False)
 	if Help:
 		print(info)
 		return 0
 
-	try: 
-		Affine = kwargs['Affine']
-	except KeyError:
-		Affine = False
-
-	try: 
-		Verbose = kwargs['Verbose']
-	except KeyError:
-		Verbose = False
+	Affine = kwargs.get('Affine', False)
+	Verbose = kwargs.get('Verbose', False)
 
 	## Convert the numpy array to simple elestix format
 	im_static_se = sitk.GetImageFromArray(im_static)
@@ -271,11 +247,7 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 
 	"""
 	
-
-	try:
-		Help = kwargs['Help']
-	except KeyError:
-		Help = False
+	Help = kwargs.get('Help', False)
 	if Help:
 		print(info)
 		return 0, 0
@@ -288,108 +260,83 @@ def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wav
 	order_list = np.argsort(Wavelengths_list)
 	Wavelengths_sorted = Wavelengths_list[order_list]
 
-	try:
-		mask_combined_avg_cutoff = kwargs['Mask_CombinedAvgCutoff']
-	except KeyError:
-		mask_combined_avg_cutoff = 0.01
+	mask_combined_avg_cutoff = kwargs.get('mask_combined_avg_cutoff', 0.01)
+	Buffer = kwargs.get('Buffer', 6)
+	LowCutoff = kwargs.get('LowCutoff', False)
+	HighCutoff = kwargs.get('HighCutoff', False)
 
-	try:
-		Buffer = kwargs['Buffer']
-	except KeyError:
-		Buffer = 6
-		
-	try:
-		LowCutoff = kwargs['LowCutoff']
-	except KeyError:
-		LowCutoff = False
-		print(f'LowCutoff set to False')
-		
-	try:
-		HighCutoff = kwargs['HighCutoff']
-	except KeyError:
-		HighCutoff = False
-		print(f'HighCutoff set to False')
-
-	try:
-		ImStatic_Index = kwargs['ImStatic_Index']
+	ImStatic_Index = kwargs.get('ImStatic_Index')
+	if not ImStatic_Index:
+		ImStatic_Index = 8
+		if MinIndex>ImStatic_Index:
+			ImStatic_Index = int(MinIndex/2)
+			print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
+	else:
 		if ImStatic_Index<5 or ImStatic_Index<Buffer:
 			print(f'Careful! You have set ImStatic_Index < 5 or < Buffer ')
 			print(f'	This index risks being in the range of unreliable frames too close to a colour transition.')
 		if ImStatic_Index>(MinIndex-Buffer):
 			print(f'Careful! You have set ImStatic_Index  > (MinIndex - Buffer')
 			print(f'	This index risks being in the range of unreliable frames too close to a colour transition.')
-	except KeyError:
-		ImStatic_Index = 8
-		if MinIndex>ImStatic_Index:
-			ImStatic_Index = int(MinIndex/2)
-			print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
 
-	try:
-		ImStatic_Wavelength = kwargs['ImStatic_Wavelength']
-		StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
-		StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
-		ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
-		print(f'ImStatic_Wavelength set to {ImStatic_Wavelength} nm')
-	except KeyError:
+
+	ImStatic_Wavelength = kwargs.get('ImStatic_Wavelength')
+	if not ImStatic_Wavelength:
 		ImStatic_Wavelength = 550
 		StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
 		StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
 		ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
 		print(f'ImStatic_Wavelength set by default closest to 550, to {ImStatic_Wavelength} nm')
-
+	else:
+		StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
+		StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
+		ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
+		print(f'ImStatic_Wavelength set to {ImStatic_Wavelength} nm')
 
 	print(f'Static image: {ImStatic_Wavelength} nm (index/plateau {StaticWav_index}), index {ImStatic_Index}. Use ImStatic_Wavelength and ImStatic_Index to change it.')
 	print(f'   NB: ImStatic_Index refers to the frame number in a given plateau/wavelenght used as initial static image. Not to be confused with array index,')
 
 
-	try:
-		ImStatic_Plateau = kwargs['ImStatic_Plateau']
-		print(f'Please input ImStatic_Wavelength instead (in nm)')
-	except KeyError:
-		pass
-
-
-	try: 
-		PlotDiff = kwargs['PlotDiff']
-	except KeyError:
-		PlotDiff = False
-
+	PlotDiff = kwargs.get('PlotDiff', False)
 	if PlotDiff:
 		print(f'PlotDiff set to True. Use \'Plot_PlateauList=[]\' or \'All\' and Plot_Index=int to set')
 
-	try: 
-		SavingPath = kwargs['SavingPath']
-	except KeyError:
+
+	SavingPath = kwargs.get('SavingPath')
+	if not SavingPath:
 		SavingPath = ''
 		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
 
-	try: 
-		Plot_PlateauList = kwargs['Plot_PlateauList']
+
+	Plot_PlateauList = kwargs.get('Plot_PlateauList')
+	if not Plot_PlateauList:
+		Plot_PlateauList = [5]
+		print(f'Set Plot_PlateauList and Plot_Index to set images to plot')
+	else:
 		if isinstance(Plot_PlateauList, int):
 			Plot_PlateauList = [Plot_PlateauList]
-	except:
-		print(f'Set Plot_PlateauList and Plot_Index to set images to plot')
-		Plot_PlateauList = [5]
 
 
-	try: 
-		Plot_Index = kwargs['Plot_Index']
-		if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
-			print(f'PlotIndex is outside the range of indices that will be analysed ({Buffer}, {MinIndex-Buffer})')
-			Plot_Index = int(MinIndex/2)
-			print(f'	Seeting it to {PlotIndex}')
-	except:
+	Plot_Index = kwargs.get('Plot_Index')
+	if not Plot_Index:
 		Plot_Index = 14
 		print(f'MinIndex = {MinIndex}, MinIndex-Buffer = {MinIndex-Buffer}')
 		if Plot_Index>(MinIndex-Buffer):
 			Plot_Index = int(MinIndex/2)
 			print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
+	else:
+		if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
+			print(f'PlotIndex is outside the range of indices that will be analysed ({Buffer}, {MinIndex-Buffer})')
+			Plot_Index = int(MinIndex/2)
+			print(f'	Seeting it to {PlotIndex}')
 
-	try:
-		SaveHypercube = kwargs['SaveHypercube']
+
+	
+
+	SaveHypercube = kwargs.get('SaveHypercube', True)
+	if SaveHypercube:
 		print(f'SaveHypercube set to {SaveHypercube}')
-	except:
-		SaveHypercube = True
+
 
 	print(f'Buffer set to {Buffer}')
 
@@ -561,11 +508,7 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 
 	"""
 	
-
-	try:
-		Help = kwargs['Help']
-	except KeyError:
-		Help = False
+	Help = kwargs.get('Help', False)
 	if Help:
 		print(info)
 		return 0, 0
@@ -580,108 +523,84 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 	order_list = np.argsort(Wavelengths_list)
 	Wavelengths_sorted = Wavelengths_list[order_list]
 
-	try:
-		mask_combined_avg_cutoff = kwargs['Mask_CombinedAvgCutoff']
-	except KeyError:
-		mask_combined_avg_cutoff = 0.01
+	mask_combined_avg_cutoff = kwargs.get('mask_combined_avg_cutoff', 0.01)
+	Buffer = kwargs.get('Buffer', 6)
 
-	try:
-		Buffer = kwargs['Buffer']
-	except KeyError:
-		Buffer = 6
-		
-	try:
-		LowCutoff = kwargs['LowCutoff']
-	except KeyError:
-		LowCutoff = False
-		print(f'LowCutoff set to False')
-		
-	try:
-		HighCutoff = kwargs['HighCutoff']
-	except KeyError:
-		HighCutoff = False
-		print(f'HighCutoff set to False')
+	LowCutoff = kwargs.get('LowCutoff', False)
+	HighCutoff = kwargs.get('HighCutoff', False)
 
-	try:
-		ImStatic_Index = kwargs['ImStatic_Index']
+
+	ImStatic_Index = kwargs.get('ImStatic_Index')
+	if not ImStatic_Index:
+		ImStatic_Index = 8
+		if MinIndex>ImStatic_Index:
+			ImStatic_Index = int(MinIndex/2)
+			print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
+	else:
 		if ImStatic_Index<5 or ImStatic_Index<Buffer:
 			print(f'Careful! You have set ImStatic_Index < 5 or < Buffer ')
 			print(f'	This index risks being in the range of unreliable frames too close to a colour transition.')
 		if ImStatic_Index>(MinIndex-Buffer):
 			print(f'Careful! You have set ImStatic_Index  > (MinIndex - Buffer')
 			print(f'	This index risks being in the range of unreliable frames too close to a colour transition.')
-	except KeyError:
-		ImStatic_Index = 8
-		if MinIndex>ImStatic_Index:
-			ImStatic_Index = int(MinIndex/2)
-			print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
 
-	try:
-		ImStatic_Wavelength = kwargs['ImStatic_Wavelength']
-		StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
-		StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
-		ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
-		print(f'ImStatic_Wavelength set to {ImStatic_Wavelength} nm')
-	except KeyError:
+
+	ImStatic_Wavelength = kwargs.get('ImStatic_Wavelength')
+	if not ImStatic_Wavelength:
 		ImStatic_Wavelength = 550
 		StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
 		StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
 		ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
 		print(f'ImStatic_Wavelength set by default closest to 550, to {ImStatic_Wavelength} nm')
+	else:
+		ImStatic_Wavelength = kwargs['ImStatic_Wavelength']
+		StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
+		StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
+		ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
+		print(f'ImStatic_Wavelength set to {ImStatic_Wavelength} nm')
 
 
 	print(f'Static image: {ImStatic_Wavelength} nm (index/plateau {StaticWav_index}), index {ImStatic_Index}. Use ImStatic_Wavelength and ImStatic_Index to change it.')
 	print(f'   NB: ImStatic_Index refers to the frame number in a given plateau/wavelenght used as initial static image. Not to be confused with array index,')
 
 
-	try:
-		ImStatic_Plateau = kwargs['ImStatic_Plateau']
-		print(f'Please input ImStatic_Wavelength instead (in nm)')
-	except KeyError:
-		pass
-
-
-	try: 
-		PlotDiff = kwargs['PlotDiff']
-	except KeyError:
-		PlotDiff = False
-
+	PlotDiff = kwargs.get('PlotDiff', False)
 	if PlotDiff:
 		print(f'PlotDiff set to True. Use \'Plot_PlateauList=[]\' or \'All\' and Plot_Index=int to set')
 
-	try: 
-		SavingPath = kwargs['SavingPath']
-	except KeyError:
+	SavingPath = kwargs.get('SavingPath')
+	if not SavingPath:
 		SavingPath = ''
 		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
 
-	try: 
-		Plot_PlateauList = kwargs['Plot_PlateauList']
+
+	Plot_PlateauList = kwargs.get('Plot_PlateauList')
+	if not Plot_PlateauList:
+		Plot_PlateauList = [5]
+		print(f'Set Plot_PlateauList and Plot_Index to set images to plot')
+	else:
 		if isinstance(Plot_PlateauList, int):
 			Plot_PlateauList = [Plot_PlateauList]
-	except:
-		print(f'Set Plot_PlateauList and Plot_Index to set images to plot')
-		Plot_PlateauList = [5]
 
 
-	try: 
-		Plot_Index = kwargs['Plot_Index']
-		if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
-			print(f'PlotIndex is outside the range of indices that will be analysed ({Buffer}, {MinIndex-Buffer})')
-			Plot_Index = int(MinIndex/2)
-			print(f'	Seeting it to {PlotIndex}')
-	except:
+	Plot_Index = kwargs.get('Plot_Index')
+	if not Plot_Index:
 		Plot_Index = 14
 		print(f'MinIndex = {MinIndex}, MinIndex-Buffer = {MinIndex-Buffer}')
 		if Plot_Index>(MinIndex-Buffer):
 			Plot_Index = int(MinIndex/2)
 			print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
+	else:
+		if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
+			print(f'PlotIndex is outside the range of indices that will be analysed ({Buffer}, {MinIndex-Buffer})')
+			Plot_Index = int(MinIndex/2)
+			print(f'	Seeting it to {PlotIndex}')
 
-	try:
-		SaveHypercube = kwargs['SaveHypercube']
+
+
+	SaveHypercube = kwargs.get('SaveHypercube', True)
+	if SaveHypercube:
 		print(f'SaveHypercube set to {SaveHypercube}')
-	except:
-		SaveHypercube = True
 
 	print(f'Buffer set to {Buffer}')
 

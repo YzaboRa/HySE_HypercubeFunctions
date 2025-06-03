@@ -75,18 +75,13 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	
 	"""
 
-		## Check if the user wants to return the peaks
-	try:
-		ReturnPeaks = kwargs['ReturnPeaks']
+	## Check if the user wants to return the peaks
+	ReturnPeaks = kwargs.get('ReturnPeaks', False)
+	if ReturnPeaks:
 		print(f'ATTENTION: ReturnPeaks is set to True. Be careful, the output will have three elements!')
-	except KeyError:
-		ReturnPeaks = False
 
 	## Check if user wants list of optional parameters
-	try:
-		Help = kwargs['Help']
-	except KeyError:
-		Help = False
+	Help = kwargs.get('Help', False)
 	if Help:
 		print(info)
 		if ReturnPeaks:
@@ -95,88 +90,63 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 			return 0
 	else:
 		print(f'Add \'Help=True\' in input for a list and description of all optional parameters ')
+
 	
 	## Check if user wants to plot the gradient (to optimise parameters)
-	try:
-		PlotGradient = kwargs['PlotGradient']
-	except KeyError:
-		PlotGradient = False
+	PlotGradient = kwargs.get('PlotGradient', False)
 
 	## Check if SaveFig
-	try:
-		SaveFig = kwargs['SaveFig']
-	except KeyError:
-		SaveFig = True
+	SaveFig = kwargs.get('SaveFig', True)
 
 	## Check if wavelengths are mixed
-	try:
-		WavelengthsMixed = kwargs['WavelengthsMixed']
-	except KeyError:
-		WavelengthsMixed = True
+	WavelengthsMixed = kwargs.get('WavelengthsMixed', True)
 		
 	## Check if user wants to print the list of peaks and distances 
 	## between them (to optimise parameters)
-	try:
-		PrintPeaks = kwargs['PrintPeaks']
-	except KeyError:
-		PrintPeaks = False
+	PrintPeaks = kwargs.get('PrintPeaks', False)
 
 	## Check if user is setting fps
-	try:
-		fps = kwargs['fps']
-	except KeyError:
-		fps = 60*3
+	fps = kwargs.get('fps', 60*3)
 		
 	## Check if user has set the max plateau size
 	## Used to handle double plateaux when neighbouring wavelengths
 	## give too low contrast 
 	## Needs to be adjusted if chaning repeat number
-	try:
-		MaxPlateauSize = kwargs['MaxPlateauSize']
-		print(f'Max plateau size set to {MaxPlateauSize}')
-	except KeyError:
+	MaxPlateauSize = kwargs.get('MaxPlateauSize')
+	if not MaxPlateauSize:
 		MaxPlateauSize = 40
 		print(f'Max plateau size set to default of {MaxPlateauSize}')
+
 	  
 	## Check if user has set the minimum size of long dark (separating sweeps)
 	## Will vary with repeat number, should be larger than MaxPlateauSize
-	try:
-		DarkMin = kwargs['DarkMin']
-		print(f'Min long dark size set to {DarkMin}')
-	except KeyError:
+	DarkMin = kwargs.get('DarkMin')
+	if not DarkMin:
 		DarkMin = 90
 		print(f'Min long dark size set to default of {DarkMin}')
 		
 	## Check if the user has input the expected plateau size
-	try:
-		PlateauSize = kwargs['PlateauSize']
-		print(f'Expected plateau size set to {PlateauSize}')
-	except KeyError:
+	PlateauSize = kwargs.get('PlateauSize')
+	if not PlateauSize:
 		PlateauSize = 45
 		print(f'Expected plateau size set to default {PlateauSize}')
 
 	## Check if the user wants to return the peaks
-	try:
-		Ncolours = kwargs['Ncolours']
-		print(f'Assuming {Ncolours} wavelengths instead of normal 8')
-	except KeyError:
-		Ncolours = 8
+	Ncolours = kwargs.get('Ncolours',8)
 
 	## Check if Blind
-	try:
-		Blind = kwargs['Blind']
-	except KeyError:
-		Blind = False
+	Blind = kwargs.get('Blind',False)
 
-	
 	## Import trace
 
 	## If CropImDimensions dimensions have been specified, pass on to import data function
-	try:
+	CropImDimensions = kwargs.get('CropImDimensions')
+	if not CropImDimensions:
+		trace = HySE_ImportData.ImportData(DataPath,Trace=True)
+	else:
 		CropImDimensions = kwargs['CropImDimensions']
 		trace = HySE_ImportData.ImportData(DataPath,Trace=True, CropImDimensions=CropImDimensions)
-	except KeyError: 
-		trace = HySE_ImportData.ImportData(DataPath,Trace=True)
+
 
 	## Find peaks
 	peaks, SGfilter, SGfilter_grad = FindPeaks(trace, **kwargs)
@@ -341,36 +311,28 @@ def FindPeaks(trace, **kwargs):
 	
 	"""
 	## Check if smoothing Window Length set by user
-	try:
-		window_length = kwargs['WindowLength']
-		## Make sure that the value is a factor of 3, if not warn user that results won't be as good
-		if window_length%3!=0:
-			print(f'Window length {window_length} is not a factor of 3')
-			print(f'Input a factor of 3 unless you are sure that the repeat number is no longer x3 RGB frames')
-		## If not, set default value
-	except KeyError:
+	window_length = kwargs.get('window_length')
+	if not window_length:
 		print(f'No window length or polyorder input. Setting to 6, 1')
 		window_length = 6
+	if window_length%3!=0:
+		print(f'Window length {window_length} is not a factor of 3')
+		print(f'Input a factor of 3 unless you are sure that the repeat number is no longer x3 RGB frames')
+
 	
 	## Check if smoothing polyorder set by user
-	try:
-		polyorder = kwargs['PolyOrder']
-	except KeyError:
-		polyorder = 1
+	polyorder = kwargs.get('polyorder', 1)
+
 		
 	## Check if peak height set by user
-	try:
-		peak_height = kwargs['PeakHeight']
-		print(f'Setting peak height to {peak_height}')
-	except KeyError:
+	peak_height = kwargs.get('peak_height')
+	if not peak_height:
 		peak_height = 0.03
-		print(f'No peak height input, setting it to default {peak_height}')
+		print(f'No peak_height input, setting it to default {peak_height}')
 	
 	## Check if peak distance set by user
-	try:
-		peak_distance = kwargs['PeakDistance']
-		print(f'Setting peak distance to {peak_distance}')
-	except KeyError:
+	peak_distance = kwargs.get('peak_distance')
+	if not peak_distance:
 		peak_distance = 14
 		print(f'No peak distance input, setting it to default {peak_distance}')
 	

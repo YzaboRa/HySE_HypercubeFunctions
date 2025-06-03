@@ -370,20 +370,11 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 		- SavingPathWithName (default '')
 
 	"""
-	try:
-		SavingPathWithName = kwargs['SavingPathWithName']
-	except KeyError:
-		SavingPathWithName = ''
 
-	try:
-		SavePlot = kwargs['SavePlot']
-	except KeyError:
-		SavePlot = False
+	kwargs.get('SavingPathWithName', '')
+	kwargs.get('SavePlot', False)
+	kwargs.get('ShowPlot', False)
 
-	try:
-		ShowPlot = kwargs['ShowPlot']
-	except KeyError:
-		ShowPlot = False
 
 	images_diff_0 = np.subtract(im_shifted.astype('float64'), im_static.astype('float64'))
 	images_diff_0_avg = np.average(np.abs(images_diff_0))
@@ -492,45 +483,30 @@ def PlotHypercube(Hypercube, **kwargs):
 
 	"""
 
-	try:
-		Help = kwargs['Help']
-	except KeyError:
-		Help = False
+	kwargs.get('Help', False)
 	if Help:
 		print(info)
-		return 
+		return
 
-	try:
-		Wavelengths = kwargs['Wavelengths']
-	except KeyError:
+	kwargs.get('Wavelengths')
+	if not Wavelengths:
 		Wavelengths = [0]
-		print(f'Input \'Wavelengths\' list for better plot')
+		print("Input 'Wavelengths' list for better plot")
 
-	try:
-		SavePlot = kwargs['SavePlot']
-	except KeyError:
-		SavePlot = False
-	try: 
-		SavingPathWithName = kwargs['SavingPathWithName']
-	except KeyError:
+	kwargs.get('SavePlot', False)
+	kwargs.get('SavingPathWithName')
+	if not SavingPathWithName:
 		SavingPathWithName = ''
-		if SavePlot==True:
+		if SavePlot:
 			print(f'SavePlot is set to True. Please input a SavingPathWithName')
-	try:
-		ShowPlot = kwargs['ShowPlot']
-	except KeyError:
-		ShowPlot = True
 
-	try:
-		SameScale = kwargs['SameScale']
-	except KeyError:
-		SameScale = False
-
-	try:
-		Masks = kwargs['Masks']
-		MaskPlots = True
-	except KeyError:
+	kwargs.get('ShowPlot', True)
+	kwargs.get('SameScale', False)
+	kwargs.get('Masks')
+	if not Masks:
 		MaskPlots = False
+	else:
+		MaskPlots = True
 
 	Wavelengths_sorted = np.sort(Wavelengths)
 
@@ -599,10 +575,8 @@ def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
 		Saved:
 			mp4 video
 	'''
-	try:
-		fps = kwargs['fps']
-	except KeyError:
-		fps = 10
+	kwargs.get('fps', 10)
+
 
 
 	(NN, YY, XX) = Hypercube.shape

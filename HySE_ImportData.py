@@ -28,6 +28,7 @@ plt.rcParams["font.family"] = "arial"
 
 def GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs):
 	## Check if the user has specificed the image crop dimensions
+
 	try:
 		CropImDimensions = kwargs['CropImDimensions']
 		CropImDimensions_input = True
@@ -48,7 +49,7 @@ def GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs):
 	return DataSweep
 
 
-def ImportData(Path, *Coords, **Info):
+def ImportData(Path, *Coords, **kwargs):
 	"""
 	Function to import the data (in full or as a trace) from the raw video
 	Uses the opencv reader
@@ -93,35 +94,28 @@ def ImportData(Path, *Coords, **Info):
 	"""
 	
 	## Check if the data should be left in the raw RGB 3D format
-	try:
-		RGB = Info['RGB']
-		print(f'Setting RGB format = {RGB}')
-	except KeyError:
-		RGB = False
-		
-	try:
-		Trace = Info['Trace']
-		print(f'Only importing the trace of the data')
-	except KeyError:
-		Trace = False
+	RGB = kwargs.get('RGB', False)
+	if RGB:
+		print(f'Using RGB format')
 
-	try:
-		CropIm = Info['CropIm']
-	except KeyError:
-		CropIm = True
+	Trace = kwargs.get('Trace', False)
+	if Trace:
+		print(f'Only importing the trace of the data')
+	
+	CropIm = kwargs.get('CropIm', True)
 	if CropIm:
 		print(f'Cropping Image')
 	else:
 		print(f'Keeping full frame')
 
-	try:
-		CropImDimensions = Info['CropImDimensions']
+	CropImDimensions = kwargs.get('CropImDimensions')
+	if not CropImDimensions:
+		CropImDimensions = [702,1856, 39,1039]
 		## [702,1856, 39,1039] ## xmin, xmax, ymin, ymax - CCRC SDI full canvas
 		## [263,695, 99,475] ## xmin, xmax, ymin, ymax  - CCRC standard canvas
+		print(f'Automatic cropping: [{CropImDimensions[0]} : {CropImDimensions[1]}],y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
+	else:
 		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}],y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
-	except KeyError:
-		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
-
 
 
 	# ## Coordinates for the image (empirical)
@@ -359,3 +353,4 @@ def ImportData_imageio(Path, *Coords, **Info):
 		data = GetFrames(Nstart, Nend, vid, CropImDimensions, RGB)
 
 	return data
+

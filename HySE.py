@@ -30,6 +30,7 @@ import HySE_CoRegistrationTools
 import HySE_GetHypercubePosition
 import HySE_ManipulateHypercube
 import HySE_Mask
+import HySE_Unmixing
 
 
 
@@ -293,6 +294,10 @@ def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Da
 
 
 
+## Functions from HySE_Unmixing
+
+def MakeMixingMatrix(Wavelengths_sorted, Arduino_MixingMatrix, **kwargs):
+	MixingMatrix = HySE_Unmixing.MakeMixingMatrix(Wavelengths_sorted, Arduino_MixingMatrix, **kwargs)
 
 
 

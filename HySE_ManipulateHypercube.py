@@ -51,6 +51,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				- Name = string
 				- SaveFig = True
 				- SaveArray = True
+				- PlotHypercube = True
 				- Order = True. Set to False if doing wavelength unmixing
 										 
 	
@@ -64,55 +65,32 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	
 	"""
 	## Check if the user has set the Buffer size
-	try: 
-		Buffer = kwargs['Buffer']
-		print(f'Buffer of frames to ignore between neighbouring wavelenghts set to 2x{Buffer}')
-	except KeyError:
-		Buffer = 6
-		print(f'Buffer of frames to ignore between neighbouring wavelenghts set to default 2x{Buffer}')
 
+	Buffer = kwargs.get('Buffer', 6)
+	print(f'Buffer of frames to ignore between neighbouring wavelenghts set to 2x{Buffer}')
 	BufferSize = 2*Buffer
 	
-	try: 
-		Name = kwargs['Name']
-	except KeyError:
-		Name = ''
-
-	try: 
-		SaveFig = kwargs['SaveFig']
-	except KeyError:
-		SaveFig = True
-
-	try: 
-		Order = kwargs['Order']
-	except KeyError:
-		Order = True
-
+	Name = kwargs.get('Name', '')
+	SaveFig = kwargs.get('SaveFig', True)
+	Order = kwargs.get('Order', True)
 	if Order==False:
 		print(f'Order set to False: the hypercube output will be out of order. Use for spectral unmixing.')
-
-	try: 
-		SaveArray = kwargs['SaveArray']
-	except KeyError:
-		SaveArray = True
-
-	try: 
-		Help = kwargs['Help']
-	except KeyError:
-		Help = False
-
+	SaveArray = kwargs.get('SaveArray', True)
+	Help = kwargs.get('Help', False)
 	if Help:
 		print(info)
 		return 0, 0
+	PlotHypercube = kwargs.get('PlotHypercube', False)
 
-
-	try:
-		CropImDimensions = kwargs['CropImDimensions']
+	CropImDimensions = kwargs.get('CropImDimensions')
+	if not CropImDimensions:
+		CropImDimensions = [702,1856, 39,1039]
 		## [702,1856, 39,1039] ## xmin, xmax, ymin, ymax - CCRC SDI full canvas
 		## [263,695, 99,475] ## xmin, xmax, ymin, ymax  - CCRC standard canvas
+		print(f'Automatic cropping: [{CropImDimensions[0]} : {CropImDimensions[1]}],y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
+	else:
 		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}],y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
-	except KeyError:
-		CropImDimensions = [702,1856, 39,1039]  ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
+
 		
 	## Import data
 	data = HySE_ImportData.ImportData(DataPath, CropImDimensions=CropImDimensions)
@@ -199,40 +177,42 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 	# Hypercube_sorted = Hypercube
 	# print(f'order_list: \n{order_list}')
-	
-	## MakeFigure
-	nn = 0
-	Mavg = np.average(Hypercube_sorted)
-	Mstd = np.std(Hypercube_sorted)
-	MM = Mavg+5*Mstd
-	fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
-	for j in range(0,4):
-		for i in range(0,4):
-			if nn<17:
-				wav = Wavelengths_sorted[nn]
-				RGB = HySE_UserTools.wavelength_to_rgb(wav)
-				ax[j,i].imshow(Hypercube_sorted[nn,:,:], cmap='gray')
-				if Order:
-					ax[j,i].set_title(f'{wav} nm', c=RGB)
-				else:
-					ax[j,i].set_title(f'im {nn}')
-				ax[j,i].set_xticks([])
-				ax[j,i].set_yticks([])
-				nn = nn+1
-			else:
-				ax[j,i].set_xticks([])
-				ax[j,i].set_yticks([])
-	plt.tight_layout()
-	## Find current path and time to save figure
+
+	## Find current path and time for saving
 	time_now = datetime.now().strftime("%Y%m%d__%I-%M-%S-%p")
 	day_now = datetime.now().strftime("%Y%m%d")
 
 	Name_withExtension = DataPath.split('/')[-1]
 	Name = Name_withExtension.split('.')[0]
 	Path = DataPath.replace(Name_withExtension, '')
-	PathToSave = f'{Path}{time_now}_{Name}'
-	if SaveFig:
-		plt.savefig(f'{PathToSave}_Hypercube.png')
+	
+	## MakeFigure
+	if PlotHypercube:
+		nn = 0
+		Mavg = np.average(Hypercube_sorted)
+		Mstd = np.std(Hypercube_sorted)
+		MM = Mavg+5*Mstd
+		fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
+		for j in range(0,4):
+			for i in range(0,4):
+				if nn<17:
+					wav = Wavelengths_sorted[nn]
+					RGB = HySE_UserTools.wavelength_to_rgb(wav)
+					ax[j,i].imshow(Hypercube_sorted[nn,:,:], cmap='gray')
+					if Order:
+						ax[j,i].set_title(f'{wav} nm', c=RGB)
+					else:
+						ax[j,i].set_title(f'im {nn}')
+					ax[j,i].set_xticks([])
+					ax[j,i].set_yticks([])
+					nn = nn+1
+				else:
+					ax[j,i].set_xticks([])
+					ax[j,i].set_yticks([])
+		plt.tight_layout()
+		if SaveFig:
+			PathToSave = f'{Path}{time_now}_{Name}'
+			plt.savefig(f'{PathToSave}_Hypercube.png')
 
 	if SaveArray:
 		np.savez(f'{PathToSave}_Hypercube.npz', Hypercube_sorted)
@@ -416,12 +396,8 @@ def GetDark(vidPath, EdgePos, **kwargs):
 
 
 def GetDark_FromData(DataAll, EdgePos, **kwargs):
-	try:
-		Buffer = kwargs['Buffer']
-		print(f'Buffer set to {Buffer}.')
-	except KeyError:
-		Buffer = 6
-		print(f'Buffer not specified. Set to default 6.')
+
+	Buffer = kwargs.get('Buffer', 6)
 
 	try:
 		DarkRepeat = kwargs['DarkRepeat']
@@ -430,11 +406,7 @@ def GetDark_FromData(DataAll, EdgePos, **kwargs):
 		DarkRepeat = 3
 		print(f'Assuming DarkRepeat = 3,')
 
-	try:
-		SaveDark = kwargs['SaveDark']
-		print(f'SaveDark set to {SaveDark}.')
-	except KeyError:
-		SaveDark = True
+	SaveDark = kwargs.get('SaveDark', True)
 
 	try: 
 		SavePath = kwargs['SavePath']
