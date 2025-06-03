@@ -58,12 +58,13 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 						Depends on the repeat number and will impact how well double plateaux are handled')
 						Automatically adjusts expected size when plateaux are detected, but needs to be set')
 						manually if a full sweep could not be detected automatically.')
-				- StartFrame = Integer: Indicates where the sweep begins, when using the blind method
+				- StartFrames = list of integers: Indicates where the sweeps begins, when using the blind method
 				- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)')
 				- ReturnPeaks = True: if want the list of peaks and peak distances')
 						(for manual tests, for example if fewer than 8 colours')
 				- Ncolours = integer: if different from 8 (for example, if one FSK was off)')
 				- fps = integer (frame per second)
+				- WavelengthsMixed = True: If True, does not overlay wavelengths on the figure
 				- SaveFig = True: Whether to save figure
 				
 	Output:
@@ -106,6 +107,12 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		SaveFig = kwargs['SaveFig']
 	except KeyError:
 		SaveFig = True
+
+	## Check if wavelengths are mixed
+	try:
+		WavelengthsMixed = kwargs['WavelengthsMixed']
+	except KeyError:
+		WavelengthsMixed = True
 		
 	## Check if user wants to print the list of peaks and distances 
 	## between them (to optimise parameters)
@@ -180,38 +187,44 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 
 	if Blind:
 		print(f'Finding sweeps - Blind method')
-		try:
-			StartFrame = kwargs['StartFrame']
-			print(f'   StartFrame: {StartFrame}')
-		except KeyError:
-			StartFrame = 0
-			print(f'Using the blind method. Set StartFrame to indicate where the sweep begins')
-		
-		EdgePos = []
-		for i in range(0,2*Ncolours+1): ## 0 to 16 + dark
-			startpos = int(StartFrame+PlateauSize*(i))
-			# print(f'.    i={i}, startpos= {startpos}')
-			EdgePos.append([startpos, int(PlateauSize)])
-		EdgePos=np.array([EdgePos])
 
-		print(EdgePos)
+		try:
+			StartFrames = kwargs['StartFrames']
+			print(f'   StartFrames:\n   {StartFrames}')
+		except KeyError:
+			StartFrames = [0]
+			print(f'Using the blind method. Set StartFrames to indicate where the sweep(s) begins')
+
+		## Add an attempted automatic detection to help user:
+		if len(StartFrames)>=2:
+			EstSpacing = StartFrames[1]-StartFrames[0]
+			MaxX = len(trace)
+			EstimatedSweeps = []
+			est_sweep = StartFrames[0]
+			while est_sweep<MaxX:
+				EstimatedSweeps.append(est_sweep)
+				est_sweep = est_sweep+EstSpacing
+			print(f'   Based on the first two indicated sweep positions, here are the expected positions for the rest of the sweeps:')
+			print(f'   {EstimatedSweeps}')
+
+
+		EdgePos = []
+		for ww in range(0,len(StartFrames)):
+			startframe = StartFrames[ww]
+			EdgePos_sub = []
+			for i in range(0,2*Ncolours+1): ## 0 to 16 + dark
+				startpos = int(startframe+PlateauSize*(i))
+				# print(f'.    i={i}, startpos= {startpos}')
+				EdgePos_sub.append([startpos, int(PlateauSize)])
+				# EdgePos_sub.append(0)
+			EdgePos.append(EdgePos_sub)
+		EdgePos=np.array(EdgePos)
+
 
 	else:
 		print(f'Finding sweeps - Automatic method')
 		## Find sweep positions, will print edges for each identified sweep
 		EdgePos, Stats = GetEdgesPos(peaks_dist, DarkMin, 0, len(trace), MaxPlateauSize, PlateauSize, Ncolours, printInfo=True)
-
-	# Averages = []
-	# for k in range(0,len(EdgePos)):
-	# 	Averages_sub = []
-	# 	EdgePos_sub = EdgePos[k,:,:]
-	# 	WW, _ = EdgePos_sub.shape
-	# 	for w in range(0,WW):
-	# 		start = EdgePos_sub[w,0]
-	# 		end = EdgePos_sub[w,0]+EdgePos_sub[w,1]
-	# 		Averages_sub.append(np.average(trace[start:end]))
-	# 	Averages.append(Averages_sub)
-	# Averages = np.array(Averages)
 
 	
 	## Now make figure to make sure all is right
@@ -241,14 +254,15 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 		for i in range(0,len(edges)):
 			s, ll = edges[i,0], edges[i,1]
 			ax.axvline(s, ls='dashed', c=SweepColors[k])
-			if i<8:
-				RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i])
-				ax.text(s+7, SGfilter[s+10]+3, Wavelengths_list[i], fontsize=fs, c=RGB)
-			elif (i==8):
-				ax.text(s, SGfilter[s+10]-3, 'DARK', fontsize=fs, c='black')
-			else:
-				RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i-1])
-				ax.text(s+8, SGfilter[s+10]+3, np.round(Wavelengths_list[i-1],0), fontsize=fs, c=RGB)
+			if WavelengthsMixed==False:
+				if i<8:
+					RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i])
+					ax.text(s+7, SGfilter[s+10]+3, Wavelengths_list[i], fontsize=fs, c=RGB)
+				elif (i==8):
+					ax.text(s, SGfilter[s+10]-3, 'DARK', fontsize=fs, c='black')
+				else:
+					RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i-1])
+					ax.text(s+8, SGfilter[s+10]+3, np.round(Wavelengths_list[i-1],0), fontsize=fs, c=RGB)
 
 	# ax.legend()
 	## Add time label
