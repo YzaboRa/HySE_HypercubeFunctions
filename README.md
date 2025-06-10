@@ -29,6 +29,7 @@ It also requires those additional libraries:
 
 ## How to use
 
+### Import parameters
 The pipeline must first be setup by importing the functions and setting up data and saving parameters:
 
 ```python
@@ -65,6 +66,8 @@ Name = '2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5'
 SavingPath = '/Users/iracicot/Library/CloudStorage/OneDrive-UniversityofCambridge/Data/CCRC/20250328/Results_MultipleSweeps/'
 ```
 
+### Compute raw arrays
+
 Then raw videos are imported to extract raw (mixed) arrays. 
 The code has automatic detections features, but clinical data tends to be too noisy for those to work properly. In these cases, a blind variation allows to input the start position and width of each sweeps.
 
@@ -89,9 +92,12 @@ StartFrames = [148,1066,1984,2901,3820]
 EdgePos_WhiteCalib = HySE.FindHypercube(WhiteCalibration_Path, Wavelengths_list, PlateauSize=45, PrintPeaks=False, Blind=True, StartFrames=StartFrames, PeakHeight=0.1, 
                              SaveFig=False, PlotGradient=False, PeakDistance=30, MaxPlateauSize=60)
 
+![20250610__04-45-20-PM_2025-03-28_13-24-53_Config1_White_Calib_Trace](https://github.com/user-attachments/assets/a8f41de6-3ada-44a0-88ae-c6d5dffb5fb8)
+
 ## Compute array from sweeps
 Hypercube_WhiteCalib, Dark_WhiteCalib = HySE.ComputeHypercube(WhiteCalibration_Path, EdgePos_WhiteCalib, Wavelengths_list, 
                                                               Order=True, SaveFig=False, SaveArray=False, Help=False, PlotHypercube=False)
+![20250610__04-47-19-PM_2025-03-28_13-28-23_Config1_White_HySE_Hypercube](https://github.com/user-attachments/assets/0ce86d23-41f9-496b-aad2-77f85d78d0bc)
 
 
 ############################
@@ -140,9 +146,11 @@ LongDark = HySE.GetLondDark(WhiteCalibration_Path, EdgePos_WhiteCalib, ExtraWav=
 
 ## Plotting the dark can help make sure the estimate is adequate
 HySE.PlotDark(LongDark)
+![HySE_LongDarkExample](https://github.com/user-attachments/assets/372215d3-dd7f-4275-864d-54b38a1339c5)
 
 
 ```
+### Normalisation
 
 The data now needs to be normalised. Several options are possible, all through the same function 'HySE.NormaliseMixedHypercube'. 
 Optional arguments allow to control what normalisation is done:
@@ -168,6 +176,7 @@ Hypercube_MacbethHySE_avg_N, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethH
                                                            SaveFigure=True, SavingPath=SavingPath+Name)
 Hypercube_MacbethHySE_avg_D, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, Wavelengths_list=Wavelengths_list,
                                                            SaveFigure=False, SavingPath=SavingPath+Name, vmax=80)
+![2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5Normalised_Hypercube](https://github.com/user-attachments/assets/eb7f9bdb-0ee8-4985-a2ab-d9e3f19d4f36)
 
 ## Using the non averaged dataset:
 Hypercube_MacbethHySE_all_ND, Mask_all = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
@@ -177,6 +186,7 @@ Hypercube_MacbethHySE_1_ND, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHy
                                                            SaveFigure=True, SavingPath=SavingPath+Name)
 
 ```
+### Unmixing
 
 Once this is done, we can then move on to the actual unmixing:
 
@@ -187,6 +197,7 @@ Once this is done, we can then move on to the actual unmixing:
 
 ## Compute the mixing matrix
 MixingMatrix = HySE.MakeMixingMatrix(Wavelengths_list, Arduino_MixingMatrix, Help=False)
+![HySE_MixingMatrixExample](https://github.com/user-attachments/assets/e71b8693-c12b-4a80-8303-4bda44a04c0e)
 
 
 ############################
@@ -200,7 +211,14 @@ Unmixed_Hypercube_MacbethHySE_avg_D = HySE.UnmixData(Hypercube_MacbethHySE_avg_D
 Unmixed_Hypercube_MacbethHySE_all_ND = HySE.UnmixData(Hypercube_MacbethHySE_all_ND, MixingMatrix)
 Unmixed_Hypercube_MacbethHySE_1_ND = HySE.UnmixData(Hypercube_MacbethHySE_1_ND, MixingMatrix)
 
+## We can plot this hypercube for visualisation:
+SP = f'{SavingPath}{Name}_UnmixedND_avg.png'
+HySE.PlotHypercube(Unmixed_Hypercube_MacbethHySE_avg, Wavelengths=Wavelengths_list_sorted, SameScale=False, Masks=Mask_avg, SavePlot=False, SavingPathWithName=SP) #vmax=0.5,
+![2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5_UnmixedND_avg](https://github.com/user-attachments/assets/904991ed-4660-4f37-a5de-291f8ef8407a)
+
 ```
+
+### Saving
 Don't forget to save the unmixed hypercubes! The functions may save figures, but you need to save the array itself:
 
 ```python
@@ -218,6 +236,8 @@ np.savez(f'{SavingPath}{Name}_SortedWavelengths.npz', Wavelengths_list_sorted)
 ```
 
 ## Optional Functions
+
+### Macbeth Colour Chart analysis
 
 When imaging a Macbeth colour chart, it is helpful to look at the spectra from each patch.
 Certain functions are designed to make this task easier.
@@ -273,10 +293,13 @@ Image_angle = 0
  
 Positions = HySE.GetPatchPos(Patch1_pos, Patch_size_x, Patch_size_y, Image_angle)
 HySE.PlotPatchesDetection(macbeth, Positions, Sample_size)
+![Macbeth_PatchesDetection](https://github.com/user-attachments/assets/2fc5df12-4370-46ab-9119-1664b781fe36)
 
 ############################
 ####### A.4 Compute the spectra for each patch
 ############################
+
+CropCoordinates = [xs, xe, ys, ye]
 
 PatchesSpectra_MacbethHySE_avg_ND = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_avg_ND, Sample_size, Positions, CropCoordinates)
 PatchesSpectra_MacbethHySE_avg_N = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_avg_N, Sample_size, Positions, CropCoordinates)
@@ -298,6 +321,7 @@ Labels = ['avg then unmix', 'unmix then avg', 'one sweep']
 Name_ToSave = f'{SavingPath}{Name}_UnmixingComparison_ND'
 
 HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraData, MacBeth_RGB, Name, PlotLabels=Labels)#, SavingPath=Name_ToSave)
+![2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5_UnmixingComparison_avg_Patches](https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e)
 
 ```
 
@@ -311,26 +335,15 @@ help(HySE.FUNCTION)
 ```
 
 
-### Here are some examples of outputs:
-
-Output from FindHypercube:
-<img width="452" alt="FindHypercubeOutput" src="https://github.com/user-attachments/assets/b6d45c7a-b74b-455e-97e9-ff4649ad153e">
-
-Output from ComputeHypercube:
-<img width="304" alt="ComputeHypercubeOutput" src="https://github.com/user-attachments/assets/afd3fbb1-79c5-4c69-9a6d-0dc0e0fe4a1f">
-
-Output from NormaliseHypercube:
-<img width="296" alt="NormaliseHypercubeOutput" src="https://github.com/user-attachments/assets/42648e4a-8a94-481b-9727-0c1ae76998be">
-
 ## To do
 - [ ] Mask images
     - [x] Mask specular reflections
     - [x] Mask areas/edges missing because of movement (co-registration)
-    - [ ] Mask images in plots
+    - [x] Mask images in plots
     - [ ] Implement option to automatically asjust masking for specular reflection
 - [x] Add function to brute force plateau detection with just plateau expected size (for when automatic detection doesn't work)
 - [x] Add rotating co-registration (set static image as co-registrated image with closest wavelength, to avoid extra distortions)
-- [ ] Co-register + normalise multiple sweeps (combine/average frames)
+- [x] Co-register + normalise multiple sweeps (combine/average frames)
 - [ ] Fine-tune normalisation to account for intensity oscillations (3-frame cycle)
 
 ## Comments
