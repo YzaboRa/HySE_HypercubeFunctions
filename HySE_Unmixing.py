@@ -173,6 +173,7 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	if Dark is not None:
 		Dark_g = gaussian_filter(Dark, sigma=Sigma)
 		print(f'Dark subtraction. Avg val = {np.average(Dark):.2f}, after blurring: {np.average(Dark_g):.2f}')
+	
 	WhiteCalibration = kwargs.get('WhiteCalibration')
 	if WhiteCalibration is not None:
 		print(f'White Normalising')
@@ -204,7 +205,11 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	else:
 		MixedHypercube_ = np.array([MixedHypercube])
 
-	Mask = HySE_Mask.GetStandardMask(WhiteCalibration_, threshold=1)
+	if WhiteCalibration is not None:
+		Mask = HySE_Mask.GetStandardMask(WhiteCalibration_, threshold=1)
+	else:
+		print(f'White Calibration not provided. Estimating mask from data itself.')
+		Mask = HySE_Mask.GetStandardMask(MixedHypercube_[0], threshold=1)
 	print(f'Mask shape: {Mask.shape}')
 		
 	MixedHypercube_N = np.zeros(MixedHypercube_.shape)

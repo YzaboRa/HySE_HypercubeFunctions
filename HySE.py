@@ -89,8 +89,8 @@ def GetPatchesIntensity(Image, Sample_size, PatchesPositions):
 	Intensities = HySE_UserTools.GetPatchesIntensity(Image, Sample_size, PatchesPositions)
 	return Intensities
 
-def PlotPatchesDetection(Macbeth, Positions):
-	HySE_UserTools.PlotPatches(Macbeth, Positions)
+def PlotPatchesDetection(Macbeth, Positions, Sample_size):
+	HySE_UserTools.PlotPatchesDetection(Macbeth, Positions, Sample_size)
 
 def psnr(img1, img2):
 	psnr = HySE_UserTools.psnr(img1, img2)
@@ -99,6 +99,9 @@ def psnr(img1, img2):
 def CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrum):
 	ComparableSpectra = HySE_UserTools.CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrum)
 	return ComparableSpectra
+
+def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData, MacBeth_RGB, Name, **kwargs):
+	HySE_UserTools.PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData, MacBeth_RGB, Name, **kwargs)
 
 
 
