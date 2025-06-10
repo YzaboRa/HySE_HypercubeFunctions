@@ -28,6 +28,9 @@ It also requires those additional libraries:
 - tqdm
 
 ## How to use
+
+The pipeline must first be setup by importing the functions and setting up data and saving parameters:
+
 ```python
 ## Import functions
 import sys
@@ -37,110 +40,270 @@ import Hyse
 
 ## Indicate which wavelengths were used (Panel4, Panel2), in nm
 Wavelengths_list = np.array([486,572,478,646,584,511,617,540, 643,606,563,498,594,526,630,553])
+Wavelengths_list_sorted = np.sort(Wavelengths_list)
+
+## Indicate the mixing matrix that was used in the Arduino code:
+Arduino_MixingMatrix = np.array([[0,3,6],
+                                 [1,4,7],
+                                 [2,5,0],
+                                 [3,6,1],
+                                 [4,7,2],
+                                 [5,0,3],
+                                 [6,1,4],
+                                 [7,2,5]])
 
 ## Locate the data to analyse
-DataPath = '{Path to the data, e.g. OneDrive folder}'
-Name = 'USAF_3x_OD_2cm'
-vidPath = DataPath+Name+'.mp4'
+DataPath_General = '{Path_to_data}/Data/'
 
-## Find the positions of each wavelengths in the data trace
-## Start with Help=True to have a list and descriptions of all the
-## parameters to play with, and then with PlotGradient=True
-## to help optimising
-EdgePos = HySE.FindHypercube(vidPath, Wavelengths_list, PeakHeight=0.045)
+WhiteCalibration_Path = DataPath_General+'2025-03-28_13-24-53_Config1_White_Calib.mp4'
+WhiteHySE_Path = DataPath_General+'2025-03-28_13-28-23_Config1_White_HySE.mp4'
+MacbethHySE_Path = DataPath_General+'2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5.mp4'
 
-## We will need to to do the same thing for the white reference data:
-EdgePosWhite = HySE.FindHypercube(vidPathWhite, Wavelengths_list, PlotGradient=True)
+Name = '2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5'
 
-## We can also at this stage compute the average dark frame between the sweeps:
-Dark = HySE.GetDark(vidPath, EdgePos)
-## Optional inputs include Buffer=6, DarkRepeat=3, CropImDimensions=[x0,xe, y0,ye]
-
+## Define Saving path:
+SavingPath = '/Users/iracicot/Library/CloudStorage/OneDrive-UniversityofCambridge/Data/CCRC/20250328/Results_MultipleSweeps/'
 ```
-Once the sweeps have been properly identified, we can compute the hypercube. There are several options.
 
-### Option 1: Co-registration with Normalisation and masking 
+Then raw videos are imported to extract raw (mixed) arrays. 
+The code has automatic detections features, but clinical data tends to be too noisy for those to work properly. In these cases, a blind variation allows to input the start position and width of each sweeps.
 
-This option offers to mask in each frame the regions where there is not enoug light (as determined with the white reference) 
-and those where there is too much (for example, to get rid of specular reflections).
-Each frame is then normalised according to the white reference and then co-registered.
-The co-registration can either be done according to a fixed static image (defined by wavelength), or a rolling method can be implemented
-where the co-registration is propagated outwards from the static image. This is an attempt to limit drastic changes in the relative intensities 
-between the static and moving image, which the co-registration algorithm doesn't always handle properly. 
+Mixed clinical data will typically consist of three types of videos:
+* WhiteCalibration: This is a dataset obtained by imaging a white reference one wavelength at a time
+* WhiteHySE: This is a dataset obtained by imaging a white reference with the mixed wavelengths illumination
+* DataHySE: This is a dataset obtained by imaging am object of interest (macbeth chart for tests, or tissue) with the mixed wavelengths illumination
 
-Note that the rolling co-registration method, because it uses previously co-registered images as static images, can propagate and 
-amplify distortions. Use with care.
 
 ```python
-## We need to identify which sweeps to analyse (the option to do them all at once is not yet available):
-Nsweep = 3
-NsweepWhite = 3
+############################
+####### 1. White Calibration
+############################
 
-## And then we can import the full data for those selected sweep:
-DataSweep = HySE.GetSweepData_FromPath(vidPath, EdgePos, Nsweep)
-DataSweepWhite = HySE.GetSweepData_FromPath(vidPathWhite, EdgePosWhite, NsweepWhite)
+## Input the position of the sweep starts (might require iterating)
+StartFrames = [148,1066,1984,2901,3820]
 
-## We can average the white reference for the normalisation by computing the hypercube:
-HypercubeWhite, _ = HySE.ComputeHypercube(vidPathWhite, EdgePosWhite, Wavelengths_list)
+## Identify all full sweeps present in the dataset. When using the blind method, use:
+##   Blind=True
+##   StartFrames=StartFrames
+##   PlateauSize={Estimated_Plateau_Size}
+EdgePos_WhiteCalib = HySE.FindHypercube(WhiteCalibration_Path, Wavelengths_list, PlateauSize=45, PrintPeaks=False, Blind=True, StartFrames=StartFrames, PeakHeight=0.1, 
+                             SaveFig=False, PlotGradient=False, PeakDistance=30, MaxPlateauSize=60)
 
-## Defining Cutoffs for Masking:
-HC = 255 ## HighCutoff (saturation)
-LC = 0.5 ## LowCutoff (if there is not enough light -> amplify noise)
+## Compute array from sweeps
+Hypercube_WhiteCalib, Dark_WhiteCalib = HySE.ComputeHypercube(WhiteCalibration_Path, EdgePos_WhiteCalib, Wavelengths_list, 
+                                                              Order=True, SaveFig=False, SaveArray=False, Help=False, PlotHypercube=False)
 
-## Now we have everything we need to compute the normalise, masked hypercube
-## If required, Help=True prints a detailed description of both functions
 
-## For the standard implementation:
-Hypercube = HySE.SweepCoRegister_MaskedWithNormalisation(DataSweep, HypercubeWhite, Dark, Wavelengths_list, ImStatic_Index=7, LowCutoff=LC, HighCutoff=HC)
+############################
+####### 2. White mixed wavelengths
+############################
 
-## And for the rolling co-registration implentation:
-Hypercube = HySE.SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, HypercubeWhite, Dark_Hypercube, Wavelengths_list, ImStatic_Index=7, LowCutoff=LC, HighCutoff=HC)
+StartFrames = [489, 1012, 1534, 2056]
 
-## Can plot result
-HySE.PlotHypercube(Hypercube, Wavelengths=Wavelengths_list, SavePlot=False)
+## Note that the expected PlateauSize will depend on the repeat used during recording
+EdgePos_WhiteHySE = HySE.FindHypercube(WhiteHySE_Path, Wavelengths_list, PlateauSize=27, PrintPeaks=False, Blind=True, StartFrames=StartFrames, PeakHeight=0.1, 
+                             SaveFig=False, PlotGradient=False, PeakDistance=30, MaxPlateauSize=60)
+
+Hypercube_WhiteHySE, Dark_WhiteHySE = HySE.ComputeHypercube(WhiteHySE_Path, EdgePos_WhiteHySE, Wavelengths_list, 
+                                                              Order=False, SaveFig=False, SaveArray=False, Help=False, PlotHypercube=True)
+
+
+############################
+####### 3. Data mixed wavelengths
+############################
+
+## This example uses test data from a macbeth chart
+StartFrames = [220,567,922,1270,1624,1972,2326] 
+
+EdgePos_MacbethHySE = HySE.FindHypercube(MacbethHySE_Path, Wavelengths_list, PlateauSize=18, PrintPeaks=False, Blind=True, StartFrames=StartFrames, PeakHeight=0.1, 
+                             SaveFig=False, PlotGradient=False, PeakDistance=30, MaxPlateauSize=60)
+
+Hypercube_MacbethHySE_avg, Dark_MacbethHySE_avg = HySE.ComputeHypercube(MacbethHySE_Path, EdgePos_MacbethHySE, Wavelengths_list, Buffer=6, Average=True,
+                                                                Order=False, Help=False, SaveFig=False, SaveArray=False, PlotHypercube=True)
+
+## In some cases, we might want to keep each sweep individual (instead of averaging them all). This can be done with the 'Average' input:
+Hypercube_MacbethHySE_all, Dark_MacbethHySE_all = HySE.ComputeHypercube(MacbethHySE_Path, EdgePos_MacbethHySE, Wavelengths_list, Buffer=6, Average=False,
+                                                                Order=False, Help=False, SaveFig=False, SaveArray=False, PlotHypercube=True)
+
+############################
+####### 4. Dark
+############################
+
+## The function that computes the array (or the raw, mixed hypercube) also outputs a dark computed from the short dark in the middle of
+##     each sweeps (between panels 2 and 4). This dark is however not always reliable, and for short repeats is the average of a small number
+##     frames. It is preferable to use the long darks between each sweeps to calculate a dark frame, when possible
+
+## In this example, the WhiteCalibration dataset includes an extra plateau at the end of the sweep, when red light was flashed
+##     to clearly indicate the end of the sweep. The 'ExtraWav' parameter allows to account for this.
+##     The 'Buffer' parameter allows to control how many frames a thrown out on either side of the selection
+LongDark = HySE.GetLondDark(WhiteCalibration_Path, EdgePos_WhiteCalib, ExtraWav=1, Buffer=30)
+
+## Plotting the dark can help make sure the estimate is adequate
+HySE.PlotDark(LongDark)
+
 
 ```
 
-### Option 2: Co-registration only
+The data now needs to be normalised. Several options are possible, all through the same function 'HySE.NormaliseMixedHypercube'. 
+Optional arguments allow to control what normalisation is done:
+* When 'Dark' is specified, the function with subtract the dark frame input
+* When WhiteCalibration is specified, the function with normalise (divide) each frame by the equivalent white calibration frame.
+
+The function also estimates a mask, from the white calibration when possible and from the data otherwise, that masks the dark corners from the endoscopic data.
+
+Depending on the selected normalisation, sometimes the automatic plotting range is inadequate. The 'vmax' option allows to manually adjust the upper scale.
+
 
 ```python
-## Select the sweep
-Nsweep = 5
-## Define where and how the data will be saved
-SP = f'{SavingPath}{Name}_NSweep{Nsweep}'
 
-Hypercube = HySE.GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, ImStatic_Plateau=1, ImStatic_Index=8, Buffer=6, SavingPath=SP)
-## Optional inputs include Plot_PlateauList='None'/'All'/[1,2, ..], Plot_Index=7, PlotDiff=True
 
+############################
+####### 6. Normalise Data
+############################
+
+##The General function for normalising the data is the following:
+Hypercube_MacbethHySE_avg_ND, Mask_avg = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=False, SavingPath=SavingPath+Name,)
+Hypercube_MacbethHySE_avg_N, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=True, SavingPath=SavingPath+Name)
+Hypercube_MacbethHySE_avg_D, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=False, SavingPath=SavingPath+Name, vmax=80)
+
+## Using the non averaged dataset:
+Hypercube_MacbethHySE_all_ND, Mask_all = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=False, SavingPath=SavingPath+Name)
+## Or a single individual sweep:
+Hypercube_MacbethHySE_1_ND, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all[0,:,:,:], Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=True, SavingPath=SavingPath+Name)
 
 ```
 
-### Option 3: Normalisation only  (no co-registration, no masking)
-
-Alternatively, if coregistration is not required, the hypercube can be computed in the following way: 
+Once this is done, we can then move on to the actual unmixing:
 
 ```python
-Hypercube, Dark = HySE.ComputeHypercube(vidPath, EdgePos, Wavelengths_list, Name=Name)
-Hypercube_White, Dark_White = HySE.ComputeHypercube(vidPath_White, EdgePos_White, Wavelengths_list, Name=Name)
+############################
+####### 5. Mixing Matrix
+############################
 
-## And then normalised
-HypercubeNormalised = HySE.NormaliseHypercube(vidPath, Hypercube, Hypercube_White, Dark_White, Wavelengths_list)
+## Compute the mixing matrix
+MixingMatrix = HySE.MakeMixingMatrix(Wavelengths_list, Arduino_MixingMatrix, Help=False)
+
+
+############################
+####### 6. Unmix the data
+############################
+
+Unmixed_Hypercube_MacbethHySE_avg_ND = HySE.UnmixData(Hypercube_MacbethHySE_avg_ND, MixingMatrix)
+Unmixed_Hypercube_MacbethHySE_avg_N = HySE.UnmixData(Hypercube_MacbethHySE_avg_N, MixingMatrix)
+Unmixed_Hypercube_MacbethHySE_avg_D = HySE.UnmixData(Hypercube_MacbethHySE_avg_D, MixingMatrix)
+
+Unmixed_Hypercube_MacbethHySE_all_ND = HySE.UnmixData(Hypercube_MacbethHySE_all_ND, MixingMatrix)
+Unmixed_Hypercube_MacbethHySE_1_ND = HySE.UnmixData(Hypercube_MacbethHySE_1_ND, MixingMatrix)
 
 ```
-The hypercubes and list of wavelengths (saved as npy files) can be visualised with the HypercubeVisualiser.
-Plots and videos can also be generated the following way:
+Don't forget to save the unmixed hypercubes! The functions may save figures, but you need to save the array itself:
 
 ```python
-## Define where and how the data will be saved
-SP = f'{SavingPath}{Name}_NSweep{Nsweep}'
-## Plot
-HySE.PlotHypercube(Hypercube, Wavelengths=Wavelengths_list)
-## Make video
-HySE.MakeHypercubeVideo(Hypercube, SP)
+
+np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_avg_ND.npz', Unmixed_Hypercube_MacbethHySE_avg_ND)
+np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_avg_N.npz', Unmixed_Hypercube_MacbethHySE_avg_N)
+np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_avg_D.npz', Unmixed_Hypercube_MacbethHySE_avg_D)
+
+np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_all_ND.npz', Unmixed_Hypercube_MacbethHySE_all_ND)
+np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_1_ND.npz', Unmixed_Hypercube_MacbethHySE_1_ND)
+
+## The Hypercube Visualiser GUI will also require a list of the wavelengths:
+np.savez(f'{SavingPath}{Name}_SortedWavelengths.npz', Wavelengths_list_sorted)
+
 ```
 
+## Optional Functions
 
-Some functions have a specific help flag that print a full description of inputs, outputs and constraints (Help=True). 
+When imaging a Macbeth colour chart, it is helpful to look at the spectra from each patch.
+Certain functions are designed to make this task easier.
+
+```python
+
+############################
+####### A.1 Location of ground truth files
+############################
+
+MacbethPath = 'MacBeth/Micro_Nano_CheckerTargetData.xls'
+
+Macbeth_sRGBPath = 'MacBeth/Macbeth_sRGB.xlsx'
+Macbeth_AdobePath = 'MacBeth/Macbeth_Adobe.xlsx'
+
+MacBethSpectraData = np.array(pd.read_excel(MacbethPath, sheet_name='Spectra'))
+MacBethSpectraColour = np.array(pd.read_excel(MacbethPath, sheet_name='Color_simple'))
+
+MacBeth_RGB = np.array(pd.read_excel(Macbeth_AdobePath))
+## Adobe RGB
+MacBethSpectraRGB = np.array([MacBethSpectraColour[:,0], MacBethSpectraColour[:,7], MacBethSpectraColour[:,8], MacBethSpectraColour[:,9]])
+
+
+############################
+####### A.2 Crop around macbeth chart
+############################
+
+xs, xe = 170,927
+ys, ye = 310,944
+
+macbeth = Unmixed_Hypercube_MacbethHySE_avg_ND[-1,ys:ye,xs:xe]
+
+plt.close()
+fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6,5))
+ax.imshow(macbeth, cmap='gray')
+plt.tight_layout()
+plt.show()
+
+
+############################
+####### A.3 Identify where each patch is located
+############################
+
+## This step requires referncing the plot previously generated, and usually requires a few iterations for each new dataset
+## Make sure that the ROI squares cover the right patches and only those, by looking at the generated plot.
+## The larger the ROI, the more pixels can be averaged to reduce noise
+Patch1_pos = [558, 660]
+## Size of a single macbeth patch, in pixel
+Patch_size_x = 116
+Patch_size_y = 115
+Sample_size = 50
+Image_angle = 0
+ 
+Positions = HySE.GetPatchPos(Patch1_pos, Patch_size_x, Patch_size_y, Image_angle)
+HySE.PlotPatchesDetection(macbeth, Positions, Sample_size)
+
+############################
+####### A.4 Compute the spectra for each patch
+############################
+
+PatchesSpectra_MacbethHySE_avg_ND = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_avg_ND, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_MacbethHySE_avg_N = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_avg_N, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_MacbethHySE_avg_D = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_avg_D, Sample_size, Positions, CropCoordinates)
+
+PatchesSpectra_MacbethHySE_all_ND = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_all_ND, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_MacbethHySE_1_ND = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_1_ND, Sample_size, Positions, CropCoordinates)
+
+############################
+####### A.5 Plot
+############################
+
+## Indicate which spectra to plot
+##     If plotting more than one, create a list with all the spectra
+PatchesToPlot = [PatchesSpectra_MacbethHySE_avg_ND, PatchesSpectra_MacbethHySE_all_ND, PatchesSpectra_MacbethHySE_1_ND]
+## For a more descriptive plot, define short labels for each spectra in the list
+Labels = ['avg then unmix', 'unmix then avg', 'one sweep']
+## If saving the figure, define a saving path
+Name_ToSave = f'{SavingPath}{Name}_UnmixingComparison_ND'
+
+HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraData, MacBeth_RGB, Name, PlotLabels=Labels)#, SavingPath=Name_ToSave)
+
+```
+
+The file contains many more functions, and each function typically contains several options.
+Most functions include a 'Help' option describing what the function does and includes a detailed description of all inputs, required and optional. It can be activated by simply adding 'Help=True' in the argument of the function to print a information text.
+
 A succint general help statement listing optional inputs and default values can be obtained for all functions by executing the following:
 
 ```python
