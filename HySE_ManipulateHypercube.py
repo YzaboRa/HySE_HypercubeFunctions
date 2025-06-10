@@ -53,6 +53,9 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				- SaveArray = True
 				- PlotHypercube = True
 				- Order = True. Set to False if doing wavelength unmixing
+				- Average = True. If more than one sweep is indicated, indicates whether
+					to average all sweeps before computing hypercube.
+					If false, it will output as many hypercubes as sweeps.
 										 
 	
 	Output:
@@ -81,6 +84,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		print(info)
 		return 0, 0
 	PlotHypercube = kwargs.get('PlotHypercube', False)
+	Average = kwargs.get('Average', True)
 
 	CropImDimensions = kwargs.get('CropImDimensions')
 	if not CropImDimensions:
@@ -162,16 +166,30 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	Darks = np.array(Darks)
 	Hypercube = np.array(Hypercube)
 	## Average sweeps
-	Hypercube = np.average(Hypercube,axis=0)
+	if Average:
+		Hypercube = np.average(Hypercube,axis=0)
+	## Always average darks
 	Darks = np.average(Darks,axis=0)
 	
 	# Sort hypercube according to the order_list
 	# Ensures wavelenghts are ordered from blue to red
 	if Order:
-		Hypercube_sorted = []
-		for k in range(0,Hypercube.shape[0]):
-			Hypercube_sorted.append(Hypercube[order_list[k]])
-		Hypercube_sorted = np.array(Hypercube_sorted)
+		if Average:
+			Hypercube_sorted = []
+			for k in range(0,Hypercube.shape[0]):
+				Hypercube_sorted.append(Hypercube[order_list[k]])
+			Hypercube_sorted = np.array(Hypercube_sorted)
+		else:
+			print(f'Warning: in HySE_ManipulateHypercube.ComputeHypercube(), Order=True but Average=False.')
+			Hypercube_sorted = []
+			NN, WW, YY, XX = Hypercube.shape
+			for n in range(0,NN):
+				hypercube_sorted_sub = []
+				for k in range(0,WW):
+					hypercube_sorted_sub.append(Hypercube[n,order_list[k],:,:])
+				Hypercube_sorted.append(hypercube_sorted_sub)
+			Hypercube_sorted = np.array(Hypercube_sorted)
+
 	else:
 		Hypercube_sorted = Hypercube
 
@@ -188,9 +206,14 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	
 	## MakeFigure
 	if PlotHypercube:
+		if Average==False:
+			HypercubeToPlot = Hypercube_sorted[0,:,:,:]
+			print(f'Plotting hypercube for sweep 0')
+		else: 
+			HypercubeToPlot = Hypercube_sorted
 		nn = 0
-		Mavg = np.average(Hypercube_sorted)
-		Mstd = np.std(Hypercube_sorted)
+		Mavg = np.average(HypercubeToPlot)
+		Mstd = np.std(HypercubeToPlot)
 		MM = Mavg+5*Mstd
 		fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
 		for j in range(0,4):
@@ -198,7 +221,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				if nn<17:
 					wav = Wavelengths_sorted[nn]
 					RGB = HySE_UserTools.wavelength_to_rgb(wav)
-					ax[j,i].imshow(Hypercube_sorted[nn,:,:], cmap='gray')
+					ax[j,i].imshow(HypercubeToPlot[nn,:,:], cmap='gray')
 					if Order:
 						ax[j,i].set_title(f'{wav} nm', c=RGB)
 					else:
@@ -367,109 +390,175 @@ def Rescale(im, PercMax, Crop=True):
 
 
 
-def GetDark(vidPath, EdgePos, **kwargs):
-	'''
-	Function that computes the dark from the long darks that seperate individual sweeps
-	Inputs:
-		- vidPath: where to find the data
-		- EdgePos: Positions indicating where each sections of frames is for each wavelength  
-			for all sweeps in the dataset  (output from FindHypercube)
-		-kwargs: optional input
-			- CropImDimensions = [xstart, xend, ystart, yend] : where to crop frames to just keep the image 
-				(default values from CCRC HD video)
-			- Buffer: sets the numner of frames to ignore on either side of a colour transition
-				Total number of frames removed = 2*Buffer (default 6)
-			- DarkRepeat: Number of extra repeat for long darks
-				(default 3)
-			- SaveDark: whether or not to save the dark
-			- SavePath: where to save the dark
+def GetLondDark(vidPath, EdgePos, **kwargs):
+	info="""
+	Computes dark frame from the long darks between sweeps. 
+	Requires at least 2 sweeps idenfitied
 
-	Outputs:
-		- Dark
-		Saved:
-			Dark
+	Input:
+		- vidPath: Path to data
+		- EdgePos: Sweep positions
 
-	'''
-	DataAll = HySE_ImportData.ImportData(vidPath, **kwargs)
-	DarkAvg = GetDark_FromData(DataAll, EdgePos, **kwargs)
-	return DarkAvg
+		- kwargs:
+			- Help: Print this help information
+			- ExtraWav = 0: If an extra plateau exists at the end
+			(for example when adding a red extra wavelength to mark the end of a sweep)
+			- Buffer = 20: Number of frames to remove at the start and end of the sweep
+
+	Ouput:
+		- LongDark: 2D numpy array
 
 
-def GetDark_FromData(DataAll, EdgePos, **kwargs):
 
-	Buffer = kwargs.get('Buffer', 6)
+	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(info)
+		return 0
 
-	try:
-		DarkRepeat = kwargs['DarkRepeat']
-		print(f'DarkRepeat set to {DarkRepeat}.')
-	except KeyError:
-		DarkRepeat = 3
-		print(f'Assuming DarkRepeat = 3,')
+	ExtraWav = kwargs.get('ExtraWav', 0)
+	Buffer = kwargs.get('Buffer', 20)
 
-	SaveDark = kwargs.get('SaveDark', True)
 
-	try: 
-		SavePath = kwargs['SavePath']
-		print(f'SavePath set to {SavePath}.')
-	except KeyError:
-		SavePath = ''
-		if SaveDark:
-			print(f'Please input a saving path with SavePath=\'\'')
-
+	(Nsweeps, Nw, _) = EdgePos.shape
+	DataAll = HySE_ImportData.ImportData(vidPath) # DataAll = HySE_ImportData.ImportData(vidPath, **kwargs)
+	Ndarks = Nsweeps-1
 	## Automatic dark checks parameters
 	std_Max = 5
 	avg_Max = 25
-
-
-	## Number of sweeps
-	NNsweeps = len(EdgePos)
-
-	## Size of the dataset
-	(NN, YY, XX) = DataAll.shape
-
-	AllDarks = []
-	## Loop through all of the sweeps
-	for n in range(0,NNsweeps):
-		start = EdgePos[n][-1][0] + EdgePos[n][-1][1] + Buffer
-
-		if n==(NNsweeps-1):
-			# print(f'	n={n}, (NN-2)={NNsweeps-2}')
-			## If this is the last sweep, check if we need to go to end of the sweep
-			## or estimate the size of a long dark (to avoid start of unfinished sweep)
-			end_estimate = start+ np.amin(EdgePos[n][:,1])*DarkRepeat
-			end_sweep = NN
-			# print(f'	end_estimate={end_estimate}, end_sweep={end_sweep}')
-			end = min(end_estimate, end_sweep)
+	Darks = []
+#     print(f'Adding {ExtraWav*EdgePos[0,-1,1]}')
+	for n in range(0,Ndarks):
+		print(EdgePos[n,-1,0], ExtraWav, EdgePos[n,-1,1], Buffer)
+		sweep_end = EdgePos[n,-1,0] + (ExtraWav+1)*EdgePos[n,-1,1]+Buffer
+		sweep_start = EdgePos[n+1,0,0]-Buffer
+		if (sweep_start-sweep_end)<0:
+			print(f'Not enough frames to calculate the long dark. Check EdgePos and Buffer values')
+			# print(f'sweep_n_end: {sweep_end}, sweep_n+1_start: {sweep_start}')
+			return 0
 		else:
-			# print(f'	n={n}')
-			end = EdgePos[n+1][0][0] - Buffer
-
-		# print(f'	n={n}, start={start}, end={end}')
-
-		## Select frames from the long dark
-		frames = DataAll[start:end, :,:]
+			print(f'Averaging {sweep_start-sweep_end} frames')
+		frames = DataAll[sweep_end:sweep_start]
+		## Sanity check to make sure we are only keeping dark frames
 		m, M = np.amin(frames), np.amax(frames)
 		avg, std = np.average(frames), np.std(frames)
-		print(f'min = {m:.2f}, max = {M:.2f}, avg = {avg:.2f}, std = {std:.2f}')
-
-		## Add extra step to make sure we are not including non-dark frames
 		if (std>std_Max or avg>avg_Max):
 			print(f'It seems like there are outlier parameters in the dark frames')
-			print(f'	min = {m:.2f}, max = {M:.2f}, avg = {avg:.2f}, std = {std:.2f}')
-			print(f'	Use \'DarkRepeat\' and \'Buffer\' to adjust the dark selection')
-
-
+			print(f'   min = {m:.2f}, max = {M:.2f}, avg = {avg:.2f}, std = {std:.2f}')
+			print(f'Start: {sweep_end}, End: {sweep_start}')
+#             print(f'   Use \'DarkRepeat\' and \'Buffer\' to adjust the dark selection')
 		dark = np.average(frames,axis=0)
-		# print(f'dark.shape = {dark.shape}')
-		AllDarks.append(dark)
-
-	AllDarks = np.array(AllDarks)
-	DarkAvg = np.average(AllDarks,axis=0)
-
-	if SaveDark:
-		if '.npz' not in SavePath:
-			SavePath_Dark = SavePath+'_Dark.npz'
-		else:
-			SavePath_Dark.replace('.npz','_Dark.npz')
-		np.savez(SavePath_Dark, DarkAvg)
+		Darks.append(dark)
+		
+	Darks = np.array(Darks)
+	DarkAvg = np.average(Darks,axis=0)
 	return DarkAvg
+
+
+
+# def GetDark(vidPath, EdgePos, **kwargs):
+# 	'''
+# 	Function that computes the dark from the long darks that seperate individual sweeps
+# 	Inputs:
+# 		- vidPath: where to find the data
+# 		- EdgePos: Positions indicating where each sections of frames is for each wavelength  
+# 			for all sweeps in the dataset  (output from FindHypercube)
+# 		-kwargs: optional input
+# 			- CropImDimensions = [xstart, xend, ystart, yend] : where to crop frames to just keep the image 
+# 				(default values from CCRC HD video)
+# 			- Buffer: sets the numner of frames to ignore on either side of a colour transition
+# 				Total number of frames removed = 2*Buffer (default 6)
+# 			- DarkRepeat: Number of extra repeat for long darks
+# 				(default 3)
+# 			- SaveDark: whether or not to save the dark
+# 			- SavePath: where to save the dark
+
+# 	Outputs:
+# 		- Dark
+# 		Saved:
+# 			Dark
+
+# 	'''
+# 	DataAll = HySE_ImportData.ImportData(vidPath, **kwargs)
+# 	DarkAvg = GetDark_FromData(DataAll, EdgePos, **kwargs)
+# 	return DarkAvg
+
+
+# def GetDark_FromData(DataAll, EdgePos, **kwargs):
+
+# 	Buffer = kwargs.get('Buffer', 6)
+
+# 	try:
+# 		DarkRepeat = kwargs['DarkRepeat']
+# 		print(f'DarkRepeat set to {DarkRepeat}.')
+# 	except KeyError:
+# 		DarkRepeat = 3
+# 		print(f'Assuming DarkRepeat = 3,')
+
+# 	SaveDark = kwargs.get('SaveDark', True)
+
+# 	try: 
+# 		SavePath = kwargs['SavePath']
+# 		print(f'SavePath set to {SavePath}.')
+# 	except KeyError:
+# 		SavePath = ''
+# 		if SaveDark:
+# 			print(f'Please input a saving path with SavePath=\'\'')
+
+# 	## Automatic dark checks parameters
+# 	std_Max = 5
+# 	avg_Max = 25
+
+
+# 	## Number of sweeps
+# 	NNsweeps = len(EdgePos)
+
+# 	## Size of the dataset
+# 	(NN, YY, XX) = DataAll.shape
+
+# 	AllDarks = []
+# 	## Loop through all of the sweeps
+# 	for n in range(0,NNsweeps):
+# 		start = EdgePos[n][-1][0] + EdgePos[n][-1][1] + Buffer
+
+# 		if n==(NNsweeps-1):
+# 			# print(f'	n={n}, (NN-2)={NNsweeps-2}')
+# 			## If this is the last sweep, check if we need to go to end of the sweep
+# 			## or estimate the size of a long dark (to avoid start of unfinished sweep)
+# 			end_estimate = start+ np.amin(EdgePos[n][:,1])*DarkRepeat
+# 			end_sweep = NN
+# 			# print(f'	end_estimate={end_estimate}, end_sweep={end_sweep}')
+# 			end = min(end_estimate, end_sweep)
+# 		else:
+# 			# print(f'	n={n}')
+# 			end = EdgePos[n+1][0][0] - Buffer
+
+# 		# print(f'	n={n}, start={start}, end={end}')
+
+# 		## Select frames from the long dark
+# 		frames = DataAll[start:end, :,:]
+# 		m, M = np.amin(frames), np.amax(frames)
+# 		avg, std = np.average(frames), np.std(frames)
+# 		print(f'min = {m:.2f}, max = {M:.2f}, avg = {avg:.2f}, std = {std:.2f}')
+
+# 		## Add extra step to make sure we are not including non-dark frames
+# 		if (std>std_Max or avg>avg_Max):
+# 			print(f'It seems like there are outlier parameters in the dark frames')
+# 			print(f'	min = {m:.2f}, max = {M:.2f}, avg = {avg:.2f}, std = {std:.2f}')
+# 			print(f'	Use \'DarkRepeat\' and \'Buffer\' to adjust the dark selection')
+
+
+# 		dark = np.average(frames,axis=0)
+# 		# print(f'dark.shape = {dark.shape}')
+# 		AllDarks.append(dark)
+
+# 	AllDarks = np.array(AllDarks)
+# 	DarkAvg = np.average(AllDarks,axis=0)
+
+# 	if SaveDark:
+# 		if '.npz' not in SavePath:
+# 			SavePath_Dark = SavePath+'_Dark.npz'
+# 		else:
+# 			SavePath_Dark.replace('.npz','_Dark.npz')
+# 		np.savez(SavePath_Dark, DarkAvg)
+# 	return DarkAvg

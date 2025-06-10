@@ -31,6 +31,14 @@ plt.rcParams["font.family"] = "arial"
 import HySE_UserTools
 import HySE_ManipulateHypercube
 
+
+def GetStandardMask(WhiteCalibration, **kwargs):
+	threshold = kwargs.get('threshold', 1)
+	Calibration_avg = np.average(np.average(WhiteCalibration, axis=1), axis=1)
+	max_idx = np.where(Calibration_avg==np.amax(Calibration_avg))[0][0]
+	Mask = WhiteCalibration[max_idx, :,:] < threshold
+	return Mask
+
 def ConvertMaskToBinary(mask):
 	mask_binary = 1-mask*1
 	return mask_binary.astype('uint8')

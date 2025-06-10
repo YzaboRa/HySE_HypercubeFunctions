@@ -103,10 +103,10 @@ def ImportData(Path, *Coords, **kwargs):
 		print(f'Only importing the trace of the data')
 	
 	CropIm = kwargs.get('CropIm', True)
-	if CropIm:
-		print(f'Cropping Image')
-	else:
-		print(f'Keeping full frame')
+	# if CropIm:
+	# 	print(f'Cropping Image')
+	# else:
+	# 	print(f'Keeping full frame')
 
 	CropImDimensions = kwargs.get('CropImDimensions')
 	if not CropImDimensions:
@@ -259,10 +259,10 @@ def ImportData_imageio(Path, *Coords, **Info):
 		CropIm = Info['CropIm']
 	except KeyError:
 		CropIm = True
-	if CropIm:
-		print(f'Cropping Image')
-	else:
-		print(f'Keeping full frame')
+	# if CropIm:
+	# 	print(f'Cropping Image')
+	# else:
+	# 	print(f'Keeping full frame')
 
 	try:
 		CropImDimensions = Info['CropImDimensions']

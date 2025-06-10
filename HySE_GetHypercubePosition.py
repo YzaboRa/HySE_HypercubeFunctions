@@ -40,7 +40,7 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 						expected plateau/dark sizes to find the frames for each wavelength.
 						To use when the data is too noisy to clearly see edges (~brute force method)
 						Expects: PlateauSize,
-						         StartFrame
+								 StartFrame
 				- PlotGradient = True: To plot gratient of smoothed trace and detected peaks')
 					To see effect of other parameters when optimising')
 				- PrintPeaks = True: To print the list of all detected peaks and their positions')

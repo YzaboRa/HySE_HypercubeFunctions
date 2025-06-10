@@ -13,9 +13,13 @@ from scipy.signal import savgol_filter, find_peaks
 import matplotlib
 from matplotlib import pyplot as plt
 import imageio
-# import matplotlib.colors as colors
-# import matplotlib.cm as cmx
+import matplotlib.patches as patches
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Rectangle
+import matplotlib.colors as colors
+import matplotlib.cm as cmx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import math
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
@@ -461,6 +465,103 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 
 
 
+# def PlotHypercube(Hypercube, **kwargs):
+# 	info="""
+# 	Function to plot the hypercube.
+# 	Input
+# 		- Hypercube (np array)
+# 		- kwargs:
+# 			- Wavelengths: List of sorted wavelengths (for titles colours, default black)
+# 			- Masks
+# 			- SavePlot: (default False)
+# 			- SavingPathWithName: Where to save the plot if SavePlot=True
+# 			- ShowPlot: (default True)
+# 			- SameScale (default False)
+# 			- Help
+
+# 	Output:
+# 		- Figure (4x4, one wavelength per subfigure)
+# 		Saved:
+# 		if SavePlot=True:
+# 			Figure
+
+# 	"""
+
+# 	kwargs.get('Help', False)
+# 	if Help:
+# 		print(f'Help is set to True')
+# 		print(info)
+# 		return 0
+
+# 	kwargs.get('Wavelengths')
+# 	if not Wavelengths:
+# 		Wavelengths = [0]
+# 		print("Input 'Wavelengths' list for better plot")
+
+# 	kwargs.get('SavePlot', False)
+# 	kwargs.get('SavingPathWithName')
+# 	if not SavingPathWithName:
+# 		SavingPathWithName = ''
+# 		if SavePlot:
+# 			print(f'SavePlot is set to True. Please input a SavingPathWithName')
+
+# 	kwargs.get('ShowPlot', True)
+# 	kwargs.get('SameScale', False)
+# 	kwargs.get('Masks')
+# 	if not Masks:
+# 		MaskPlots = False
+# 	else:
+# 		MaskPlots = True
+
+# 	Wavelengths_sorted = np.sort(Wavelengths)
+
+
+# 	NN, YY, XX = Hypercube.shape
+
+# 	nn = 0
+# 	# plt.close()
+# 	fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
+# 	for j in range(0,4):
+# 		for i in range(0,4):
+# 			if nn<NN:
+# 				if Wavelengths[0]==0:
+# 					wav = 0
+# 					RGB = (0,0,0) ## Set title to black if no wavelength input
+# 				else:
+# 					wav = Wavelengths_sorted[nn]
+# 					RGB = wavelength_to_rgb(wav)
+
+# 				if MaskPlots:
+# 					array = Hypercube[nn,:,:]
+# 					mask = Masks[nn,:,:]
+# 					ArrayToPlot = np.ma.array(array, mask=mask)
+# 				else:
+# 					ArrayToPlot = Hypercube[nn,:,:]
+
+# 				if SameScale:
+# 					ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=np.amax(Hypercube))
+# 				else:
+# 					ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=np.average(ArrayToPlot)*3)
+# 				if wav==0:
+# 					ax[j,i].set_title(f'{nn} wavelength', c=RGB)
+# 				else:
+# 					ax[j,i].set_title(f'{wav} nm', c=RGB)
+# 				ax[j,i].set_xticks([])
+# 				ax[j,i].set_yticks([])
+# 				nn = nn+1
+# 			else:
+# 				ax[j,i].set_xticks([])
+# 				ax[j,i].set_yticks([])
+
+# 	plt.tight_layout()
+# 	if SavePlot:
+# 		if '.png' not in SavingPathWithName:
+# 			SavingPathWithName = SavingPathWithName+'_Hypercube.png'
+# 		plt.savefig(f'{SavingPathWithName}')
+# 	if ShowPlot:
+# 		plt.show()
+
+
 def PlotHypercube(Hypercube, **kwargs):
 	info="""
 	Function to plot the hypercube.
@@ -473,6 +574,7 @@ def PlotHypercube(Hypercube, **kwargs):
 			- SavingPathWithName: Where to save the plot if SavePlot=True
 			- ShowPlot: (default True)
 			- SameScale (default False)
+			- vmax
 			- Help
 
 	Output:
@@ -483,27 +585,31 @@ def PlotHypercube(Hypercube, **kwargs):
 
 	"""
 
-	kwargs.get('Help', False)
+	Help = kwargs.get('Help', False)
 	if Help:
+		print(f'Help is set to True')
 		print(info)
-		return
+		return 0
 
-	kwargs.get('Wavelengths')
-	if not Wavelengths:
+	Wavelengths = kwargs.get('Wavelengths')
+	if Wavelengths is None:
 		Wavelengths = [0]
 		print("Input 'Wavelengths' list for better plot")
 
-	kwargs.get('SavePlot', False)
-	kwargs.get('SavingPathWithName')
-	if not SavingPathWithName:
+	SavePlot = kwargs.get('SavePlot', False)
+	SavingPathWithName = kwargs.get('SavingPathWithName')
+	if SavingPathWithName is None:
 		SavingPathWithName = ''
 		if SavePlot:
 			print(f'SavePlot is set to True. Please input a SavingPathWithName')
 
-	kwargs.get('ShowPlot', True)
-	kwargs.get('SameScale', False)
-	kwargs.get('Masks')
-	if not Masks:
+	ShowPlot = kwargs.get('ShowPlot', True)
+	SameScale = kwargs.get('SameScale', False)
+	vmax = kwargs.get('vmax')
+	if vmax is not None:
+		SameScale = True
+	Masks = kwargs.get('Masks')
+	if Masks is None:
 		MaskPlots = False
 	else:
 		MaskPlots = True
@@ -524,17 +630,26 @@ def PlotHypercube(Hypercube, **kwargs):
 					RGB = (0,0,0) ## Set title to black if no wavelength input
 				else:
 					wav = Wavelengths_sorted[nn]
-					RGB = wavelength_to_rgb(wav)
+					RGB = HySE.wavelength_to_rgb(wav)
 
 				if MaskPlots:
 					array = Hypercube[nn,:,:]
-					mask = Masks[nn,:,:]
+					if len(Masks.shape)==2:
+						mask = Masks
+					elif len(Masks.shape)==3:
+						mask = Masks[nn,:,:]
+					else:
+						print(f'Masks shape error:  {Masks.shape}')
+						return 0
 					ArrayToPlot = np.ma.array(array, mask=mask)
 				else:
 					ArrayToPlot = Hypercube[nn,:,:]
 
 				if SameScale:
-					ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=np.amax(Hypercube))
+					if vmax is None:
+						ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=np.amax(Hypercube))
+					else:
+						ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=vmax)
 				else:
 					ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=np.average(ArrayToPlot)*3)
 				if wav==0:
@@ -555,9 +670,6 @@ def PlotHypercube(Hypercube, **kwargs):
 		plt.savefig(f'{SavingPathWithName}')
 	if ShowPlot:
 		plt.show()
-
-
-
 
 
 
@@ -589,5 +701,165 @@ def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
 		data = Hypercube[i,:,:].astype('uint8')
 		out.write(data)
 	out.release()
+
+
+def PlotDark(Dark):
+	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(5,5))
+	im = ax.imshow(Dark, cmap='gray')
+	divider = make_axes_locatable(ax)
+	cax = divider.append_axes("right", size="5%", pad=0.05)
+	plt.colorbar(im, cax=cax)
+	ax.set_title(f'Dark \navg: {np.average(Dark):.2f}, min: {np.nanmin(Dark):.2f}, max: {np.nanmax(Dark):.2f}')
+	plt.show()
+
+
+
+
+
+
+
+### Macbeth colour charts
+
+def GetPatchPos(Patch1_pos, Patch_size_x, Patch_size_y, Image_angle):
+	Positions = []
+	[y0, x0] = Patch1_pos
+	Image_angle_rad = Image_angle*np.pi/180
+	index = 0
+	for j in range(0,5):
+		y0s = y0 -  j*Patch_size_y*np.cos(Image_angle_rad) #j*Patch_size -
+		x0s = x0 + j*Patch_size_x*np.sin(Image_angle_rad)
+		for i in range(0,6):
+			x = x0s - Patch_size_x*np.cos(Image_angle_rad)*i
+			y = y0s - Patch_size_x*np.sin(Image_angle_rad)*i
+			if (j==0 and i==5):
+				y = y-15
+				x = x+10
+			Positions.append([index, x, y])
+			index +=1
+	return np.array(Positions)
+
+def GetPatchesSpectrum(Hypercube, Sample_size, Positions, CropCoordinates):
+	Spectrum = []
+	(NN, YY, XX) = Hypercube.shape
+	for n in range(0,NN):
+		im_sub = Hypercube[n,:,:]
+		Intensities = GetPatchesIntensity(im_sub[CropCoordinates[2]:CropCoordinates[3], CropCoordinates[0]:CropCoordinates[1]], Sample_size, Positions)
+		Spectrum.append(Intensities)
+	return np.array(Spectrum)
+
+
+def GetPatchesIntensity(Image, Sample_size, PatchesPositions):
+	N = len(PatchesPositions)
+	Intensities = []
+	for n in range(0,N):
+		nn = PatchesPositions[n,0]
+		x0, y0 = PatchesPositions[n,1], PatchesPositions[n,2]
+		xs, xe  = int(x0-Sample_size/2), int(x0+Sample_size/2)
+		ys, ye  = int(y0-Sample_size/2), int(y0+Sample_size/2)
+		im_sub = Image[ys:ye, xs:xe]
+		val = np.average(im_sub)
+		std = np.std(im_sub)
+		Intensities.append([nn, val, std])       
+	return np.array(Intensities)
+
+
+def PlotPatchesDetection(Macbeth, Positions):
+	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(5,5))
+	im = ax.imshow(macbeth, cmap='gray')
+	for i in range(0, 30):  
+	    ax.scatter(Positions[i,1], Positions[i,2], color='cornflowerblue', s=15)
+	    ax.text(Positions[i,1]-10, Positions[i,2]-8, f'{Positions[i,0]+1:.0f}', color='red')
+	    area = patches.Rectangle((Positions[i,1]-Sample_size/2, Positions[i,2]-Sample_size/2), Sample_size, Sample_size, edgecolor='none', facecolor='cornflowerblue', alpha=0.4)
+	    ax.add_patch(area)
+	plt.tight_layout()
+	plt.show()
+
+
+
+def psnr(img1, img2):
+	mse = np.mean(np.square(np.subtract(img1,img2)))
+	if mse==0:
+		return np.Inf
+	max_pixel = 1 #255.0
+	psnr = 20 * math.log10(max_pixel / np.sqrt(mse)) 
+#     psnr = 20 * math.log10(max_pixel) - 10 * math.log10(mse)  
+	return psnr
+
+
+def CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrum):
+	ComparableSpectra = []
+	for i in range(0,len(Wavelengths_sorted)):
+		wav=Wavelengths_sorted[i]
+		index=find_closest(GroundTruthWavelengths, wav)
+		ComparableSpectra.append(GroundTruthSpectrum[index])
+	return np.array(ComparableSpectra)
+
+
+def PlotPatchesSpectra(PatchesSpectra, Wavelengths_sorted, MacBethSpectraData, MacBeth_RGB, Name, **kwargs):
+	SavingPath = kwargs.get('SavingPath', '')
+	if SavingPath is None:
+		SaveFig = False
+	else:
+		SaveFig = True
+
+	PlotColours = ['limegreen', 'limegreen', 'royalblue', 'darkblue',    'orange', 'orange', 'red', 'red']
+	PlotLinestyles = ['-', '--', '-', '--',    '-', '--', '-', '--']
+
+	Nwhite=8-1
+	NN = len(Wavelengths_sorted)
+	White_truth = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth,Nwhite+1]
+	GroundTruthWavelengths = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth,0]
+
+	fig, ax = plt.subplots(nrows=5, ncols=6, figsize=(14,12))
+	for i in range(0,6):
+		for j in range(0,5):
+			patchN = i + j*6
+			color=(MacBeth_RGB[patchN,0]/255, MacBeth_RGB[patchN,1]/255, MacBeth_RGB[patchN,2]/255)
+
+			GroundTruthSpectrum = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth,patchN+1]
+			GroundTruthSpectrumN = np.divide(GroundTruthSpectrum, White_truth)
+			
+			ax[j,i].plot(GroundTruthWavelengths, GroundTruthSpectrumN, color='black', lw=4, label='Truth')
+
+			spectra_WhiteNorm = np.divide(PatchesSpectra[:,patchN,1], PatchesSpectra[:,Nwhite,1])
+			ax[j,i].plot(Wavelengths_sorted, spectra_WhiteNorm, '.-', c=PlotColours[w], label=PlotLabels[w]) #PlotLinestyles[w]
+			GT_comparable = CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrumN)
+
+			PSNR = psnr(GT_comparable, spectra_WhiteNorm)
+
+			ax[j,i].set_ylim(-0.02,1.02)
+			ax[j,i].set_xlim(450,670)
+		
+			if patchN==Nwhite:
+				ax[j,i].set_title(f'Patch {patchN+1} - white', color='black', fontsize=10)# - {itn:.0f} itn,\n {r1norm*10**6:.0f} e-6 r1norm', fontsize=12)
+				ax[j,i].legend(fontsize=7, loc='lower center')
+			else:
+				ax[j,i].set_title(f'Patch {patchN+1}\n PSNR = {PSNR:.2f}', color=color, fontsize=10) # fontweight="bold",
+				
+			if j==4:
+				ax[j,i].set_xlabel('Wavelength [nm]')
+			if j!=4:
+				ax[j,i].xaxis.set_ticklabels([])
+			if i==0:
+				ax[j,i].set_ylabel('Normalized intensity')
+			if i!=0:
+				ax[j,i].yaxis.set_ticklabels([])
+			
+	plt.suptitle(f'Spectra for {Name}')
+	plt.tight_layout()
+	if SaveFig:
+		plt.savefig(f'{SavingPath}{Name}_Patches.png')
+	plt.show()
+
+
+
+
+
+
+
+
+
+
+
 
 
