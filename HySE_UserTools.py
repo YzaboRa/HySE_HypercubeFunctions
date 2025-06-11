@@ -872,7 +872,10 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 			PSNR_Vals = []
 			for k in range(0,len(PatchesSpectra_All)):
 				PatchesSpectra = PatchesSpectra_All[k]
-				spectra_WhiteNorm = np.divide(PatchesSpectra[:,patchN,1], PatchesSpectra[:,Nwhite,1])
+				if WhitePatchNormalise:
+					spectra_WhiteNorm = np.divide(PatchesSpectra[:,patchN,1], PatchesSpectra[:,Nwhite,1])
+				else:
+					spectra_WhiteNorm = PatchesSpectra[:,patchN,1]
 				ax[j,i].plot(Wavelengths_sorted, spectra_WhiteNorm, '.-', c=PlotColours[k], label=PlotLabels[k]) #PlotLinestyles[w], , label=PlotLabels[w]
 				GT_comparable = CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrumN)
 
