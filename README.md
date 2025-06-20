@@ -341,15 +341,12 @@ help(HySE.FUNCTION)
 
 
 ## To do
-- [ ] Mask images
-    - [x] Mask specular reflections
-    - [x] Mask areas/edges missing because of movement (co-registration)
-    - [x] Mask images in plots
-    - [ ] Implement option to automatically asjust masking for specular reflection
-- [x] Add function to brute force plateau detection with just plateau expected size (for when automatic detection doesn't work)
-- [x] Add rotating co-registration (set static image as co-registrated image with closest wavelength, to avoid extra distortions)
-- [x] Co-register + normalise multiple sweeps (combine/average frames)
-- [ ] Fine-tune normalisation to account for intensity oscillations (3-frame cycle)
+- [ ] Update masking of images
+   - [ ] Specular reflections
+   - [ ] Low intensity areas
+- [ ] Co-registration
+   - [ ] Try SimpleElastix with better data
+   - [ ] Other algirithm
 
 ## Comments
 - If the functions cannote be loaded, try adding an empty \__init__.py file in the same folder
