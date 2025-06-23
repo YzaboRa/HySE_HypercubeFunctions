@@ -145,7 +145,7 @@ Hypercube_MacbethHySE_all, Dark_MacbethHySE_all = HySE.ComputeHypercube(MacbethH
 ## In this example, the WhiteCalibration dataset includes an extra plateau at the end of the sweep, when red light was flashed
 ##     to clearly indicate the end of the sweep. The 'ExtraWav' parameter allows to account for this.
 ##     The 'Buffer' parameter allows to control how many frames a thrown out on either side of the selection
-LongDark = HySE.GetLondDark(WhiteCalibration_Path, EdgePos_WhiteCalib, ExtraWav=1, Buffer=30)
+LongDark = HySE.GetLongDark(WhiteCalibration_Path, EdgePos_WhiteCalib, ExtraWav=1, Buffer=30)
 
 ## Plotting the dark can help make sure the estimate is adequate
 HySE.PlotDark(LongDark)
