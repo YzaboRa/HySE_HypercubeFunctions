@@ -300,7 +300,6 @@ def find_closest(arr, val):
 
 
 
-
 def wavelength_to_rgb(wavelength, gamma=0.8):
 
 	'''This converts a given wavelength of light to an 
@@ -465,103 +464,6 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 
 
 
-# def PlotHypercube(Hypercube, **kwargs):
-# 	info="""
-# 	Function to plot the hypercube.
-# 	Input
-# 		- Hypercube (np array)
-# 		- kwargs:
-# 			- Wavelengths: List of sorted wavelengths (for titles colours, default black)
-# 			- Masks
-# 			- SavePlot: (default False)
-# 			- SavingPathWithName: Where to save the plot if SavePlot=True
-# 			- ShowPlot: (default True)
-# 			- SameScale (default False)
-# 			- Help
-
-# 	Output:
-# 		- Figure (4x4, one wavelength per subfigure)
-# 		Saved:
-# 		if SavePlot=True:
-# 			Figure
-
-# 	"""
-
-# 	kwargs.get('Help', False)
-# 	if Help:
-# 		print(f'Help is set to True')
-# 		print(info)
-# 		return 0
-
-# 	kwargs.get('Wavelengths')
-# 	if not Wavelengths:
-# 		Wavelengths = [0]
-# 		print("Input 'Wavelengths' list for better plot")
-
-# 	kwargs.get('SavePlot', False)
-# 	kwargs.get('SavingPathWithName')
-# 	if not SavingPathWithName:
-# 		SavingPathWithName = ''
-# 		if SavePlot:
-# 			print(f'SavePlot is set to True. Please input a SavingPathWithName')
-
-# 	kwargs.get('ShowPlot', True)
-# 	kwargs.get('SameScale', False)
-# 	kwargs.get('Masks')
-# 	if not Masks:
-# 		MaskPlots = False
-# 	else:
-# 		MaskPlots = True
-
-# 	Wavelengths_sorted = np.sort(Wavelengths)
-
-
-# 	NN, YY, XX = Hypercube.shape
-
-# 	nn = 0
-# 	# plt.close()
-# 	fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
-# 	for j in range(0,4):
-# 		for i in range(0,4):
-# 			if nn<NN:
-# 				if Wavelengths[0]==0:
-# 					wav = 0
-# 					RGB = (0,0,0) ## Set title to black if no wavelength input
-# 				else:
-# 					wav = Wavelengths_sorted[nn]
-# 					RGB = wavelength_to_rgb(wav)
-
-# 				if MaskPlots:
-# 					array = Hypercube[nn,:,:]
-# 					mask = Masks[nn,:,:]
-# 					ArrayToPlot = np.ma.array(array, mask=mask)
-# 				else:
-# 					ArrayToPlot = Hypercube[nn,:,:]
-
-# 				if SameScale:
-# 					ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=np.amax(Hypercube))
-# 				else:
-# 					ax[j,i].imshow(ArrayToPlot, cmap='gray', vmin=0, vmax=np.average(ArrayToPlot)*3)
-# 				if wav==0:
-# 					ax[j,i].set_title(f'{nn} wavelength', c=RGB)
-# 				else:
-# 					ax[j,i].set_title(f'{wav} nm', c=RGB)
-# 				ax[j,i].set_xticks([])
-# 				ax[j,i].set_yticks([])
-# 				nn = nn+1
-# 			else:
-# 				ax[j,i].set_xticks([])
-# 				ax[j,i].set_yticks([])
-
-# 	plt.tight_layout()
-# 	if SavePlot:
-# 		if '.png' not in SavingPathWithName:
-# 			SavingPathWithName = SavingPathWithName+'_Hypercube.png'
-# 		plt.savefig(f'{SavingPathWithName}')
-# 	if ShowPlot:
-# 		plt.show()
-
-
 def PlotHypercube(Hypercube, **kwargs):
 	info="""
 	Function to plot the hypercube.
@@ -711,9 +613,6 @@ def PlotDark(Dark):
 	plt.colorbar(im, cax=cax)
 	ax.set_title(f'Dark \navg: {np.average(Dark):.2f}, min: {np.nanmin(Dark):.2f}, max: {np.nanmax(Dark):.2f}')
 	plt.show()
-
-
-
 
 
 

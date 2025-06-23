@@ -333,23 +333,23 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 
 
-# def NormaliseFrames(image, image_white, image_dark):
-# 	## Convert to float to avoid numerical errors
-# 	im = image.astype('float64')
-# 	white = image_white.astype('float64')
-# 	dark = image_dark.astype('float64')
-# 	# Subtract dark
-# 	im_d = np.subtract(im, dark)
-# 	white_d = np.subtract(white, dark)
-# 	## avoid negative
-# 	## NB: the value subtracted rounds up to 0, but avoids
-# 	## running into huge numerical errors when dividing
-# 	im_d = im_d - np.amin(im_d)
-# 	white_d = white_d - np.amin(white_d)
-# 	## Divide image by white, avoiding /0 errors
-# 	im_n = np.divide(im_d, white_d, out=np.zeros_like(im_d), where=white_d!=0)
+def NormaliseFrames(image, image_white, image_dark):
+	## Convert to float to avoid numerical errors
+	im = image.astype('float64')
+	white = image_white.astype('float64')
+	dark = image_dark.astype('float64')
+	# Subtract dark
+	im_d = np.subtract(im, dark)
+	white_d = np.subtract(white, dark)
+	## avoid negative
+	## NB: the value subtracted rounds up to 0, but avoids
+	## running into huge numerical errors when dividing
+	im_d = im_d - np.amin(im_d)
+	white_d = white_d - np.amin(white_d)
+	## Divide image by white, avoiding /0 errors
+	im_n = np.divide(im_d, white_d, out=np.zeros_like(im_d), where=white_d!=0)
 
-# 	return im_n
+	return im_n
 
 
 

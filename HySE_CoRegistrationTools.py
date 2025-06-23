@@ -34,276 +34,280 @@ import HySE_ManipulateHypercube
 PythonEnvironment = get_ipython().__class__.__name__
 
 
-def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
-	info="""
-	Apply Simple Elastix co-registration to all sweep
+# def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
+# 	info="""
+# 	Apply Simple Elastix co-registration to all sweep
 
-	Input:
-		- DataSweep: List of 3D arrays. Each element in the list contains all frames in a plateau (wavelength)
-		- WhiteHypercube: White reference hypercube (3D array, assumed sorted)
-		- Dark: 2D array
-		- Wavelengths_list: not sorted
-		- kwargs 
-			- Buffer: sets the numner of frames to ignore on either side of a colour transition
-				Total number of frames removed = 2*Buffer (default 6)
-			- ImStatic_Wavelength: sets the wavelength (in nm) from which the static image is selected (default closest to 550)
-			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
-			- PlotDiff: Whether to plot figure showing the co-registration (default False)
-				If set to True, also expects:
-				- SavingPath: Where to save figure (default '')
-				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul 5)
-				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
-			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
-				(default True)
-			- Help: print this help message is True
+# 	Input:
+# 		- DataSweep: List of 3D arrays. Each element in the list contains all frames in a plateau (wavelength)
+# 		- WhiteHypercube: White reference hypercube (3D array, assumed sorted)
+# 		- Dark: 2D array
+# 		- Wavelengths_list: not sorted
+# 		- kwargs 
+# 			- Buffer: sets the numner of frames to ignore on either side of a colour transition
+# 				Total number of frames removed = 2*Buffer (default 6)
+# 			- ImStatic_Wavelength: sets the wavelength (in nm) from which the static image is selected (default closest to 550)
+# 			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
+# 			- PlotDiff: Whether to plot figure showing the co-registration (default False)
+# 				If set to True, also expects:
+# 				- SavingPath: Where to save figure (default '')
+# 				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul 5)
+# 				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
+# 			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
+# 				(default True)
+# 			- Help: print this help message is True
 
 
-	Outputs:
-		- Normalised and co-registered Hypercube
+# 	Outputs:
+# 		- Normalised and co-registered Hypercube
 
-	"""
+# 	"""
 	
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(info)
-		return 0
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(info)
+# 		return 0
 		
-	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
-	MaxIndex = np.amax(AllIndices)
-	MinIndex = np.amin(AllIndices)
-	# print(AllIndices)
-	# print(MaxIndex)
+# 	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
+# 	MaxIndex = np.amax(AllIndices)
+# 	MinIndex = np.amin(AllIndices)
+# 	# print(AllIndices)
+# 	# print(MaxIndex)
 
-	## Sort Wavelengths
-	order_list = np.argsort(Wavelengths_list)
-	Wavelengths_sorted = Wavelengths_list[order_list]
+# 	## Sort Wavelengths
+# 	order_list = np.argsort(Wavelengths_list)
+# 	Wavelengths_sorted = Wavelengths_list[order_list]
 
-	Buffer = kwargs.get('Buffer', 6)
+# 	Buffer = kwargs.get('Buffer', 6)
 
-	ImStatic_Index = kwargs.get('ImStatic_Index')
-	if not ImStatic_Index:
-		ImStatic_Index = 8
-		if MinIndex>ImStatic_Index:
-			ImStatic_Index = int(MinIndex/2)
-			print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
-	else:
-		if ImStatic_Index<5 or ImStatic_Index<Buffer:
-			print(f'Careful! You have set ImStatic_Index < 5 or < Buffer ')
-			print(f'	This index risks being in the range of unreliable frames too close to a colour transition.')
-		if ImStatic_Index>(MinIndex-Buffer):
-			print(f'Careful! You have set ImStatic_Index  > (MinIndex - Buffer')
-			print(f'	This index risks being in the range of unreliable frames too close to a colour transition.')
-
-
-	ImStatic_Wavelength = kwargs.get('ImStatic_Wavelength')
-	if not ImStatic_Wavelength:
-		ImStatic_Wavelength = 550
-		StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
-		StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
-		ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
-		print(f'ImStatic_Wavelength set by default closest to 550, to {ImStatic_Wavelength} nm')
-	else:
-		ImStatic_Wavelength = kwargs['ImStatic_Wavelength']
-		StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
-		StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
-		ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
-		print(f'ImStatic_Wavelength set to {ImStatic_Wavelength} nm')
+# 	ImStatic_Index = kwargs.get('ImStatic_Index')
+# 	if not ImStatic_Index:
+# 		ImStatic_Index = 8
+	# 	if MinIndex>ImStatic_Index:
+	# 		ImStatic_Index = int(MinIndex/2)
+	# 		print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
+	# else:
+	# 	if ImStatic_Index<5 or ImStatic_Index<Buffer:
+	# 		print(f'Careful! You have set ImStatic_Index < 5 or < Buffer ')
+	# 		print(f'	This index risks being in the range of unreliable frames too close to a colour transition.')
+	# 	if ImStatic_Index>(MinIndex-Buffer):
+	# 		print(f'Careful! You have set ImStatic_Index  > (MinIndex - Buffer')
+	# 		print(f'	This index risks being in the range of unreliable frames too close to a colour transition.')
 
 
-	print(f'Static image: {ImStatic_Wavelength} nm (index/plateau {StaticWav_index}), index {ImStatic_Index}. Use ImStatic_Wavelength and ImStatic_Index to change it.')
-	print(f'   NB: ImStatic_Index refers to the frame number in a given plateau/wavelenght used as initial static image. Not to be confused with array index,')
+	# ImStatic_Wavelength = kwargs.get('ImStatic_Wavelength')
+	# if not ImStatic_Wavelength:
+	# 	ImStatic_Wavelength = 550
+	# 	StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
+	# 	StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
+	# 	ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
+	# 	print(f'ImStatic_Wavelength set by default closest to 550, to {ImStatic_Wavelength} nm')
+	# else:
+	# 	ImStatic_Wavelength = kwargs['ImStatic_Wavelength']
+	# 	StaticWav_index = HySE_UserTools.find_closest(Wavelengths_list, ImStatic_Wavelength)
+	# 	StaticWav_index_sorted = HySE_UserTools.find_closest(Wavelengths_sorted, ImStatic_Wavelength)
+	# 	ImStatic_Wavelength = Wavelengths_list[StaticWav_index]
+	# 	print(f'ImStatic_Wavelength set to {ImStatic_Wavelength} nm')
 
 
-	PlotDiff = kwargs.get('PlotDiff', False)
-	if PlotDiff:
-		print(f'PlotDiff set to True. Use \'Plot_PlateauList=[]\' or \'All\' and Plot_Index=int to set')
-
-	SavingPath = kwargs.get('SavingPath')
-	if not SavingPath:
-		SavingPath = ''
-		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
-
-	Plot_PlateauList = kwargs.get('Plot_PlateauList')
-	if not Plot_PlateauList:
-		Plot_PlateauList = [5]
-		print(f'Set Plot_PlateauList and Plot_Index to set images to plot')
-	else:
-		if isinstance(Plot_PlateauList, int):
-			Plot_PlateauList = [Plot_PlateauList]
-
-	Plot_Index = kwargs.get('Plot_Index')
-	if not Plot_Index:
-		Plot_Index = 14
-		print(f'MinIndex = {MinIndex}, MinIndex-Buffer = {MinIndex-Buffer}')
-		if Plot_Index>(MinIndex-Buffer):
-			Plot_Index = int(MinIndex/2)
-			print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
-	else:
-		if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
-			print(f'PlotIndex is outside the range of indices that will be analysed ({Buffer}, {MinIndex-Buffer})')
-			Plot_Index = int(MinIndex/2)
-			print(f'	Seeting it to {PlotIndex}')
+	# print(f'Static image: {ImStatic_Wavelength} nm (index/plateau {StaticWav_index}), index {ImStatic_Index}. Use ImStatic_Wavelength and ImStatic_Index to change it.')
+	# print(f'   NB: ImStatic_Index refers to the frame number in a given plateau/wavelenght used as initial static image. Not to be confused with array index,')
 
 
-	SaveHypercube = kwargs.get('SaveHypercube', True)
-	if SaveHypercube:
-		print(f'Saving Hypercube')
+	# PlotDiff = kwargs.get('PlotDiff', False)
+	# if PlotDiff:
+	# 	print(f'PlotDiff set to True. Use \'Plot_PlateauList=[]\' or \'All\' and Plot_Index=int to set')
+
+	# SavingPath = kwargs.get('SavingPath')
+	# if not SavingPath:
+	# 	SavingPath = ''
+	# 	print(f'PlotDiff has been set to True. Indicate a SavingPath.')
+
+	# Plot_PlateauList = kwargs.get('Plot_PlateauList')
+	# if not Plot_PlateauList:
+	# 	Plot_PlateauList = [5]
+	# 	print(f'Set Plot_PlateauList and Plot_Index to set images to plot')
+	# else:
+	# 	if isinstance(Plot_PlateauList, int):
+	# 		Plot_PlateauList = [Plot_PlateauList]
+
+	# Plot_Index = kwargs.get('Plot_Index')
+	# if not Plot_Index:
+	# 	Plot_Index = 14
+	# 	print(f'MinIndex = {MinIndex}, MinIndex-Buffer = {MinIndex-Buffer}')
+	# 	if Plot_Index>(MinIndex-Buffer):
+	# 		Plot_Index = int(MinIndex/2)
+	# 		print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
+	# else:
+	# 	if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
+	# 		print(f'PlotIndex is outside the range of indices that will be analysed ({Buffer}, {MinIndex-Buffer})')
+	# 		Plot_Index = int(MinIndex/2)
+	# 		print(f'	Seeting it to {PlotIndex}')
 
 
-	print(f'Buffer set to {Buffer}')
-
-	t0 = time.time()
-	Ncolours = len(DataSweep)-1
-	(_, YY, XX) = DataSweep[1].shape
-
-	## Deal with special cases when plateau list is input as string
-	if isinstance(Plot_PlateauList, str):
-		if Plot_PlateauList=='All':
-			Plot_PlateauList = [i for i in range(0,Ncolours)]
-		elif Plot_PlateauList=='None':
-			Plot_PlateauList = []
+	# SaveHypercube = kwargs.get('SaveHypercube', True)
+	# if SaveHypercube:
+	# 	print(f'Saving Hypercube')
 
 
-	## Define static image
-	if StaticWav_index>=8:
-		## to account for the fact that the dark is not included in the wavelengths list
-		im_static_0 = DataSweep[StaticWav_index-1][ImStatic_Index,:,:]
-	else:
-		im_static_0 = DataSweep[StaticWav_index][ImStatic_Index,:,:]
+	# print(f'Buffer set to {Buffer}')
 
-	White_static_0 = WhiteHypercube[StaticWav_index_sorted,:,:]
-	im_staticN_init = HySE_ManipulateHypercube.NormaliseFrames(im_static_0, White_static_0, Dark) ## HySE_ManipulateHypercube.
-	im_staticN_0 = im_staticN_init
+	# t0 = time.time()
+	# Ncolours = len(DataSweep)-1
+	# (_, YY, XX) = DataSweep[1].shape
 
-	## Loop through all colours (wavelengths)
-	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')
-
-	Hypercube = np.zeros(WhiteHypercube.shape)
-
-	## Starting from static image to higher wavelengths
-	for u in range(StaticWav_index_sorted, Ncolours):
-		wav = Wavelengths_sorted[u]
-		## Set static image for this wavelength
-		im_staticN = im_staticN_0
-		## Find wavelnegth index in raw data frame
-		c = np.where(Wavelengths_list==wav)[0][0]
-		if c>=8:
-			c=c+1
-		## Find white reference for wavelenght
-		im_white = WhiteHypercube[u,:,:]
-		## Now co-register all frames
-		ImagesTemp = []
-		(NN, YY, XX) = DataSweep[c].shape
-#         print(f'Index range: {Buffer}, {NN-Buffer}')
-		for i in range(Buffer,NN-Buffer):
-			im_shifted = DataSweep[c][i,:,:]
-			## Normalise before co-registration
-			im_shiftedN = HySE_ManipulateHypercube.NormaliseFrames(im_shifted, im_white, Dark) #HySE_ManipulateHypercube.
-			im_coregistered, shift_val, time_taken = CoRegisterImages(im_staticN, im_shiftedN)    
-			ImagesTemp.append(im_coregistered)
-			## Set static image for next wavelength
-			if i==ImStatic_Index:
-				im_staticN_0 = im_coregistered
-
-			## Plot co-registration if requested
-			if PlotDiff:
-				if c in Plot_PlateauList:
-					if '.png' in SavingPath:
-						NameTot = SavingPath.split('/')[-1]
-						Name = NameTot.replace('.png', '')+f'_Plateau{c}_Index{i}.png'
-						SavingPathWithName = SavingPath.replace(NameTot, Name)
-					else:
-						Name = f'_{wav}nm_Index{i}_CoRegistration.png'
-						SavingPathWithName = SavingPath+Name
-
-					if i==Plot_Index:
-						HySE_UserTools.PlotCoRegistered(im_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
-
-		ImagesTemp = np.array(ImagesTemp)
-		ImAvg = np.average(ImagesTemp, axis=0)
-		Hypercube[u,:,:] = ImAvg
+	# ## Deal with special cases when plateau list is input as string
+	# if isinstance(Plot_PlateauList, str):
+	# 	if Plot_PlateauList=='All':
+	# 		Plot_PlateauList = [i for i in range(0,Ncolours)]
+	# 	elif Plot_PlateauList=='None':
+	# 		Plot_PlateauList = []
 
 
-	im_staticN_0 = im_staticN_init
+	# ## Define static image
+	# if StaticWav_index>=8:
+# 		## to account for the fact that the dark is not included in the wavelengths list
+# 		im_static_0 = DataSweep[StaticWav_index-1][ImStatic_Index,:,:]
+# 	else:
+# 		im_static_0 = DataSweep[StaticWav_index][ImStatic_Index,:,:]
 
-	## Starting now going from static wavelenght to lower wavelengths
-	for uu in range(0, StaticWav_index_sorted):
-		u = StaticWav_index_sorted-uu-1 ## go backwards
+# 	White_static_0 = WhiteHypercube[StaticWav_index_sorted,:,:]
+# 	im_staticN_init = HySE_ManipulateHypercube.NormaliseFrames(im_static_0, White_static_0, Dark) ## HySE_ManipulateHypercube.
+# 	im_staticN_0 = im_staticN_init
 
-		wav = Wavelengths_sorted[u]
-		## Set static image for this wavelength
-		im_staticN = im_staticN_0
-		## Find wavelnegth index in raw data frame
-		c = np.where(Wavelengths_list==wav)[0][0]
-		if c>=8:
-			c=c+1
+# 	## Loop through all colours (wavelengths)
+# 	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')
+
+# 	Hypercube = np.zeros(WhiteHypercube.shape)
+
+# 	## Starting from static image to higher wavelengths
+# 	for u in range(StaticWav_index_sorted, Ncolours):
+# 		wav = Wavelengths_sorted[u]
+# 		## Set static image for this wavelength
+# 		im_staticN = im_staticN_0
+# 		## Find wavelnegth index in raw data frame
+# 		c = np.where(Wavelengths_list==wav)[0][0]
+# 		if c>=8:
+# 			c=c+1
+# 		## Find white reference for wavelenght
+# 		im_white = WhiteHypercube[u,:,:]
+# 		## Now co-register all frames
+# 		ImagesTemp = []
+# 		(NN, YY, XX) = DataSweep[c].shape
+# #         print(f'Index range: {Buffer}, {NN-Buffer}')
+# 		for i in range(Buffer,NN-Buffer):
+# 			im_shifted = DataSweep[c][i,:,:]
+# 			## Normalise before co-registration
+# 			im_shiftedN = HySE_ManipulateHypercube.NormaliseFrames(im_shifted, im_white, Dark) #HySE_ManipulateHypercube.
+# 			im_coregistered, shift_val, time_taken = CoRegisterImages(im_staticN, im_shiftedN)    
+# 			ImagesTemp.append(im_coregistered)
+# 			## Set static image for next wavelength
+# 			if i==ImStatic_Index:
+# 				im_staticN_0 = im_coregistered
+
+# 			## Plot co-registration if requested
+# 			if PlotDiff:
+# 				if c in Plot_PlateauList:
+# 					if '.png' in SavingPath:
+# 						NameTot = SavingPath.split('/')[-1]
+# 						Name = NameTot.replace('.png', '')+f'_Plateau{c}_Index{i}.png'
+# 						SavingPathWithName = SavingPath.replace(NameTot, Name)
+# 					else:
+# 						Name = f'_{wav}nm_Index{i}_CoRegistration.png'
+# 						SavingPathWithName = SavingPath+Name
+
+# 					if i==Plot_Index:
+# 						HySE_UserTools.PlotCoRegistered(im_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+
+# 		ImagesTemp = np.array(ImagesTemp)
+# 		ImAvg = np.average(ImagesTemp, axis=0)
+# 		Hypercube[u,:,:] = ImAvg
+
+
+# 	im_staticN_0 = im_staticN_init
+
+# 	## Starting now going from static wavelenght to lower wavelengths
+# 	for uu in range(0, StaticWav_index_sorted):
+# 		u = StaticWav_index_sorted-uu-1 ## go backwards
+
+# 		wav = Wavelengths_sorted[u]
+# 		## Set static image for this wavelength
+# 		im_staticN = im_staticN_0
+# 		## Find wavelnegth index in raw data frame
+# 		c = np.where(Wavelengths_list==wav)[0][0]
+# 		if c>=8:
+# 			c=c+1
 		
-		## Find white reference for wavelenght
-		im_white = WhiteHypercube[u,:,:]
-		## Now co-register all frames
-		ImagesTemp = []
-		(NN, YY, XX) = DataSweep[c].shape
+# 		## Find white reference for wavelenght
+# 		im_white = WhiteHypercube[u,:,:]
+# 		## Now co-register all frames
+# 		ImagesTemp = []
+# 		(NN, YY, XX) = DataSweep[c].shape
 		
-		for i in range(Buffer,NN-Buffer):
-			im_shifted = DataSweep[c][i,:,:]
-			## Normalise before co-registration
-			im_shiftedN = HySE_ManipulateHypercube.NormaliseFrames(im_shifted, im_white, Dark)
-			im_coregistered, shift_val, time_taken = CoRegisterImages(im_staticN, im_shiftedN)
-			ImagesTemp.append(im_coregistered)
-			## Set static image for next wavelength
-			if i==ImStatic_Index:
-				im_staticN_0 = im_coregistered
+# 		for i in range(Buffer,NN-Buffer):
+# 			im_shifted = DataSweep[c][i,:,:]
+# 			## Normalise before co-registration
+# 			im_shiftedN = HySE_ManipulateHypercube.NormaliseFrames(im_shifted, im_white, Dark)
+# 			im_coregistered, shift_val, time_taken = CoRegisterImages(im_staticN, im_shiftedN)
+# 			ImagesTemp.append(im_coregistered)
+# 			## Set static image for next wavelength
+# 			if i==ImStatic_Index:
+# 				im_staticN_0 = im_coregistered
 
-			## Plot co-registration if requested
-			if PlotDiff:
-				if c in Plot_PlateauList:
-					if '.png' in SavingPath:
-						NameTot = SavingPath.split('/')[-1]
-						Name = NameTot.replace('.png', '')+f'_Plateau{c}_Index{i}.png'
-						SavingPathWithName = SavingPath.replace(NameTot, Name)
-					else:
-						Name = f'_{wav}nm_Index{i}_CoRegistration.png'
-						SavingPathWithName = SavingPath+Name
+# 			## Plot co-registration if requested
+# 			if PlotDiff:
+# 				if c in Plot_PlateauList:
+# 					if '.png' in SavingPath:
+# 						NameTot = SavingPath.split('/')[-1]
+# 						Name = NameTot.replace('.png', '')+f'_Plateau{c}_Index{i}.png'
+# 						SavingPathWithName = SavingPath.replace(NameTot, Name)
+# 					else:
+# 						Name = f'_{wav}nm_Index{i}_CoRegistration.png'
+# 						SavingPathWithName = SavingPath+Name
 
-					if i==Plot_Index:
-						HySE_UserTools.PlotCoRegistered(im_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+# 					if i==Plot_Index:
+# 						HySE_UserTools.PlotCoRegistered(im_staticN, im_shiftedN, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
 
-		ImagesTemp = np.array(ImagesTemp)
-		ImAvg = np.average(ImagesTemp, axis=0)
-		Hypercube[u,:,:] = ImAvg
+# 		ImagesTemp = np.array(ImagesTemp)
+# 		ImAvg = np.average(ImagesTemp, axis=0)
+# 		Hypercube[u,:,:] = ImAvg
 
-	## Calculate time taken
-	tf = time.time()
-	time_total = tf-t0
-	minutes = int(time_total/60)
-	seconds = time_total - minutes*60
-	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
+# 	## Calculate time taken
+# 	tf = time.time()
+# 	time_total = tf-t0
+# 	minutes = int(time_total/60)
+# 	seconds = time_total - minutes*60
+# 	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
 
-	if SaveHypercube:
-		if '.png' in SavingPath:
-			NameTot = SavingPath.split('/')[-1]
-			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
-			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
-			SavingPathHypercube = SavingPath.replace(NameTot, Name)
-			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
-		else:
-			Name = f'_CoregisteredHypercube.npz'
-			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
-			SavingPathHypercube = SavingPath+Name
-			SavingPathWavelengths = SavingPath+Name_wav
+# 	if SaveHypercube:
+# 		if '.png' in SavingPath:
+# 			NameTot = SavingPath.split('/')[-1]
+# 			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
+# 			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
+# 			SavingPathHypercube = SavingPath.replace(NameTot, Name)
+# 			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
+# 		else:
+# 			Name = f'_CoregisteredHypercube.npz'
+# 			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
+# 			SavingPathHypercube = SavingPath+Name
+# 			SavingPathWavelengths = SavingPath+Name_wav
 
-		np.savez(f'{SavingPathHypercube}', Hypercube)
-		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
+# 		np.savez(f'{SavingPathHypercube}', Hypercube)
+# 		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
 
-	return Hypercube
+# 	return Hypercube
 
 
 
 
 def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
 	"""
+
+	~~ Co-registration only ~~
+
 	This function imports the raw data from a single sweep and computes the co-registered
 	hypercube from it.
+
 	Inputs:
 		- vidPath: where to find the data
 		- EdgePos: Positions indicating where each sections of frames is for each wavelength  
@@ -348,7 +352,13 @@ def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwarg
 
 
 def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
-	"""
+	info="""
+
+	~~ Co-registration with normalisation and masking ~~
+
+	NB: Old function, normalisation and masking not optimal. Never tested with wavelength mixing.
+	    New function to be written.
+
 	Apply Simple Elastix co-registration to all sweep
 
 	Input:
@@ -372,6 +382,11 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 		- Normalised and co-registered Hypercube
 
 	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(info)
+		return 0
+
 	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
 	MaxIndex = np.amax(AllIndices)
 	MinIndex = np.amin(AllIndices)
@@ -386,7 +401,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 
 
 	ImStatic_Index = kwargs.get('ImStatic_Index')
-	if not ImStatic_Index:
+	if ImStatic_Index is None:
 		ImStatic_Index = 8
 		if MinIndex>ImStatic_Index:
 			ImStatic_Index = int(MinIndex/2)
@@ -406,12 +421,12 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 
 
 	SavingPath = kwargs.get('SavingPath')
-	if not SavingPath:
+	if SavingPath is None:
 		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
 	
 
 	Plot_PlateauList = kwargs.get('Plot_PlateauList')
-	if not Plot_PlateauList:
+	if Plot_PlateauList is None:
 		Plot_PlateauList = [5]
 		print(f'Set Plot_PlateauList and Plot_Index to set images to plot')
 	else:
@@ -421,7 +436,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 	
 
 	Plot_Index = kwargs.get('Plot_Index')
-	if not Plot_Index:
+	if Plot_Index is None:
 		Plot_Index = 14
 		print(f'MinIndex = {MinIndex}, MinIndex-Buffer = {MinIndex-Buffer}')
 		if Plot_Index>(MinIndex-Buffer):
@@ -571,7 +586,13 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 
 
 def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
-	"""
+	info = """
+
+	~~ Used in SweepCoRegister_WithNormalisation ~~
+
+	NB: Old function, normalisation and masking not optimal. Never tested with wavelength mixing.
+	    New function to be written.
+
 	Apply Simple Elastix co-registration to all sweep
 
 	Input:
@@ -593,6 +614,13 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	Outputs:
 
 	"""
+
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(info)
+		return 0
+
+
 	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
 	MaxIndex = np.amax(AllIndices)
 	MinIndex = np.amin(AllIndices)
@@ -608,7 +636,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 
 
 	ImStatic_Index = kwargs.get('ImStatic_Index')
-	if not ImStatic_Index:
+	if ImStatic_Index is None:
 		ImStatic_Index = 8
 		if MinIndex>ImStatic_Index:
 			ImStatic_Index = int(MinIndex/2)
@@ -628,7 +656,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	
 
 	SavingPath = kwargs.get('SavingPath')
-	if not SavingPath:
+	if SavingPath is None:
 		SavingPath = ''
 		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
 	
@@ -640,7 +668,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	
 
 	Plot_Index = kwargs.get('Plot_Index')
-	if not Plot_Index:
+	if Plot_Index is None:
 		Plot_Index = 14
 		print(f'MinIndex = {MinIndex}, MinIndex-Buffer = {MinIndex-Buffer}')
 		if Plot_Index>(MinIndex-Buffer):
