@@ -245,65 +245,6 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 
 
-
-
-def NormaliseFrames(image, image_white, image_dark):
-	## Convert to float to avoid numerical errors
-	im = image.astype('float64')
-	white = image_white.astype('float64')
-	dark = image_dark.astype('float64')
-	# Subtract dark
-	im_d = np.subtract(im, dark)
-	white_d = np.subtract(white, dark)
-	## avoid negative
-	## NB: the value subtracted rounds up to 0, but avoids
-	## running into huge numerical errors when dividing
-	im_d = im_d - np.amin(im_d)
-	white_d = white_d - np.amin(white_d)
-	## Divide image by white, avoiding /0 errors
-	im_n = np.divide(im_d, white_d, out=np.zeros_like(im_d), where=white_d!=0)
-
-	return im_n
-
-
-
-
-
-def Rescale(im, PercMax, Crop=True):
-	"""
-	Function used to crop a certain percentage of pixel values (saturated pixels for example).
-	Sometimes handy for data visualisation.
-	Input:
-		- Image 
-		- Maximal percentage (pixels at this value are set to 1)
-		- Crop: If True, all pixels above max pixel are set to 1
-				If False, the image is simply rescaled with pixels higher than 1
-					(will be cropped in plotting)
-
-	Output:
-		- Rescaled image
-
-	"""
-	imflat = im.flatten()
-	imsorted = np.sort(imflat)
-	N = len(imsorted)
-	Nmax = int(np.round(PercMax*N,0))
-	MM = imsorted[Nmax]
-	imnoneg = im-np.amin(im)
-	imrescaled = imnoneg/MM
-	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8,4))
-	ax.plot(imsorted,'.-')
-	ax.axvline(Nmax,c='red')
-	plt.tight_layout()
-	plt.show()
-	if Crop:
-		pos = np.where(imrescaled>1)
-		for i in range(0,len(pos[0])):
-			imrescaled[pos[0][i],pos[1][i]] = 1
-	return imrescaled
-
-
-
 def GetLongDark(vidPath, EdgePos, **kwargs):
 	info="""
 	Computes dark frame from the long darks between sweeps. 
@@ -364,4 +305,65 @@ def GetLongDark(vidPath, EdgePos, **kwargs):
 	Darks = np.array(Darks)
 	DarkAvg = np.average(Darks,axis=0)
 	return DarkAvg
+
+
+
+
+
+
+
+def NormaliseFrames(image, image_white, image_dark):
+	## Convert to float to avoid numerical errors
+	im = image.astype('float64')
+	white = image_white.astype('float64')
+	dark = image_dark.astype('float64')
+	# Subtract dark
+	im_d = np.subtract(im, dark)
+	white_d = np.subtract(white, dark)
+	## avoid negative
+	## NB: the value subtracted rounds up to 0, but avoids
+	## running into huge numerical errors when dividing
+	im_d = im_d - np.amin(im_d)
+	white_d = white_d - np.amin(white_d)
+	## Divide image by white, avoiding /0 errors
+	im_n = np.divide(im_d, white_d, out=np.zeros_like(im_d), where=white_d!=0)
+
+	return im_n
+
+
+
+
+
+def Rescale(im, PercMax, Crop=True):
+	"""
+	Function used to crop a certain percentage of pixel values (saturated pixels for example).
+	Sometimes handy for data visualisation.
+	Input:
+		- Image 
+		- Maximal percentage (pixels at this value are set to 1)
+		- Crop: If True, all pixels above max pixel are set to 1
+				If False, the image is simply rescaled with pixels higher than 1
+					(will be cropped in plotting)
+
+	Output:
+		- Rescaled image
+
+	"""
+	imflat = im.flatten()
+	imsorted = np.sort(imflat)
+	N = len(imsorted)
+	Nmax = int(np.round(PercMax*N,0))
+	MM = imsorted[Nmax]
+	imnoneg = im-np.amin(im)
+	imrescaled = imnoneg/MM
+	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(8,4))
+	ax.plot(imsorted,'.-')
+	ax.axvline(Nmax,c='red')
+	plt.tight_layout()
+	plt.show()
+	if Crop:
+		pos = np.where(imrescaled>1)
+		for i in range(0,len(pos[0])):
+			imrescaled[pos[0][i],pos[1][i]] = 1
+	return imrescaled
 

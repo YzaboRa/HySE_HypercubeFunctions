@@ -105,6 +105,10 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 
 
 
+
+
+
+
 ## Functions from HySE_ImportData
 
 def GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs):
@@ -121,12 +125,15 @@ def ImportData(Path, *Coords, **kwargs):
 	data = HySE_ImportData.ImportData(Path, *Coords, **kwargs)
 	return data
 
-def ImportData_imageio(Path, *Coords, **kwargs):
-	"""
-	kwargs = RGB (False), Trace (False), CropIm (True), CropImDimensions (CCRC HD video)
-	"""
-	data = HySE_ImportData.ImportData_imageio(Path, *Coords, **kwargs)
-	return data
+# def ImportData_imageio(Path, *Coords, **kwargs):
+# 	"""
+# 	kwargs = RGB (False), Trace (False), CropIm (True), CropImDimensions (CCRC HD video)
+# 	"""
+# 	data = HySE_ImportData.ImportData_imageio(Path, *Coords, **kwargs)
+# 	return data
+
+
+
 
 
 
@@ -184,8 +191,52 @@ def GetPeakDist(peaks, FrameStart, FrameEnd):
 	return peaks_dist
 
 
-def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, Ncolours, printInfo=True):
-	EdgePos, Stats = HySE_GetHypercubePosition.GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, Ncolours, printInfo=True)
+def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, Ncolours, printInfo=True, **kwargs):
+	EdgePos, Stats = HySE_GetHypercubePosition.GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, Ncolours, printInfo=True, **kwargs)
+
+
+
+
+
+
+
+
+
+
+## Functions from HySE_Unmixing
+
+def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
+	"""
+	kwargs: Help, FromCalib (False), Hypercube_WhiteCalib, UseMean (False), Plot (True), SaveFig (False), SavingPath ('')
+	"""
+	MixingMatrix = HySE_Unmixing.MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs)
+	return MixingMatrix
+
+def NormaliseMixedHypercube(MixedHypercube, **kwargs):
+	"""
+	kwargs: Help, Dark, WhiteCalibration (*HySE calibration), Sigma, Wavelengths, Plot (True), vmax, vmin, SavePlot (False), SavingFigure ('')
+	"""
+	MixedHypercube_N, Mask = HySE_Unmixing.NormaliseMixedHypercube(MixedHypercube, **kwargs)
+	return MixedHypercube_N, Mask
+
+def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
+	"""
+	kwargs: Help, Average (True)
+	"""
+	UnmixedHypercube = HySE_Unmixing.UnmixData(MixedHypercube, MixingMatrix, **kwargs)
+	return UnmixedHypercube
+
+def MakeObservedMatrix(Hypercube):
+	"""
+	kwargs:
+	"""
+	Matrix = HySE_Unmixing.MakeObservedMatrix(Hypercube)
+	return Matrix
+
+
+
+
+
 
 
 
@@ -200,18 +251,6 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	return Hypercube_sorted, Darks
 
 
-def NormaliseHypercube(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs):
-	"""
-	kwargs = Name ('')
-	"""
-	hypercubeN = HySE_ManipulateHypercube.NormaliseHypercube(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs)
-	return hypercubeN
-
-
-def Rescale(im, PercMax, Crop=True):
-	imrescaled = HySE_ManipulateHypercube.Rescale(im, PercMax, Crop=True)
-	return imrescaled
-
 def GetLongDark(vidPath, EdgePos, **kwargs):
 	"""
 	kwargs: Help, ExtraWav (0), Buffer (20)
@@ -219,35 +258,25 @@ def GetLongDark(vidPath, EdgePos, **kwargs):
 	LongDark = HySE_ManipulateHypercube.GetLongDark(vidPath, EdgePos, **kwargs)
 	return LongDark
 
-# def GetDark(vidPath, EdgePos, **kwargs):
-# 	"""
-# 	kwargs = CropImDimensions (CCRC HD video), Buffer (6), DarkRepeat (3), SaveDark (True), SavePath ('')
-# 	"""
-# 	DarkAvg = HySE_ManipulateHypercube.GetDark(vidPath, EdgePos, **kwargs)
-# 	return DarkAvg
-
-# def GetDark_FromData(DataAll, EdgePos, **kwargs):
-# 	"""
-# 	kwargs = CropImDimensions (CCRC HD video), Buffer (6), DarkRepeat (3), SaveDark (True), SavePath ('')
-# 	"""
-# 	DarkAvg = HySE_ManipulateHypercube.GetDark(DataAll, EdgePos, **kwargs)
-	# return DarkAvg
 
 def NormaliseFrames(image, image_white, image_dark):
 	imageN = HySE_ManipulateHypercube.NormaliseFrames(image, image_white, image_dark)
 	return imageN
 
+def Rescale(im, PercMax, Crop=True):
+	imrescaled = HySE_ManipulateHypercube.Rescale(im, PercMax, Crop=True)
+	return imrescaled
+
+
+
+
+
+
+
+
 
 
 ## Functions from HySE_CoRegistrationTools
-
-def SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
-	"""
-	kwargs = Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), PlotDiff (False), SavingPath (''), Plot_PlateauList ([5])
-			 Plot_Index (14), SaveHypercube (False), Help (False)
-	"""
-	Hypercube = HySE_CoRegistrationTools.SweepRollingCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
-	return Hypercube
 
 def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
 	"""
@@ -282,6 +311,13 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 
 
 
+
+
+
+
+
+
+
 ## Functions from HySE_Mask
 
 def GetStandardMask(WhiteCalibration, **kwargs):
@@ -296,13 +332,13 @@ def BooleanMaskOperation(bool_white, bool_wav):
 	bool_result = HySE_Mask.BooleanMaskOperation(bool_white, bool_wav)
 	return bool_result
 
-def TakeWavMaskDiff(mask_white, mask_shifted):
-	result = HySE_Mask.TakeWavMaskDiff(mask_white, mask_shifted)
-	return result
+# def TakeWavMaskDiff(mask_white, mask_shifted):
+# 	result = HySE_Mask.TakeWavMaskDiff(mask_white, mask_shifted)
+# 	return result
 
-def CombineMasks(mask_white, mask_shifted):
-	mask = HySE_Mask.CombineMasks(mask_white, mask_shifted)
-	return mask
+# def CombineMasks(mask_white, mask_shifted):
+# 	mask = HySE_Mask.CombineMasks(mask_white, mask_shifted)
+# 	return mask
 
 def GetMask(frame, **kwargs):
 	"""
@@ -311,62 +347,8 @@ def GetMask(frame, **kwargs):
 	combined_mask = HySE_Mask.GetMask(frame, **kwargs)
 	return combined_mask
 
-def CoRegisterImages_WithMask(im_static, im_moving, **kwargs):
-	"""
-	kwargs: StaticMask, MovingMask, Affine, Verbose, Help
-	"""
-	im_coregistered = HySE_Mask.CoRegisterImages_WithMask(im_static, im_moving, **kwargs)
-	return im_coregistered
-
-def SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
-	"""
-	kwargs: Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), LowCutoff (False), HighCutoff (False), Mask_CombinedAvgCutoff (0.01),
-	SavingPath (''), SaveHypercube (True), PlotDiff (False), Plot_PlateauList (5, 'All'/'None'), Plot_Index (14), Help
-	"""
-	Hypercube, hypercube_masks = HySE_Mask.SweepCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
-	return Hypercube, hypercube_masks
 
 
-def SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
-	"""
-	kwargs: Buffer (6), ImStatic_Wavelength (550), ImStatic_Index (8), LowCutoff (False), HighCutoff (False), Mask_CombinedAvgCutoff (0.01),
-	SavingPath (''), SaveHypercube (True), PlotDiff (False), Plot_PlateauList (5, 'All'/'None'), Plot_Index (14), Help
-	"""
-	Hypercube, hypercube_masks = HySE_Mask.SweepRollingCoRegister_MaskedWithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs)
-	return Hypercube, hypercube_masks
-
-
-
-
-## Functions from HySE_Unmixing
-
-def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
-	"""
-	kwargs: Help, FromCalib (False), Hypercube_WhiteCalib, UseMean (False), Plot (True), SaveFig (False), SavingPath ('')
-	"""
-	MixingMatrix = HySE_Unmixing.MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs)
-	return MixingMatrix
-
-def NormaliseMixedHypercube(MixedHypercube, **kwargs):
-	"""
-	kwargs: Help, Dark, WhiteCalibration (*HySE calibration), Sigma, Wavelengths, Plot (True), vmax, vmin, SavePlot (False), SavingFigure ('')
-	"""
-	MixedHypercube_N, Mask = HySE_Unmixing.NormaliseMixedHypercube(MixedHypercube, **kwargs)
-	return MixedHypercube_N, Mask
-
-def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
-	"""
-	kwargs: Help, Average (True)
-	"""
-	UnmixedHypercube = HySE_Unmixing.UnmixData(MixedHypercube, MixingMatrix, **kwargs)
-	return UnmixedHypercube
-
-def MakeObservedMatrix(Hypercube):
-	"""
-	kwargs:
-	"""
-	Matrix = HySE_Unmixing.MakeObservedMatrix(Hypercube)
-	return Matrix
 
 
 

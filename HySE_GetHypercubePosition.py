@@ -354,8 +354,8 @@ def GetPeakDist(peaks, FrameStart, FrameEnd):
 
 
 
-def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, Ncolours, printInfo=True):
-	"""
+def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, Ncolours, printInfo=True, **kwargs):
+	info = """
 	Function that identify sweeps from the detected peaks.
 	Input:
 		- Peaks_dist: outut from GetPeakDist
@@ -380,6 +380,12 @@ def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, Plate
 		- Stats: (No longer used) Statistics about the identified sweeps. Useful for debugging.
 
 	"""
+
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(info)
+		return 0,0
+
 	EdgePos = []
 	temp = []
 	Stats = []
