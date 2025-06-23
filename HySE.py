@@ -212,11 +212,11 @@ def Rescale(im, PercMax, Crop=True):
 	imrescaled = HySE_ManipulateHypercube.Rescale(im, PercMax, Crop=True)
 	return imrescaled
 
-def GetLondDark(vidPath, EdgePos, **kwargs):
+def GetLongDark(vidPath, EdgePos, **kwargs):
 	"""
 	kwargs: Help, ExtraWav (0), Buffer (20)
 	"""
-	LongDark = HySE_ManipulateHypercube.GetLondDark(vidPath, EdgePos, **kwargs)
+	LongDark = HySE_ManipulateHypercube.GetLongDark(vidPath, EdgePos, **kwargs)
 	return LongDark
 
 # def GetDark(vidPath, EdgePos, **kwargs):
@@ -231,7 +231,7 @@ def GetLondDark(vidPath, EdgePos, **kwargs):
 # 	kwargs = CropImDimensions (CCRC HD video), Buffer (6), DarkRepeat (3), SaveDark (True), SavePath ('')
 # 	"""
 # 	DarkAvg = HySE_ManipulateHypercube.GetDark(DataAll, EdgePos, **kwargs)
-	return DarkAvg
+	# return DarkAvg
 
 def NormaliseFrames(image, image_white, image_dark):
 	imageN = HySE_ManipulateHypercube.NormaliseFrames(image, image_white, image_dark)

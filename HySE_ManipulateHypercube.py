@@ -247,109 +247,109 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 
 
-def NormaliseHypercube_Old(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs):
-	"""
-	Function that normalises the hypercube with the white reference
-	Input:
-		- Hypercube : Computed from data (3D array)
+# def NormaliseHypercube_Old(DataPath, Hypercube, Hypercube_White, Dark, Wavelengths_list, **kwargs):
+# 	"""
+# 	Function that normalises the hypercube with the white reference
+# 	Input:
+# 		- Hypercube : Computed from data (3D array)
 
-		- Hypercube White: Computed from white reference (3D array)
+# 		- Hypercube White: Computed from white reference (3D array)
 
-		- Dark : Ideally Extracted from white reference (2D array)
+# 		- Dark : Ideally Extracted from white reference (2D array)
 
-		- Wavelengths_list : List of wavelengths as implemented in the data gathering (not ordered)
+# 		- Wavelengths_list : List of wavelengths as implemented in the data gathering (not ordered)
 
-		- kwargs: optional arguments
+# 		- kwargs: optional arguments
 
-			Accepts:
-			- Name: String, used for plotting and saving data
-
-
-	Output:
-		- Normalised Hypercube
+# 			Accepts:
+# 			- Name: String, used for plotting and saving data
 
 
-	"""
-	try: 
-		Name = kwargs['Name']+'_'
-	except KeyError:
-		Name = ''
+# 	Output:
+# 		- Normalised Hypercube
+
+
+# 	"""
+# 	try: 
+# 		Name = kwargs['Name']+'_'
+# 	except KeyError:
+# 		Name = ''
 		
-	## Sort Wavelengths
-	order_list = np.argsort(Wavelengths_list)
-	Wavelengths_sorted = Wavelengths_list[order_list]   
+# 	## Sort Wavelengths
+# 	order_list = np.argsort(Wavelengths_list)
+# 	Wavelengths_sorted = Wavelengths_list[order_list]   
 		
-	Nw, YY, XX = Hypercube.shape
-	hypercubeN = np.zeros((Nw,YY,XX))
-	## Convert to float to avoid numerical errors
-	darkf = Dark.astype('float64')
-	for n in range(0,Nw):
-		h = Hypercube[n,:,:].astype('float64')
-		w = Hypercube_White[n,:,:].astype('float64')
-		## Subtract Dark
-		hh = np.subtract(h,darkf)
-		ww = np.subtract(w,darkf)
-		## Make sure there is no negative values 
-		hh = hh-np.amin(hh)
-		ww = ww-np.amin(ww)
-		## Divide and ignore /0
-		hN = np.divide(hh,ww, out=np.zeros_like(hh), where=ww!=0)
-		hypercubeN[n,:,:] = hN
-#         hypercubeN[n,:,:] = hh
+# 	Nw, YY, XX = Hypercube.shape
+# 	hypercubeN = np.zeros((Nw,YY,XX))
+# 	## Convert to float to avoid numerical errors
+# 	darkf = Dark.astype('float64')
+# 	for n in range(0,Nw):
+# 		h = Hypercube[n,:,:].astype('float64')
+# 		w = Hypercube_White[n,:,:].astype('float64')
+# 		## Subtract Dark
+# 		hh = np.subtract(h,darkf)
+# 		ww = np.subtract(w,darkf)
+# 		## Make sure there is no negative values 
+# 		hh = hh-np.amin(hh)
+# 		ww = ww-np.amin(ww)
+# 		## Divide and ignore /0
+# 		hN = np.divide(hh,ww, out=np.zeros_like(hh), where=ww!=0)
+# 		hypercubeN[n,:,:] = hN
+# #         hypercubeN[n,:,:] = hh
 	
-	## MakeFigurehypercubeN
-	Mavg = np.average(hypercubeN)
-	Mstd = np.std(hypercubeN)
-	MM = Mavg+5*Mstd
-	nn = 0
-	fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
-	for j in range(0,4):
-		for i in range(0,4):
-			if nn<17:
-				wav = Wavelengths_sorted[nn]
-				RGB = HySE_UserTools.wavelength_to_rgb(wav)
-				ax[j,i].imshow(hypercubeN[nn,:,:], cmap='gray', vmin=0, vmax=MM) ##vmax=np.amax(hypercubeN)
-				ax[j,i].set_title(f'{wav} nm', c=RGB)
-				ax[j,i].set_xticks([])
-				ax[j,i].set_yticks([])
-				nn = nn+1
-			else:
-				ax[j,i].set_xticks([])
-				ax[j,i].set_yticks([])
-	plt.suptitle(f'{Name} Hypercube Normalised - vmax={MM:.2f}')
-	## Find current path and time to save figure
-	time_now = datetime.now().strftime("%Y%m%d__%I-%M-%S-%p")
-	day_now = datetime.now().strftime("%Y%m%d")
-	plt.tight_layout()
+# 	## MakeFigurehypercubeN
+# 	Mavg = np.average(hypercubeN)
+# 	Mstd = np.std(hypercubeN)
+# 	MM = Mavg+5*Mstd
+# 	nn = 0
+# 	fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
+# 	for j in range(0,4):
+# 		for i in range(0,4):
+# 			if nn<17:
+# 				wav = Wavelengths_sorted[nn]
+# 				RGB = HySE_UserTools.wavelength_to_rgb(wav)
+# 				ax[j,i].imshow(hypercubeN[nn,:,:], cmap='gray', vmin=0, vmax=MM) ##vmax=np.amax(hypercubeN)
+# 				ax[j,i].set_title(f'{wav} nm', c=RGB)
+# 				ax[j,i].set_xticks([])
+# 				ax[j,i].set_yticks([])
+# 				nn = nn+1
+# 			else:
+# 				ax[j,i].set_xticks([])
+# 				ax[j,i].set_yticks([])
+# 	plt.suptitle(f'{Name} Hypercube Normalised - vmax={MM:.2f}')
+# 	## Find current path and time to save figure
+# 	time_now = datetime.now().strftime("%Y%m%d__%I-%M-%S-%p")
+# 	day_now = datetime.now().strftime("%Y%m%d")
+# 	plt.tight_layout()
 
-	Name_withExtension = DataPath.split('/')[-1]
-	Name = Name_withExtension.split('.')[0]
-	Path = DataPath.replace(Name_withExtension, '')
-	PathToSave = f'{Path}{time_now}_{Name}'
-	plt.savefig(f'{PathToSave}_HypercubeNormalised.png')
-	np.savez(f'{PathToSave}_HypercubeNormalised.npz', hypercubeN)
+# 	Name_withExtension = DataPath.split('/')[-1]
+# 	Name = Name_withExtension.split('.')[0]
+# 	Path = DataPath.replace(Name_withExtension, '')
+# 	PathToSave = f'{Path}{time_now}_{Name}'
+# 	plt.savefig(f'{PathToSave}_HypercubeNormalised.png')
+# 	np.savez(f'{PathToSave}_HypercubeNormalised.npz', hypercubeN)
 
-	return hypercubeN
+# 	return hypercubeN
 
 
 
-def NormaliseFrames(image, image_white, image_dark):
-	## Convert to float to avoid numerical errors
-	im = image.astype('float64')
-	white = image_white.astype('float64')
-	dark = image_dark.astype('float64')
-	# Subtract dark
-	im_d = np.subtract(im, dark)
-	white_d = np.subtract(white, dark)
-	## avoid negative
-	## NB: the value subtracted rounds up to 0, but avoids
-	## running into huge numerical errors when dividing
-	im_d = im_d - np.amin(im_d)
-	white_d = white_d - np.amin(white_d)
-	## Divide image by white, avoiding /0 errors
-	im_n = np.divide(im_d, white_d, out=np.zeros_like(im_d), where=white_d!=0)
+# def NormaliseFrames(image, image_white, image_dark):
+# 	## Convert to float to avoid numerical errors
+# 	im = image.astype('float64')
+# 	white = image_white.astype('float64')
+# 	dark = image_dark.astype('float64')
+# 	# Subtract dark
+# 	im_d = np.subtract(im, dark)
+# 	white_d = np.subtract(white, dark)
+# 	## avoid negative
+# 	## NB: the value subtracted rounds up to 0, but avoids
+# 	## running into huge numerical errors when dividing
+# 	im_d = im_d - np.amin(im_d)
+# 	white_d = white_d - np.amin(white_d)
+# 	## Divide image by white, avoiding /0 errors
+# 	im_n = np.divide(im_d, white_d, out=np.zeros_like(im_d), where=white_d!=0)
 
-	return im_n
+# 	return im_n
 
 
 
@@ -390,7 +390,7 @@ def Rescale(im, PercMax, Crop=True):
 
 
 
-def GetLondDark(vidPath, EdgePos, **kwargs):
+def GetLongDark(vidPath, EdgePos, **kwargs):
 	info="""
 	Computes dark frame from the long darks between sweeps. 
 	Requires at least 2 sweeps idenfitied
@@ -407,9 +407,6 @@ def GetLondDark(vidPath, EdgePos, **kwargs):
 
 	Ouput:
 		- LongDark: 2D numpy array
-
-
-
 	"""
 	Help = kwargs.get('Help', False)
 	if Help:
