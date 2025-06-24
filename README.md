@@ -93,14 +93,21 @@ EdgePos_WhiteCalib = HySE.FindHypercube(WhiteCalibration_Path, Wavelengths_list,
                              SaveFig=False, PlotGradient=False, PeakDistance=30, MaxPlateauSize=60)
 
 ```
-![20250610__04-45-20-PM_2025-03-28_13-24-53_Config1_White_Calib_Trace](https://github.com/user-attachments/assets/a8f41de6-3ada-44a0-88ae-c6d5dffb5fb8)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/a8f41de6-3ada-44a0-88ae-c6d5dffb5fb8" width="600"/>
+</p>
+
 ```python
 
 ## Compute array from sweeps
 Hypercube_WhiteCalib, Dark_WhiteCalib = HySE.ComputeHypercube(WhiteCalibration_Path, EdgePos_WhiteCalib, Wavelengths_list, 
                                                               Order=True, SaveFig=False, SaveArray=False, Help=False, PlotHypercube=False)
 ```
-![20250610__04-47-19-PM_2025-03-28_13-28-23_Config1_White_HySE_Hypercube](https://github.com/user-attachments/assets/0ce86d23-41f9-496b-aad2-77f85d78d0bc)
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/0ce86d23-41f9-496b-aad2-77f85d78d0bc" width="400"/>
+</p>
+
 ```python
 
 ############################
@@ -347,7 +354,12 @@ A detailed description of a given function with its inputs and outputs can be ac
 HySE.help('Unmixing.MakeMixingMatrix')
 ```
 
-Most functions also allow the input of 'Help=True' as an argument, which will print the same detailed function description.
+Most functions also allow the input of 'Help=True' as an argument, which will print the same detailed function description. 
+The output (0) will match the size of the expected output in order to allow debugging on the go.
+
+```python
+HySE.MakeMixingMatrix(_,_,Help=True)
+```
 
 ## To do
 - [ ] Update masking of images
