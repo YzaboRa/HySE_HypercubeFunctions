@@ -330,15 +330,24 @@ HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraDa
 ![2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5_UnmixingComparison_avg_Patches](https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e)
 
 
-The file contains many more functions, and each function typically contains several options.
-Most functions include a 'Help' option describing what the function does and includes a detailed description of all inputs, required and optional. It can be activated by simply adding 'Help=True' in the argument of the function to print a information text.
+## Help 
 
-A succint general help statement listing optional inputs and default values can be obtained for all functions by executing the following:
-
+A general help function allows to print all the modules and associated functions:
 ```python
-help(HySE.FUNCTION)
+HySE.help()
 ```
 
+Adding a module in argument allows to print in more details the functinos it contains:
+```python
+HySE.help('Unmixing')
+```
+
+A detailed description of a given function with its inputs and outputs can be accessed by adding the function to the argument:
+```python
+HySE.help('Unmixing.MakeMixingMatrix')
+```
+
+Most functions also allow the input of 'Help=True' as an argument, which will print the same detailed function description.
 
 ## To do
 - [ ] Update masking of images
