@@ -16,6 +16,7 @@ from matplotlib import pyplot as plt
 import imageio
 # import matplotlib.colors as colors
 # import matplotlib.cm as cmx
+import inspect
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
@@ -28,7 +29,7 @@ import HySE.UserTools
 
 
 def FindHypercube(DataPath, Wavelengths_list, **kwargs):
-	info="""
+	"""
 	Input: 
 	
 	- DataPath: Path to the data
@@ -83,7 +84,8 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	## Check if user wants list of optional parameters
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(FindHypercube))
 		if ReturnPeaks:
 			return 0,0,0
 		else:
@@ -310,6 +312,11 @@ def FindPeaks(trace, **kwargs):
 	
 	
 	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(FindPeaks))
+		return 0,0,0
+
 	## Check if smoothing Window Length set by user
 	window_length = kwargs.get('window_length')
 	if not window_length:
@@ -346,6 +353,17 @@ def FindPeaks(trace, **kwargs):
 
 
 def GetPeakDist(peaks, FrameStart, FrameEnd):
+	"""
+	Get distance between peaks (dor automatic edge detection, to identify sweep position)
+	Inputs:
+	- peaks
+	- FrameStart
+	- FrameEnd
+
+	Output:
+	- peak_dist (array)
+
+	"""
 	peaks_dist = []
 	for i in range(0,len(peaks)-1):
 		peaks_dist.append([peaks[i], peaks[i+1]-peaks[i]])
@@ -355,7 +373,7 @@ def GetPeakDist(peaks, FrameStart, FrameEnd):
 
 
 def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, PlateauSize, Ncolours, printInfo=True, **kwargs):
-	info = """
+	"""
 	Function that identify sweeps from the detected peaks.
 	Input:
 		- Peaks_dist: outut from GetPeakDist
@@ -383,7 +401,8 @@ def GetEdgesPos(peaks_dist, DarkMin, FrameStart, FrameEnd, MaxPlateauSize, Plate
 
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(GetEdgesPos))
 		return 0,0
 
 	EdgePos = []

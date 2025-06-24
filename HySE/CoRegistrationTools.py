@@ -21,6 +21,7 @@ import SimpleITK as sitk
 import time
 # from tqdm.notebook import trange, tqdm, tnrange
 from tqdm import trange
+import inspect
 
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
@@ -79,6 +80,10 @@ def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwarg
 		- plots of the coregistration for wavelengths in Plot_PlateauList and indices=Plot_Index
 
 	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetCoregisteredHypercube))
+		return 0
 
 	## ImportDatafor the sweep
 	DataSweep = HySE.Import.GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs)
@@ -90,12 +95,12 @@ def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwarg
 
 
 def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengths_list, **kwargs):
-	info="""
+	"""
 
 	~~ Co-registration with normalisation and masking ~~
 
 	NB: Old function, normalisation and masking not optimal. Never tested with wavelength mixing.
-	    New function to be written.
+		New function to be written.
 
 	Apply Simple Elastix co-registration to all sweep
 
@@ -122,7 +127,8 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 	"""
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(SweepCoRegister_WithNormalisation))
 		return 0
 
 	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
@@ -324,12 +330,12 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 
 
 def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
-	info = """
+	"""
 
 	~~ Used in SweepCoRegister_WithNormalisation ~~
 
 	NB: Old function, normalisation and masking not optimal. Never tested with wavelength mixing.
-	    New function to be written.
+		New function to be written.
 
 	Apply Simple Elastix co-registration to all sweep
 
@@ -355,7 +361,8 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(SweepCoRegister))
 		return 0
 
 
@@ -579,10 +586,53 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 
 
 def CoRegisterImages(im_static, im_shifted, **kwargs):
+	"""
+	Basic function that co-registers a shifted image to a defined static image.
+	It uses SimpleElastix funtions. 
+	Lines of code can be commented 
+
+
+	Inputs:
+		- im_static
+		- im_shifted
+		- kwargs:
+			- Affine
+			- Verbose
+			- MaximumNumberOfIterations: integer (e.g. 500)
+			- Metric (default 'AdvancedMattesMutualInformation', also 'NormalizedCorrelation' and 'AdvancedKappaStatistic')
+			- Optimizer (default 'AdvancedMattesMutualInformation')
+			- Transform (default 'BSplineTransform'). Also:
+				Global (Parametric) Transforms:
+				- 'TranslationTransform': Only accounts for shifts (translations)
+				- 'Euler2DTransform': Rigid transformations, including translation and rotation
+				- 'VersorTransform': Similar to Euler, rotations are represented by a versor (quaternion), which can be more numerically stable for large rotations.
+				- 'Similarity2DTransform': Adds isotropic scaling to the rigid transformations (translation, rotation, and uniform scaling).
+				- 'ScaleTransform': Allows for anisotropic scaling (different scaling factors along each axis)
+				- 'AffineTransform': A general linear transformation that includes translation, rotation, scaling (isotropic and anisotropic), and shearing
+				Deformable (Non-Parametric) Transforms
+				- 'BSplineTransform': uses a sparse regular grid of control points to define a smooth, non-rigid deformation field
+				- 'DisplacementFieldTransform': epresents the transformation as a dense grid of displacement vectors, where each pixel has a corresponding vector indicating its movement. 
+				This offers the highest flexibility but can be computationally more expensive and may require more memory.
+
+	Outputs:
+		- im_coregistered
+		- shift_val: estiimate of the maximal shift
+		- time_taken
+
+
+	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(CoRegisterImages))
+		return 0,0,0
+
 	## If we don't expect complex deformations, set transform to affine
 	## To limit unwanted distortions
 	Affine = kwargs.get('Affine', False)
 	Verbose = kwargs.get('Verbose', False)
+	Metric = kwargs.get('Metric', 'AdvancedMattesMutualInformation')
+	Transform = kwargs.get('Transform', 'BSplineTransform')
+	Optimizer = kwargs.get('Transform', 'AdaptiveStochasticGradientDescent')
 		
 		
 	t0 = time.time()
@@ -607,51 +657,53 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	else:
 		parameterMap = sitk.GetDefaultParameterMap('translation')
 		## Select metric robust to intensity differences (non uniform)
-		parameterMap['Metric'] = ['AdvancedMattesMutualInformation'] 
+		parameterMap['Metric'] = [Metric] 
 		## Select Bspline transform, which allows for non rigid and non uniform deformations
-		parameterMap['Transform'] = ['BSplineTransform']
+		parameterMap['Transform'] = [Transform]
 
 	## Tried those parameters, on Macbeth chart data (not moving), did not have significant impact
-#     parameterMap['AutomaticTransformInitialization'] = ['true']
-#     parameterMap['AutomaticTransformInitializationMethod'] = ['CenterOfGravity']
-#     parameterMap['HistogramMatch'] = ['true']
-#     parameterMap['BSplineRegularizationOrder'] = ['11'] ## default 3
-#     parameterMap['Optimizer'] = ['AdaptiveStochasticGradientDescent']
-
+	# parameterMap['AutomaticTransformInitialization'] = ['true']
+	# parameterMap['AutomaticTransformInitializationMethod'] = ['CenterOfGravity']
+	# parameterMap['HistogramMatch'] = ['true']
+	# parameterMap['BSplineRegularizationOrder'] = ['11'] ## default 
 
 	## Parameters to play with if co-registration is not optimal:
 
 #         # Controls how long the optimizer runs
-#     parameterMap['MaximumNumberOfIterations'] = ['500'] 
-#         # You can try different metrics like AdvancedMattesMutualInformation, NormalizedCorrelation, 
-#         # or AdvancedKappaStatistic for different registration scenarios.
-#     parameterMap['Metric'] = ['AdvancedMattesMutualInformation']
-#         # Adjust the number of bins used in mutual information metrics
-#     parameterMap['NumberOfHistogramBins'] = ['32']
-#         # Change the optimizer to AdaptiveStochasticGradientDescent for potentially better convergence
-#     parameterMap['Optimizer'] = ['AdaptiveStochasticGradientDescent']
-#         # Controls the grid spacing for the BSpline transform
-#     parameterMap['FinalGridSpacingInPhysicalUnits'] = ['10.0']
-#         # Refines the BSpline grid at different resolutions.
-#     parameterMap['GridSpacingSchedule'] = ['10.0', '5.0', '2.0']
-#         # Automatically estimate the scales for the transform parameters.
-#     parameterMap['AutomaticScalesEstimation'] = ['true']
-#         # Controls the number of resolutions used in the multi-resolution pyramid. 
-#         # A higher number can lead to better registration at the cost of increased computation time.
-#     parameterMap['NumberOfResolutions'] = ['4']
-#         # Automatically initializes the transform based on the center of mass of the images.
-#     parameterMap['AutomaticTransformInitialization'] = ['true']
-#         # Controls the interpolation order for the final transformation.
-#     parameterMap['FinalBSplineInterpolationOrder'] = ['3']
+	parameterMap['Optimizer'] = [Optimizer]
+	MaximumNumberOfIterations = kwargs.get('MaximumNumberOfIterations')
+	if MaximumNumberOfIterations is not None:
+		parameterMap['MaximumNumberOfIterations'] = [str(MaximumNumberOfIterations)] 
 
-# #         # Adjust the maximum step length for the optimizer
-# #     parameterMap['MaximumStepLength'] = ['4.0']
-# #         # Use more samples for computing gradients
-# #     parameterMap['NumberOfSamplesForExactGradient'] = ['10000']
-# #         # Specify the grid spacing in voxels for the final resolution.
-# #     parameterMap['FinalGridSpacingInVoxels'] = ['8.0']
-# #         # Defines the spacing of the sampling grid used during optimization.
-# #     parameterMap['SampleGridSpacing'] = ['2.0']
+	#     # You can try different metrics like AdvancedMattesMutualInformation, NormalizedCorrelation, 
+	#     # or AdvancedKappaStatistic for different registration scenarios.
+	# parameterMap['Metric'] = ['AdvancedMattesMutualInformation']
+	#     # Adjust the number of bins used in mutual information metrics
+	# parameterMap['NumberOfHistogramBins'] = ['32']
+	#     # Change the optimizer to AdaptiveStochasticGradientDescent for potentially better convergence
+	# parameterMap['Optimizer'] = ['AdaptiveStochasticGradientDescent']
+	#     # Controls the grid spacing for the BSpline transform
+	# parameterMap['FinalGridSpacingInPhysicalUnits'] = ['10.0']
+	#     # Refines the BSpline grid at different resolutions.
+	# parameterMap['GridSpacingSchedule'] = ['10.0', '5.0', '2.0']
+	#     # Automatically estimate the scales for the transform parameters.
+	# parameterMap['AutomaticScalesEstimation'] = ['true']
+	#     # Controls the number of resolutions used in the multi-resolution pyramid. 
+	#     # A higher number can lead to better registration at the cost of increased computation time.
+	# parameterMap['NumberOfResolutions'] = ['4']
+	#     # Automatically initializes the transform based on the center of mass of the images.
+	# parameterMap['AutomaticTransformInitialization'] = ['true']
+	#     # Controls the interpolation order for the final transformation.
+	# parameterMap['FinalBSplineInterpolationOrder'] = ['3']
+
+#         # Adjust the maximum step length for the optimizer
+#     parameterMap['MaximumStepLength'] = ['4.0']
+#         # Use more samples for computing gradients
+#     parameterMap['NumberOfSamplesForExactGradient'] = ['10000']
+#         # Specify the grid spacing in voxels for the final resolution.
+#     parameterMap['FinalGridSpacingInVoxels'] = ['8.0']
+#         # Defines the spacing of the sampling grid used during optimization.
+#     parameterMap['SampleGridSpacing'] = ['2.0']
 
 
 	## If required, set maximum number of iterations

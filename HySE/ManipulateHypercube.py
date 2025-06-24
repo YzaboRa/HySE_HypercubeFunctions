@@ -16,6 +16,7 @@ from matplotlib import pyplot as plt
 import imageio
 # import matplotlib.colors as colors
 # import matplotlib.cm as cmx
+import inspect
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
@@ -28,7 +29,7 @@ import HySE.UserTools
 
 
 def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
-	info="""
+	"""
 	Function to compute the hypercube. It inputs the path to the data and
 	the EdgePos output from the FindHypercube function (which indicates where
 	to find the start for each wavelenght for each identified sweep)
@@ -81,7 +82,8 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	SaveArray = kwargs.get('SaveArray', True)
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(ComputeHypercube))
 		return 0, 0
 	PlotHypercube = kwargs.get('PlotHypercube', False)
 	Average = kwargs.get('Average', True)
@@ -246,7 +248,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 
 def GetLongDark(vidPath, EdgePos, **kwargs):
-	info="""
+	"""
 	Computes dark frame from the long darks between sweeps. 
 	Requires at least 2 sweeps idenfitied
 
@@ -265,7 +267,8 @@ def GetLongDark(vidPath, EdgePos, **kwargs):
 	"""
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(GetLongDark))
 		return 0
 
 	ExtraWav = kwargs.get('ExtraWav', 0)
@@ -313,6 +316,19 @@ def GetLongDark(vidPath, EdgePos, **kwargs):
 
 
 def NormaliseFrames(image, image_white, image_dark):
+	"""
+	Normalises an image with white and dark references
+	Returns (im-dark)/(white-dark)
+
+	Inputs:
+	- image
+	- image_white
+	- image_dark
+
+	Returns:
+	- image_normalised
+
+	"""
 	## Convert to float to avoid numerical errors
 	im = image.astype('float64')
 	white = image_white.astype('float64')

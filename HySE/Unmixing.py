@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 # import imageio
 # import matplotlib.colors as colors
 # import matplotlib.cm as cmx
+import inspect
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter
 matplotlib.rcParams.update({'font.size': 14})
@@ -19,7 +20,7 @@ import HySE.Masking
 
 
 def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
-	info = '''
+	'''
 	Computes a mixing matrix, based on the Arduino matrix used during data recording
 	If FromCalib is set to True, the mixing matrix is computed using the single wavelength
 	sweep calibration. Otherwise, the function outputs a binary mixing matrix
@@ -42,6 +43,9 @@ def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
 			- SaveFig = False
 			- SavingPath = ''
 
+	Outputs:
+		- MixingMatrix
+
 	'''
 
 	Help = kwargs.get('Help', False)
@@ -52,7 +56,8 @@ def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
 	SavingPath = kwargs.get('SavingPath', '')
 
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(MakeMixingMatrix))
 		return 0
 
 	if FromCalib:
@@ -135,7 +140,7 @@ def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
 
 
 def NormaliseMixedHypercube(MixedHypercube, **kwargs):
-	info='''
+	'''
 	Normalises the raw mixed hypercube.
 	Dark subtraction and/or white normalisation
 
@@ -156,17 +161,30 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			- SavePlot = False
 			- SavingFigure = '' string.
 			
-	Output:
 		- Normalised mixed hypercube. 
 			If Dark is indicated, the normalised hypercube will be dark subtracted
 			If WhiteCalibration is indicated, the normalised hypercube will be white normalised
+
+
+	Outputs:
+		- Normalised Hypercube
+
+		- Mask
+			Removes black corners from the Olympus display. Estimated from the white calibration if provided,
+			otherwise it uses the data itself to estimate the mask
+
+	To add:
+		- Add option to input White Calibration for masking but not for calibration
+
 
 
 	'''
 	
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(NormaliseMixedHypercube))
+		return 0,0
 		
 	Sigma = kwargs.get('Sigma', 20)
 	Dark = kwargs.get('Dark')
@@ -264,7 +282,7 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 
 
 def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
-	info='''
+	'''
 	Computes the unmixing of the raw hypercube according to a mixing matrix
 
 	Input:
@@ -285,7 +303,9 @@ def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
 	Help = kwargs.get('Help', False)
 	Average = kwargs.get('Average', True)
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(UnmixData))
+		return 0
 
 	## Adjust shape of the Hypercube for consistency
 	if len(MixedHypercube.shape)>3:
@@ -316,6 +336,17 @@ def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
 		
 		
 def MakeObservedMatrix(Hypercube):
+	"""
+	Make observed matrix (ravel) from the hypercube to feed in the unmixing algorithm
+
+	Inputs:
+		- Hypercube
+
+	Outptus:
+		- ObservedMatrix
+
+
+	"""
 	N, YY, XX = Hypercube.shape
 	Matrix = []
 	for n in range(0,N):

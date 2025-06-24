@@ -22,6 +22,7 @@ import time
 from tqdm import trange
 # import matplotlib.colors as colors
 # import matplotlib.cm as cmx
+import inspect
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
@@ -33,6 +34,25 @@ import HySE.UserTools
 
 
 def GetStandardMask(WhiteCalibration, **kwargs):
+	"""
+	Returns a array (mask) that includes every pixel with a value below a threshold.
+	Threshold can be indicated, or set automatically to 1.
+	Best to use white calibration data for optimal mask
+
+	Inputs:
+	- WhiteCalibration (or image)
+	- kwargs (optional)
+		- threshold
+		- Help
+
+	Outputs:
+	- Mask
+
+	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetStandardMask))
+		return 0
 	threshold = kwargs.get('threshold', 1)
 	Calibration_avg = np.average(np.average(WhiteCalibration, axis=1), axis=1)
 	max_idx = np.where(Calibration_avg==np.amax(Calibration_avg))[0][0]
@@ -40,10 +60,24 @@ def GetStandardMask(WhiteCalibration, **kwargs):
 	return Mask
 
 def ConvertMaskToBinary(mask):
+	"""
+	Invert mask (1-mask_value) and convert to binary format
+
+	Inputs: 
+	- Mask
+
+	Output:
+	- BinaryMask (inverted)
+
+	"""
 	mask_binary = 1-mask*1
 	return mask_binary.astype('uint8')
 
 def BooleanMaskOperation(bool_white, bool_wav):
+	"""
+	Old function to handle boolean operation for masks
+
+	"""
 	bool_result = False
 	if bool_white!=bool_wav:
 		if bool_wav==1:
@@ -63,7 +97,7 @@ def BooleanMaskOperation(bool_white, bool_wav):
 	
 
 def GetMask(frame, **kwargs):
-	info='''
+	'''
 	Inputs:
 		- frame (2D array)
 		- kwargs
@@ -78,7 +112,8 @@ def GetMask(frame, **kwargs):
 	'''
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(info)
+		# print(info)
+		print(inspect.getdoc(GetMask))
 		return 0
 
 	LowCutoff = kwargs.get('LowCutoff', False)

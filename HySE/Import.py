@@ -20,14 +20,36 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import SimpleITK as sitk
 import time
 from tqdm.notebook import trange, tqdm, tnrange
-
+import inspect
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
 
 
 def GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs):
+	"""
+	Function that imports a sweep directly from the indicated path
+	(Useful when the EdgePos is known already - Legacy function)
+
+	Input:
+		- vidPath
+		- EdgePos
+		- Nsweep
+		- kwargs:
+			- CropImDimensions
+			- Help
+
+	Output:
+		- DataSweep
+
+	"""
 	## Check if the user has specificed the image crop dimensions
+
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetSweepData_FromPath))
+		return 0
+
 
 	try:
 		CropImDimensions = kwargs['CropImDimensions']
@@ -92,6 +114,11 @@ def ImportData(Path, *Coords, **kwargs):
 			of if Trace = True and RGB = True:
 			shape (N_RGBframes)
 	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(ImportData))
+		return 0
+
 	
 	## Check if the data should be left in the raw RGB 3D format
 	RGB = kwargs.get('RGB', False)
