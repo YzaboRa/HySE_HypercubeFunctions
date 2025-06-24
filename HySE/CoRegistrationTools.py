@@ -26,9 +26,9 @@ matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
 
-import HySE_UserTools
-import HySE_ImportData
-import HySE_ManipulateHypercube
+import HySE.UserTools
+import HySE.Import
+import HySE.ManipulateHypercube
 
 
 PythonEnvironment = get_ipython().__class__.__name__
@@ -81,7 +81,7 @@ def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwarg
 	"""
 
 	## ImportDatafor the sweep
-	DataSweep = HySE_ImportData.GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs)
+	DataSweep = HySE.Import.GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs)
 	## Compute Hypercube
 	Hypercube = SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
 	return Hypercube
@@ -218,7 +218,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 	## Define static image
 	im_static = DataSweep[ImStatic_Plateau][ImStatic_Index,:,:]
 	ImStatic_Plateau_sorted = order_list[ImStatic_Plateau]
-	im_staticN = HySE_ManipulateHypercube.NormaliseFrames(im_static, WhiteHypercube[ImStatic_Plateau_sorted,:,:], Dark)
+	im_staticN = HySE.ManipulateHypercube.NormaliseFrames(im_static, WhiteHypercube[ImStatic_Plateau_sorted,:,:], Dark)
 
 	## Loop through all colours (wavelengths)
 	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')
@@ -253,7 +253,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 					hypercube_index = order_list[c]
 					im_white = WhiteHypercube[hypercube_index,:,:]
 
-				im_shiftedN = HySE_ManipulateHypercube.NormaliseFrames(im_shifted, im_white, Dark)
+				im_shiftedN = HySE.ManipulateHypercube.NormaliseFrames(im_shifted, im_white, Dark)
 
 				im_coregistered, shift_val, time_taken = CoRegisterImages(im_staticN, im_shiftedN)
 				ImagesTemp.append(im_coregistered)
@@ -274,7 +274,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 							if c==ImStatic_Plateau and i==ImStatic_Index:
 								print(f'Skipping plot for plateau={c}, index={i} because it is the static image')
 							else:
-								HySE_UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+								HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
 
 			
 			ImagesTemp = np.array(ImagesTemp)
@@ -494,7 +494,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 							if c==ImStatic_Plateau and i==ImStatic_Index:
 								print(f'Skipping plot for plateau={c}, index={i} because it is the static image')
 							else:
-								HySE_UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+								HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
 
 			
 			ImagesTemp = np.array(ImagesTemp)

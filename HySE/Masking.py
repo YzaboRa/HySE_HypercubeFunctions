@@ -28,8 +28,8 @@ plt.rcParams["font.family"] = "arial"
 
 
 # import HySE_ImportData
-import HySE_UserTools
-import HySE_ManipulateHypercube
+import HySE.UserTools
+# import HySE.ManipulateHypercube
 
 
 def GetStandardMask(WhiteCalibration, **kwargs):
@@ -106,7 +106,7 @@ def GetMask(frame, **kwargs):
 	if PlotMasks:
 		fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(13,3.5))
 
-		m, M = HySE_UserTools.FindPlottingRange(frame)
+		m, M = HySE.UserTools.FindPlottingRange(frame)
 		im0 = ax[0].imshow(frame, vmin=m, vmax=M)
 		ax[0].set_title('frame')
 		divider = make_axes_locatable(ax[0])

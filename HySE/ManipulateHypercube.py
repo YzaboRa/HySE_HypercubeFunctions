@@ -21,8 +21,8 @@ matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
 
-import HySE_ImportData
-import HySE_UserTools
+import HySE.Import
+import HySE.UserTools
 
 
 
@@ -97,7 +97,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 		
 	## Import data
-	data = HySE_ImportData.ImportData(DataPath, CropImDimensions=CropImDimensions)
+	data = HySE.Import.ImportData(DataPath, CropImDimensions=CropImDimensions)
 	
 	## Sort Wavelengths
 	order_list = np.argsort(Wavelengths_list)
@@ -180,7 +180,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				Hypercube_sorted.append(Hypercube[order_list[k]])
 			Hypercube_sorted = np.array(Hypercube_sorted)
 		else:
-			print(f'Warning: in HySE_ManipulateHypercube.ComputeHypercube(), Order=True but Average=False.')
+			print(f'Warning: in HySE.ManipulateHypercube.ComputeHypercube(), Order=True but Average=False.')
 			Hypercube_sorted = []
 			NN, WW, YY, XX = Hypercube.shape
 			for n in range(0,NN):
@@ -220,7 +220,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 			for i in range(0,4):
 				if nn<17:
 					wav = Wavelengths_sorted[nn]
-					RGB = HySE_UserTools.wavelength_to_rgb(wav)
+					RGB = HySE.UserTools.wavelength_to_rgb(wav)
 					ax[j,i].imshow(HypercubeToPlot[nn,:,:], cmap='gray')
 					if Order:
 						ax[j,i].set_title(f'{wav} nm', c=RGB)
@@ -273,7 +273,7 @@ def GetLongDark(vidPath, EdgePos, **kwargs):
 
 
 	(Nsweeps, Nw, _) = EdgePos.shape
-	DataAll = HySE_ImportData.ImportData(vidPath) # DataAll = HySE_ImportData.ImportData(vidPath, **kwargs)
+	DataAll = HySE.Import.ImportData(vidPath) # DataAll = Import.ImportData(vidPath, **kwargs)
 	Ndarks = Nsweeps-1
 	## Automatic dark checks parameters
 	std_Max = 5

@@ -14,7 +14,7 @@ matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
 
-import HySE_Mask
+import HySE.Masking
 
 
 
@@ -206,10 +206,10 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		MixedHypercube_ = np.array([MixedHypercube])
 
 	if WhiteCalibration is not None:
-		Mask = HySE_Mask.GetStandardMask(WhiteCalibration_, threshold=1)
+		Mask = HySE.Masking.GetStandardMask(WhiteCalibration_, threshold=1)
 	else:
 		print(f'White Calibration not provided. Estimating mask from data itself.')
-		Mask = HySE_Mask.GetStandardMask(MixedHypercube_[0], threshold=1)
+		Mask = HySE.Masking.GetStandardMask(MixedHypercube_[0], threshold=1)
 	print(f'Mask shape: {Mask.shape}')
 		
 	MixedHypercube_N = np.zeros(MixedHypercube_.shape)

@@ -21,8 +21,8 @@ matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
 
-import HySE_ImportData
-import HySE_UserTools
+import HySE.Import
+import HySE.UserTools
 
 
 
@@ -142,10 +142,10 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	## If CropImDimensions dimensions have been specified, pass on to import data function
 	CropImDimensions = kwargs.get('CropImDimensions')
 	if not CropImDimensions:
-		trace = HySE_ImportData.ImportData(DataPath,Trace=True)
+		trace = HySE.Import.ImportData(DataPath,Trace=True)
 	else:
 		CropImDimensions = kwargs['CropImDimensions']
-		trace = HySE_ImportData.ImportData(DataPath,Trace=True, CropImDimensions=CropImDimensions)
+		trace = HySE.Import.ImportData(DataPath,Trace=True, CropImDimensions=CropImDimensions)
 
 
 	## Find peaks
@@ -226,12 +226,12 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 			ax.axvline(s, ls='dashed', c=SweepColors[k])
 			if WavelengthsMixed==False:
 				if i<8:
-					RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i])
+					RGB = HySE.UserTools.wavelength_to_rgb(Wavelengths_list[i])
 					ax.text(s+7, SGfilter[s+10]+3, Wavelengths_list[i], fontsize=fs, c=RGB)
 				elif (i==8):
 					ax.text(s, SGfilter[s+10]-3, 'DARK', fontsize=fs, c='black')
 				else:
-					RGB = HySE_UserTools.wavelength_to_rgb(Wavelengths_list[i-1])
+					RGB = HySE.UserTools.wavelength_to_rgb(Wavelengths_list[i-1])
 					ax.text(s+8, SGfilter[s+10]+3, np.round(Wavelengths_list[i-1],0), fontsize=fs, c=RGB)
 
 	# ax.legend()
