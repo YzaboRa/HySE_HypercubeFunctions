@@ -381,9 +381,10 @@ HySE.MakeMixingMatrix(_,_,Help=True)
 - [ ] Update masking of images
    - [ ] Specular reflections
    - [ ] Low intensity areas
+- [ ] Spectra only normalisation
 - [ ] Co-registration
    - [ ] Try SimpleElastix with better data
-   - [ ] Other algirithm
+   - [ ] Other algorithm
 
 ## Comments
 - If the functions cannote be loaded, try adding an empty \__init__.py file in the same folder
