@@ -157,8 +157,6 @@ LongDark = HySE.GetLongDark(WhiteCalibration_Path, EdgePos_WhiteCalib, ExtraWav=
 ## Plotting the dark can help make sure the estimate is adequate
 HySE.PlotDark(LongDark)
 ```
-![HySE_LongDarkExample]()
-
 <p align="center">
   <img src="https://github.com/user-attachments/assets/372215d3-dd7f-4275-864d-54b38a1339c5" width="400"/>
 </p>
@@ -352,7 +350,7 @@ Name_ToSave = f'{SavingPath}{Name}_UnmixingComparison_ND'
 HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraData, MacBeth_RGB, Name, PlotLabels=Labels)#, SavingPath=Name_ToSave)
 ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e" width="500"/>
+  <img src="https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e" width="600"/>
 </p>
 
 ## Help 
