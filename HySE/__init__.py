@@ -42,8 +42,8 @@ def help(name=None):
 	"""
 	if name is None:
 		print("HySE - Overview of Available Modules and Their Functions\n")
-		print("ℹ️  Use `HySE.help('ModuleName')` to list functions in a module.")
-		print("ℹ️  Use `HySE.help('ModuleName.FunctionName')` for full details on a function.\n")
+		print("  Use `HySE.help('ModuleName')` to list functions in a module.")
+		print("  Use `HySE.help('ModuleName.FunctionName')` for full details on a function.\n")
 		for loader, mod_name, is_pkg in pkgutil.iter_modules(__path__):
 			print(f"📦 {mod_name}")
 			submodule = importlib.import_module(f"{__name__}.{mod_name}")
