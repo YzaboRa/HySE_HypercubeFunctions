@@ -52,7 +52,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				- Name = string
 				- SaveFig = True
 				- SaveArray = True
-				- PlotHypercube = True
+				- Plot = True
 				- Order = True. Set to False if doing wavelength unmixing
 				- Average = True. If more than one sweep is indicated, indicates whether
 					to average all sweeps before computing hypercube.
@@ -85,7 +85,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		# print(info)
 		print(inspect.getdoc(ComputeHypercube))
 		return 0, 0
-	PlotHypercube = kwargs.get('PlotHypercube', False)
+	Plot = kwargs.get('Plot', False)
 	Average = kwargs.get('Average', True)
 
 	CropImDimensions = kwargs.get('CropImDimensions')
@@ -207,7 +207,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	Path = DataPath.replace(Name_withExtension, '')
 	
 	## MakeFigure
-	if PlotHypercube:
+	if Plot:
 		if Average==False:
 			HypercubeToPlot = Hypercube_sorted[0,:,:,:]
 			print(f'Plotting hypercube for sweep 0')

@@ -137,6 +137,46 @@ def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
 
 	return MixingMatrix
 
+def BlurWhiteCalibration(WhiteCalibration, Sigma):
+	"""
+	Function that applies Gaussian blurring to every frame in the white reference
+
+	Inputs:
+		- WhiteCalibration
+		- Sigma (blurring)
+
+	Outputs:
+		- WhiteCalibrationBlurred
+
+	"""
+	(WW, YY, XX) = WhiteCalibration.shape
+	WhiteCalibrationBlurred = np.zeros(WhiteCalibration.shape)
+	for w in range(0,WW):
+		cal_sub = WhiteCalibration[w,:,:]
+		cal_sub_blurred = gaussian_filter(cal_sub, sigma=Sigma)
+		WhiteCalibrationBlurred[w,:,:] = cal_sub_blurred
+	return WhiteCalibrationBlurred
+
+def SubtractDark(WhiteCalibration, Dark_g):
+	"""
+	Function that subtacts dark from every frame in hypecube
+
+	Inputs:
+		- WhiteCalibration
+		- Dark_g
+
+	Outputs:
+		- WhiteCalibration_D
+
+	"""
+	(WW, YY, XX) = WhiteCalibration.shape
+	WhiteCalibration_D = np.zeros(WhiteCalibration.shape)
+	for w in range(0,WW):
+		cal_sub = WhiteCalibration[w,:,:]
+		cal_sub_d = np.subtract(cal_sub, Dark_g)
+		WhiteCalibration_D[w,:,:] = cal_sub_d
+	return WhiteCalibration_D
+
 
 
 def NormaliseMixedHypercube(MixedHypercube, **kwargs):
@@ -153,13 +193,15 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			- WhiteCalibration = array shape (Nwavelengths, YY, XX)
 			- Sigma = 20. Integer, indicates how much blurring to apply 
 				for the dark and White calibration arrays
+			- SpectralNormalisation = False. If True, the white reference will be used to normalise the spectrum
+				instead of both spectrally and spatially.
 			- Wavelengths_list = list of wavelengths (unsorted)
 				Required for WhiteCalibration
-			- Plot = True
 			- vmax: float. For plotting range
 			- vmin: float. For plotting range
 			- SavePlot = False
 			- SavingFigure = '' string.
+			- Plot = True
 			
 		- Normalised mixed hypercube. 
 			If Dark is indicated, the normalised hypercube will be dark subtracted
@@ -173,16 +215,10 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			Removes black corners from the Olympus display. Estimated from the white calibration if provided,
 			otherwise it uses the data itself to estimate the mask
 
-	To add:
-		- Add option to input White Calibration for masking but not for calibration
-
-
-
 	'''
 	
 	Help = kwargs.get('Help', False)
 	if Help:
-		# print(info)
 		print(inspect.getdoc(NormaliseMixedHypercube))
 		return 0,0
 		
@@ -192,6 +228,8 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		Dark_g = gaussian_filter(Dark, sigma=Sigma)
 		print(f'Dark subtraction. Avg val = {np.average(Dark):.2f}, after blurring: {np.average(Dark_g):.2f}')
 	
+	SpectralNormalisation = kwargs.get('SpectralNormalisation', False)
+
 	WhiteCalibration = kwargs.get('WhiteCalibration')
 	if WhiteCalibration is not None:
 		print(f'White Normalising')
@@ -200,15 +238,18 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			print(f'Please indicate Wavelengths_list (unsorted) when requesting WhiteCalibration')
 			return 0
 		if Dark is not None:
-			WhiteCalibration_ = gaussian_filter(np.subtract(WhiteCalibration, Dark_g), sigma=Sigma)
+			WhiteCalibration_ = BlurWhiteCalibration(SubtractDark(WhiteCalibration, Dark_g), Sigma)
 		else:
-			WhiteCalibration_ = gaussian_filter(WhiteCalibration, sigma=Sigma)
-		
+			WhiteCalibration_ = BlurWhiteCalibration(WhiteCalibration, Sigma)
+	
+	if (SpectralNormalisation and WhiteCalibration is None):
+				print(f'Please input WhiteCalibration when requesting SpectralNormalisation')
+				return 0
 #         wavelength_to_index = {wavelength: idx for idx, wavelength in enumerate(np.sort(Wavelengths_list))}
 			
-		
-			
 	Plot = kwargs.get('Plot', True)
+			
+	# Plot = kwargs.get('Plot', True)
 	SaveFigure = kwargs.get('SaveFigure', True)
 	SavingPath = kwargs.get('SavingPath', '')
 	vmax = kwargs.get('vmax', 5)
@@ -240,12 +281,12 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			else:
 				frame_N = frame
 			if WhiteCalibration is not None:
-#                 white_idx = wavelength_to_index[Wavelengths_list[w]]
-				white_cal_sub = WhiteCalibration_[w,:,:]
-				frame_WN = np.divide(frame_N, white_cal_sub, out=np.zeros_like(frame_N), where=white_cal_sub!=0)
-#                 frame_N = np.divide(frame_N.astype('float64'), WhiteCalibration_[white_idx,:,:].astype('float64'), 
-#                                     out=np.zeros_like(frame_N), where=WhiteCalibration_[white_idx,:,:]!=0)
-#                 frame_N = frame_N
+				if SpectralNormalisation:
+					white_cal_val = np.average(WhiteCalibration_[w,:,:])
+					frame_WN = frame_N/white_cal_val
+				else:
+					white_cal_sub = WhiteCalibration_[w,:,:]
+					frame_WN = np.divide(frame_N, white_cal_sub, out=np.zeros_like(frame_N), where=white_cal_sub!=0)
 				MixedHypercube_N[s,w,:,:] = np.ma.array(frame_WN, mask=Mask)
 			else:
 				MixedHypercube_N[s,w,:,:] = np.ma.array(frame_N, mask=Mask)
