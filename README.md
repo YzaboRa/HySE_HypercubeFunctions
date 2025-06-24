@@ -350,7 +350,7 @@ Name_ToSave = f'{SavingPath}{Name}_UnmixingComparison_ND'
 HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraData, MacBeth_RGB, Name, PlotLabels=Labels)#, SavingPath=Name_ToSave)
 ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e" width="600"/>
+  <img src="https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e" width="750"/>
 </p>
 
 ## Help 
