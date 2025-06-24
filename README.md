@@ -94,7 +94,7 @@ EdgePos_WhiteCalib = HySE.FindHypercube(WhiteCalibration_Path, Wavelengths_list,
 
 ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/a8f41de6-3ada-44a0-88ae-c6d5dffb5fb8" width="600"/>
+  <img src="https://github.com/user-attachments/assets/a8f41de6-3ada-44a0-88ae-c6d5dffb5fb8" width="700"/>
 </p>
 
 ```python
@@ -105,7 +105,7 @@ Hypercube_WhiteCalib, Dark_WhiteCalib = HySE.ComputeHypercube(WhiteCalibration_P
 ```
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/0ce86d23-41f9-496b-aad2-77f85d78d0bc" width="400"/>
+  <img src="https://github.com/user-attachments/assets/0ce86d23-41f9-496b-aad2-77f85d78d0bc" width="500"/>
 </p>
 
 ```python
@@ -157,7 +157,11 @@ LongDark = HySE.GetLongDark(WhiteCalibration_Path, EdgePos_WhiteCalib, ExtraWav=
 ## Plotting the dark can help make sure the estimate is adequate
 HySE.PlotDark(LongDark)
 ```
-![HySE_LongDarkExample](https://github.com/user-attachments/assets/372215d3-dd7f-4275-864d-54b38a1339c5)
+![HySE_LongDarkExample]()
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/372215d3-dd7f-4275-864d-54b38a1339c5" width="400"/>
+</p>
 
 ### Normalisation
 
@@ -186,7 +190,12 @@ Hypercube_MacbethHySE_avg_N, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethH
 Hypercube_MacbethHySE_avg_D, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, Wavelengths_list=Wavelengths_list,
                                                            SaveFigure=False, SavingPath=SavingPath+Name, vmax=80)
 ```
-![2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5Normalised_Hypercube](https://github.com/user-attachments/assets/eb7f9bdb-0ee8-4985-a2ab-d9e3f19d4f36)
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/eb7f9bdb-0ee8-4985-a2ab-d9e3f19d4f36" width="500"/>
+</p>
+
+
 ```python
 ## Using the non averaged dataset:
 Hypercube_MacbethHySE_all_ND, Mask_all = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
@@ -208,7 +217,10 @@ Once this is done, we can then move on to the actual unmixing:
 ## Compute the mixing matrix
 MixingMatrix = HySE.MakeMixingMatrix(Wavelengths_list, Arduino_MixingMatrix, Help=False)
 ```
-![HySE_MixingMatrixExample](https://github.com/user-attachments/assets/e71b8693-c12b-4a80-8303-4bda44a04c0e)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/e71b8693-c12b-4a80-8303-4bda44a04c0e" width="400"/>
+</p>
+
 ```python
 
 ############################
@@ -226,8 +238,9 @@ Unmixed_Hypercube_MacbethHySE_1_ND = HySE.UnmixData(Hypercube_MacbethHySE_1_ND, 
 SP = f'{SavingPath}{Name}_UnmixedND_avg.png'
 HySE.PlotHypercube(Unmixed_Hypercube_MacbethHySE_avg, Wavelengths=Wavelengths_list_sorted, SameScale=False, Masks=Mask_avg, SavePlot=False, SavingPathWithName=SP) #vmax=0.5,
 ```
-![2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5_UnmixedND_avg](https://github.com/user-attachments/assets/904991ed-4660-4f37-a5de-291f8ef8407a)
-
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/904991ed-4660-4f37-a5de-291f8ef8407a" width="500"/>
+</p>
 
 ### Saving
 Don't forget to save the unmixed hypercubes! The functions may save figures, but you need to save the array itself:
@@ -305,7 +318,11 @@ Image_angle = 0
 Positions = HySE.GetPatchPos(Patch1_pos, Patch_size_x, Patch_size_y, Image_angle)
 HySE.PlotPatchesDetection(macbeth, Positions, Sample_size)
 ```
-![Macbeth_PatchesDetection](https://github.com/user-attachments/assets/2fc5df12-4370-46ab-9119-1664b781fe36)
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2fc5df12-4370-46ab-9119-1664b781fe36" width="400"/>
+</p>
+
 ```python
 ############################
 ####### A.4 Compute the spectra for each patch
@@ -334,8 +351,9 @@ Name_ToSave = f'{SavingPath}{Name}_UnmixingComparison_ND'
 
 HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraData, MacBeth_RGB, Name, PlotLabels=Labels)#, SavingPath=Name_ToSave)
 ```
-![2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5_UnmixingComparison_avg_Patches](https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e)
-
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e" width="500"/>
+</p>
 
 ## Help 
 
