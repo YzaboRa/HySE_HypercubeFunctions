@@ -383,10 +383,10 @@ HySE.MakeMixingMatrix(_,_,Help=True)
    - [ ] Low intensity areas
 - [x] Spectra only normalisation
 - [ ] Try different unmixing algorithms
--    [ ] Non-Negative Least Squares (NNLS)
--    [ ] Weighted Least Squares (WLS)
--    [ ] Tikhonov Regularization (Ridge Regression)
--    [ ] Sparse Unmixing (Lasso)
+   - [ ] Non-Negative Least Squares (NNLS)
+   - [ ] Weighted Least Squares (WLS)
+   - [ ] Tikhonov Regularization (Ridge Regression)
+   - [ ] Sparse Unmixing (Lasso)
 - [ ] Co-registration
    - [ ] Try SimpleElastix with better data
    - [ ] Other algorithm
