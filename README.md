@@ -381,7 +381,12 @@ HySE.MakeMixingMatrix(_,_,Help=True)
 - [ ] Update masking of images
    - [ ] Specular reflections
    - [ ] Low intensity areas
-- [ ] Spectra only normalisation
+- [x] Spectra only normalisation
+- [ ] Try different unmixing algorithms
+-    [ ] Non-Negative Least Squares (NNLS)
+-    [ ] Weighted Least Squares (WLS)
+-    [ ] Tikhonov Regularization (Ridge Regression)
+-    [ ] Sparse Unmixing (Lasso)
 - [ ] Co-registration
    - [ ] Try SimpleElastix with better data
    - [ ] Other algorithm
