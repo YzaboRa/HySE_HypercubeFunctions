@@ -1,13 +1,13 @@
+"""
+
+Functions used for wavelenght unmixing
+
+"""
+
 import numpy as np
-# import cv2
-# import os
 from datetime import datetime
-# from scipy.signal import savgol_filter, find_peaks
 import matplotlib
 from matplotlib import pyplot as plt
-# import imageio
-# import matplotlib.colors as colors
-# import matplotlib.cm as cmx
 import inspect
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter
@@ -216,18 +216,18 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			otherwise it uses the data itself to estimate the mask
 
 	'''
-	
+
 	Help = kwargs.get('Help', False)
 	if Help:
 		print(inspect.getdoc(NormaliseMixedHypercube))
 		return 0,0
-		
+
 	Sigma = kwargs.get('Sigma', 20)
 	Dark = kwargs.get('Dark')
 	if Dark is not None:
 		Dark_g = gaussian_filter(Dark, sigma=Sigma)
 		print(f'Dark subtraction. Avg val = {np.average(Dark):.2f}, after blurring: {np.average(Dark_g):.2f}')
-	
+
 	SpectralNormalisation = kwargs.get('SpectralNormalisation', False)
 
 	WhiteCalibration = kwargs.get('WhiteCalibration')
@@ -239,17 +239,16 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			return 0
 		if Dark is not None:
 			WhiteCalibration_ = BlurWhiteCalibration(SubtractDark(WhiteCalibration, Dark_g), Sigma)
+			print(f'WC-Dark: {np.average(np.average(WhiteCalibration_, axis=1), axis=1)}')
 		else:
 			WhiteCalibration_ = BlurWhiteCalibration(WhiteCalibration, Sigma)
-	
+			print(f'WC: {np.average(np.average(WhiteCalibration_, axis=1), axis=1)}')
+
 	if (SpectralNormalisation and WhiteCalibration is None):
 				print(f'Please input WhiteCalibration when requesting SpectralNormalisation')
 				return 0
-#         wavelength_to_index = {wavelength: idx for idx, wavelength in enumerate(np.sort(Wavelengths_list))}
-			
+
 	Plot = kwargs.get('Plot', True)
-			
-	# Plot = kwargs.get('Plot', True)
 	SaveFigure = kwargs.get('SaveFigure', True)
 	SavingPath = kwargs.get('SavingPath', '')
 	vmax = kwargs.get('vmax', 5)
@@ -257,8 +256,7 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	if (Dark is None) and (WhiteCalibration is None):
 		print(f'No normalisation')
 		Plot=False
-	
-	
+
 	if len(MixedHypercube.shape)>3:
 		MixedHypercube_ = MixedHypercube
 	else:
@@ -269,34 +267,34 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	else:
 		print(f'White Calibration not provided. Estimating mask from data itself.')
 		Mask = HySE.Masking.GetStandardMask(MixedHypercube_[0], threshold=1)
-	print(f'Mask shape: {Mask.shape}')
-		
+
 	MixedHypercube_N = np.zeros(MixedHypercube_.shape)
 	(SS, WW, YY, XX) = MixedHypercube_.shape
 	for s in range(0,SS):
-		for w in range(0,WW):
-			frame = MixedHypercube_[s,w,:,:]
-			if Dark is not None:
-				frame_N = np.subtract(frame, Dark_g)
-			else:
-				frame_N = frame
-			if WhiteCalibration is not None:
-				if SpectralNormalisation:
-					white_cal_val = np.average(WhiteCalibration_[w,:,:])
-					frame_WN = frame_N/white_cal_val
-				else:
-					white_cal_sub = WhiteCalibration_[w,:,:]
-					frame_WN = np.divide(frame_N, white_cal_sub, out=np.zeros_like(frame_N), where=white_cal_sub!=0)
-				MixedHypercube_N[s,w,:,:] = np.ma.array(frame_WN, mask=Mask)
-			else:
-				MixedHypercube_N[s,w,:,:] = np.ma.array(frame_N, mask=Mask)
+		MixedHypercube_sub = MixedHypercube_[s,:,:,:]
+		if Dark is not None:
+			MixedHypercube_subN = SubtractDark(MixedHypercube_sub, Dark_g)
+		else:
+			MixedHypercube_subN = MixedHypercube_sub
 			
+		for w in range(0,WW):
+			frame = MixedHypercube_subN[w,:,:]
+			if WhiteCalibration is None:
+				frameN = frame
+			else:
+				whiteframe = WhiteCalibration_[w,:,:]
+				if SpectralNormalisation:
+					whiteval = np.average(whiteframe)
+					frameN = frame/whiteval
+				else:
+					frameN = np.divide(frame, whiteframe, out=np.zeros_like(frame), where=whiteframe!=0)
+			MixedHypercube_N[s,w,:,:] = np.ma.array(frameN, mask=Mask)
+
 	if Plot:
 		HypercubeToPlot = MixedHypercube_N[0,:,:,:]
 		nn = 0
 		Mavg = np.average(HypercubeToPlot)
 		Mstd = np.std(HypercubeToPlot)
-#         MM = Mavg+5*Mstd
 		fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
 		for j in range(0,4):
 			for i in range(0,4):
@@ -314,12 +312,11 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		if SaveFigure:
 			plt.savefig(f'{SavingPath}Normalised_Hypercube.png')
 		plt.show()
-			
+
 	if MixedHypercube_N.shape[0]==1:
 		MixedHypercube_N = MixedHypercube_N[0,:,:,:]
-			
-	return MixedHypercube_N, Mask
 
+	return MixedHypercube_N, Mask
 
 
 def UnmixData(MixedHypercube, MixingMatrix, **kwargs):

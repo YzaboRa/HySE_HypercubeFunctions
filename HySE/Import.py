@@ -14,8 +14,6 @@ from scipy.signal import savgol_filter, find_peaks
 import matplotlib
 from matplotlib import pyplot as plt
 import imageio
-# import matplotlib.colors as colors
-# import matplotlib.cm as cmx
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import SimpleITK as sitk
 import time
