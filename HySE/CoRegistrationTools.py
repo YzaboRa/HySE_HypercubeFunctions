@@ -643,11 +643,11 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 		
 	t0 = time.time()
 	## Convert the numpy array to simple elestix format
-	im_static_se = sitk.GetImageFromArray(im_static)
-	im_shifted_se = sitk.GetImageFromArray(im_shifted)
+	im_static_se = _sitk.GetImageFromArray(im_static)
+	im_shifted_se = _sitk.GetImageFromArray(im_shifted)
 
 	## Create object
-	elastixImageFilter = sitk.ElastixImageFilter()
+	elastixImageFilter = _sitk.ElastixImageFilter()
 
 	## Turn off console
 	if Verbose==False:
@@ -659,9 +659,9 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 
 	## Set transform parameters
 	if Affine:
-		parameterMap = sitk.GetDefaultParameterMap('affine')
+		parameterMap = _sitk.GetDefaultParameterMap('affine')
 	else:
-		parameterMap = sitk.GetDefaultParameterMap('translation')
+		parameterMap = _sitk.GetDefaultParameterMap('translation')
 		## Select metric robust to intensity differences (non uniform)
 		parameterMap['Metric'] = [Metric] 
 		## Select Bspline transform, which allows for non rigid and non uniform deformations
@@ -719,7 +719,7 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	## Execute
 	result = elastixImageFilter.Execute()
 	## Convert result to numpy array
-	im_coregistered = sitk.GetArrayFromImage(result)
+	im_coregistered = _sitk.GetArrayFromImage(result)
 	t1 = time.time()
 
 	## Find time taken:
