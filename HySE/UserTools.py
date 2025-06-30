@@ -400,7 +400,8 @@ def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
 	Help = kwargs.get('Help', False)
 	if Help:
 		print(inspect.getdoc(MakeHypercubeVideo))
-	kwargs.get('fps', 10)
+	
+	fps = kwargs.get('fps', 10)
 
 	(NN, YY, XX) = Hypercube.shape
 	if '.mp4' not in SavingPathWithName:
