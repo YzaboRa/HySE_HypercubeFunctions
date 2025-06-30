@@ -15,7 +15,7 @@ import matplotlib
 from matplotlib import pyplot as plt
 import imageio
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import SimpleITK as sitk
+# import SimpleITK as sitk
 import time
 from tqdm import trange
 import inspect
@@ -31,6 +31,7 @@ import HySE.ManipulateHypercube
 
 PythonEnvironment = get_ipython().__class__.__name__
 
+from ._optional import sitk as _sitk
 
 
 
@@ -618,6 +619,14 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 
 
 	"""
+	if _sitk is None:
+		raise ImportError(
+			"This function requires SimpleITK. "
+			"Install it with `pip install SimpleITK` or "
+			"`pip install HySE[registration]`."
+		)
+
+		
 	Help = kwargs.get('Help', False)
 	if Help:
 		print(inspect.getdoc(CoRegisterImages))

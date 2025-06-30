@@ -13,6 +13,7 @@
 
 import pkgutil
 import importlib
+import types
 import inspect
 import textwrap
 
@@ -25,7 +26,6 @@ for loader, module_name, is_pkg in pkgutil.iter_modules(__path__):
 		if obj.__module__ == f"{__name__}.{module_name}" and not name.startswith("_"):
 			globals()[name] = obj
 			__all__.append(name)
-
 
 
 

@@ -15,7 +15,6 @@ import matplotlib
 from matplotlib import pyplot as plt
 import imageio
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import SimpleITK as sitk
 import time
 from tqdm.notebook import trange, tqdm, tnrange
 import inspect
