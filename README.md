@@ -27,6 +27,8 @@ It also requires those additional libraries:
 - time
 - tqdm
 
+If SimpleElastix is not installed, or cannot be imported, the code will simply ignore it. This will not be a problem as long as the co-registration functions are not used.
+
 ## How to use
 
 ### Import parameters
