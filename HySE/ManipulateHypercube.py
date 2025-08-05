@@ -338,7 +338,7 @@ def GetDark_WholeVideo(vidPath, **kwargs):
 	 # DataAll = Import.ImportData(vidPath, **kwargs)
 
 	L = len(DataAll)
-	chunk_size = 200 ## How many frames to average
+	chunk_size = 100 ## How many frames to average
 	N = int(L/chunk_size)
 
 	Darks = []
