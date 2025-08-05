@@ -167,10 +167,16 @@ def ImportData(Path, *Coords, **kwargs):
 	XX = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 	YY = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 	if CropIm:
+		# print(CropImDimensions)
+		if CropImDimensions[1]==-1:
+			CropImDimensions[1] = XX
+		if CropImDimensions[3]==-1:
+			CropImDimensions[3] = YY
 		# XX = ImagePos_PCIe[1]-ImagePos_PCIe[0]
 		# YY = ImagePos_PCIe[3]-ImagePos_PCIe[2]
 		XX = CropImDimensions[1]-CropImDimensions[0]
 		YY = CropImDimensions[3]-CropImDimensions[2]
+		# print(CropImDimensions)
 
 	## Create empty array to store the data
 	if RGB:
@@ -193,7 +199,11 @@ def ImportData(Path, *Coords, **kwargs):
 		if frame is not None:
 			if CropIm:
 				# print(f'fc = {fc}, frame.shape = {frame.shape}')
-				frame = frame[CropImDimensions[2]:CropImDimensions[3], CropImDimensions[0]:CropImDimensions[1]]
+				x_start = CropImDimensions[0]
+				x_end = CropImDimensions[1]
+				y_start = CropImDimensions[2]
+				y_end = CropImDimensions[3]
+				frame = frame[y_start:y_end, x_start:x_end]
 			if (fc>=Nstart) and (fc<Nend):
 				if RGB:
 					if Trace:
