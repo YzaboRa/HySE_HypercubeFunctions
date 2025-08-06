@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 import inspect
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter
+from scipy.optimize import lsq_linear
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
@@ -356,14 +357,12 @@ def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
 	else:
 		MixedHypercube_ = np.array([MixedHypercube])
 		
-		
 	UnmixedHypercube = []
 	SS, WW, YY, XX = MixedHypercube_.shape
 	for s in range(0,SS):
 		hypercube_sub = MixedHypercube_[s,:,:,:]
 		NN, YY, XX = hypercube_sub.shape
 		ObservedMatrix = MakeObservedMatrix(hypercube_sub)
-#         print(f'MixingMatrix: {MixingMatrix.shape}, ObservedMatrix: {ObservedMatrix}')
 		SolvedMatrix_flat = np.linalg.lstsq(MixingMatrix, ObservedMatrix, rcond=-1)[0]
 		SolvedMatrix = []
 		for n in range(0,NN):
@@ -396,4 +395,73 @@ def MakeObservedMatrix(Hypercube):
 		data_sub = Hypercube[n,:,:]
 		Matrix.append(data_sub.ravel())
 	return np.array(Matrix)
+
+
+
+def UnmixDataNNLS(MixedHypercube, MixingMatrix, intensity_thresh=1e-2, std_thresh=1e-3,
+                  max_iter=5000, parallel=False, **kwargs):
+    """
+    Unmix a hypercube using non-negative least squares with noise filtering
+    and rejection of pixels with negative or invalid total intensity.
+
+    Parameters:
+        - MixedHypercube : array, shape (S, N, Y, X) or (N, Y, X)
+        - MixingMatrix : array, shape (num_images, num_wavelengths)
+        - intensity_thresh = 1e-2 : float, reject very dim pixels
+        - std_thresh = 1e-3 : float, reject flat/noisy pixels
+        - max_iter = 5000 : int, maximum iterations for solver
+        - parallel = False : bool, enable parallel processing
+        - kwargs
+        	- Help: Show this help message
+        	- Average = True. If the input mixed hypercube containes more than one shape,
+				the function can average the unmixed arrays or leave then individually
+
+
+    """
+    Help = kwargs.get('Help', False)
+    Average = kwargs.get('Average', True)
+    if Help:
+        print(inspect.getdoc(UnmixDataNNLS))
+        return 0
+
+    if len(MixedHypercube.shape) > 3:
+        MixedHypercube_ = MixedHypercube
+    else:
+        MixedHypercube_ = np.array([MixedHypercube])
+
+    UnmixedHypercube = []
+    SS, WW, YY, XX = MixedHypercube_.shape
+
+    for s in range(SS):
+        hypercube_sub = MixedHypercube_[s]
+        NN, YY, XX = hypercube_sub.shape
+        ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T  # shape: (pixels, n_meas)
+        num_pixels = ObservedMatrix.shape[0]
+        num_waves = MixingMatrix.shape[1]
+        SolvedMatrix_flat = np.zeros((num_waves, num_pixels))
+
+        def solve_single(i):
+            pixel = ObservedMatrix[i, :]
+            if (np.sum(pixel) < intensity_thresh or
+                np.std(pixel) < std_thresh or
+                np.sum(pixel) < 0):
+                return np.zeros(num_waves)
+            res = lsq_linear(MixingMatrix, pixel, bounds=(0, np.inf), max_iter=max_iter, method='trf')
+            return res.x if res.success else np.zeros(num_waves)
+
+        if parallel:
+            from joblib import Parallel, delayed
+            results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
+            SolvedMatrix_flat = np.array(results).T
+        else:
+            for i in range(num_pixels):
+                SolvedMatrix_flat[:, i] = solve_single(i)
+
+        SolvedMatrix = [SolvedMatrix_flat[n, :].reshape(YY, XX) for n in range(num_waves)]
+        UnmixedHypercube.append(SolvedMatrix)
+
+    UnmixedHypercube = np.array(UnmixedHypercube)
+    if Average:
+        UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
+    return UnmixedHypercube
 		
