@@ -643,6 +643,7 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 			- PlotLabels: What label to put for each provided set of spectra. If not indicated
 				a generic 'option 1', 'option 2' etc will be used
 			- WhitePatchNormalise (True). Normalises all spectral by the spectra of the white patch
+			- ClipYScale (True): Clip the y range of the plots to [-0.05,1.05]
 
 	Outputs:
 		- (plots figure)
@@ -659,6 +660,8 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 		SaveFig = False
 	else:
 		SaveFig = True
+
+	ClipYScale = kwargs.get('ClipYScale', True)
 
 	PlotColours = ['limegreen', 'royalblue', 'darkblue', 'orange', 'red', 'cyan', 'magenta']
 		
@@ -710,7 +713,8 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 				PSNR = psnr(GT_comparable, spectra_WhiteNorm)
 				PSNR_Vals.append(PSNR)
 
-			ax[j,i].set_ylim(-0.05,1.05)
+			if ClipYScale:
+				ax[j,i].set_ylim(-0.05,1.05)
 			ax[j,i].set_xlim(450,670)
 			
 			if len(PSNR_Vals)>1:
@@ -733,8 +737,9 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 				ax[j,i].xaxis.set_ticklabels([])
 			if i==0:
 				ax[j,i].set_ylabel('Normalized intensity')
-			if i!=0:
-				ax[j,i].yaxis.set_ticklabels([])
+			if ClipYScale:
+				if i!=0:
+					ax[j,i].yaxis.set_ticklabels([])
 
 	plt.suptitle(f'Spectra for {Name} - Selected Method: {ChosenMethod}')
 	plt.tight_layout()

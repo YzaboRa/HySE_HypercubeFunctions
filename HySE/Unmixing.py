@@ -75,7 +75,7 @@ def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
 	Panel2_wavs = Wavelengths_unsorted[0:8]
 	Panel4_wavs = Wavelengths_unsorted[8:]
 	MixingMatrix = np.zeros((len(Wavelengths_sorted), len(Wavelengths_sorted)))
-	(NN, _) = Arduino_MixingMatrix.shape
+	(NN, Nmixed) = Arduino_MixingMatrix.shape
 	for i in range(0,NN):
 		## First profile (profile 2 - REDs)
 		bins = Arduino_MixingMatrix[i,:]
@@ -133,6 +133,9 @@ def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
 		else:
 			ax.set_title(f'Mixing Matrix - Binary')
 		plt.tight_layout()
+		if SaveFig:
+			plt.savefig(SavingPath)
+
 		plt.show()
 
 	return MixingMatrix
