@@ -236,6 +236,8 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	WhiteCalibration = kwargs.get('WhiteCalibration')
 	if WhiteCalibration is not None:
 		print(f'White Normalising')
+		if SpectralNormalisation:
+			print(f'Only spectral normalisation')
 		Wavelengths_list = kwargs.get('Wavelengths_list')
 		if Wavelengths_list is None:
 			print(f'Please indicate Wavelengths_list (unsorted) when requesting WhiteCalibration')
