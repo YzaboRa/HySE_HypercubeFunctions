@@ -655,7 +655,7 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 		print(inspect.getdoc(PlotPatchesSpectra))
 		return
 
-	SavingPath = kwargs.get('SavingPath', '')
+	SavingPath = kwargs.get('SavingPath')
 	if SavingPath is None:
 		SaveFig = False
 	else:
