@@ -399,69 +399,147 @@ def MakeObservedMatrix(Hypercube):
 
 
 def UnmixDataNNLS(MixedHypercube, MixingMatrix, intensity_thresh=1e-2, std_thresh=1e-3,
-                  max_iter=5000, parallel=False, **kwargs):
-    """
-    Unmix a hypercube using non-negative least squares with noise filtering
-    and rejection of pixels with negative or invalid total intensity.
+				  max_iter=5000, parallel=True, **kwargs):
+	"""
+	Unmix a hypercube using non-negative least squares with noise filtering
+	and rejection of pixels with negative or invalid total intensity.
 
-    Parameters:
-        - MixedHypercube : array, shape (S, N, Y, X) or (N, Y, X)
-        - MixingMatrix : array, shape (num_images, num_wavelengths)
-        - intensity_thresh = 1e-2 : float, reject very dim pixels
-        - std_thresh = 1e-3 : float, reject flat/noisy pixels
-        - max_iter = 5000 : int, maximum iterations for solver
-        - parallel = False : bool, enable parallel processing
-        - kwargs
-        	- Help: Show this help message
-        	- Average = True. If the input mixed hypercube containes more than one shape,
+	Parameters:
+		- MixedHypercube : array, shape (S, N, Y, X) or (N, Y, X)
+		- MixingMatrix : array, shape (num_images, num_wavelengths)
+		- intensity_thresh = 1e-2 : float, reject very dim pixels
+		- std_thresh = 1e-3 : float, reject flat/noisy pixels
+		- max_iter = 5000 : int, maximum iterations for solver
+		- parallel = False : bool, enable parallel processing
+		- kwargs
+			- Help: Show this help message
+			- Average = True. If the input mixed hypercube containes more than one shape,
 				the function can average the unmixed arrays or leave then individually
 
+	Output:
+		- Unmixed Hypercube
 
-    """
-    Help = kwargs.get('Help', False)
-    Average = kwargs.get('Average', True)
-    if Help:
-        print(inspect.getdoc(UnmixDataNNLS))
-        return 0
+	"""
+	Help = kwargs.get('Help', False)
+	Average = kwargs.get('Average', True)
+	if Help:
+		print(inspect.getdoc(UnmixDataNNLS))
+		return 0
 
-    if len(MixedHypercube.shape) > 3:
-        MixedHypercube_ = MixedHypercube
-    else:
-        MixedHypercube_ = np.array([MixedHypercube])
+	if len(MixedHypercube.shape) > 3:
+		MixedHypercube_ = MixedHypercube
+	else:
+		MixedHypercube_ = np.array([MixedHypercube])
 
-    UnmixedHypercube = []
-    SS, WW, YY, XX = MixedHypercube_.shape
+	UnmixedHypercube = []
+	SS, WW, YY, XX = MixedHypercube_.shape
 
-    for s in range(SS):
-        hypercube_sub = MixedHypercube_[s]
-        NN, YY, XX = hypercube_sub.shape
-        ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T  # shape: (pixels, n_meas)
-        num_pixels = ObservedMatrix.shape[0]
-        num_waves = MixingMatrix.shape[1]
-        SolvedMatrix_flat = np.zeros((num_waves, num_pixels))
+	for s in range(SS):
+		hypercube_sub = MixedHypercube_[s]
+		NN, YY, XX = hypercube_sub.shape
+		ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T  # shape: (pixels, n_meas)
+		num_pixels = ObservedMatrix.shape[0]
+		num_waves = MixingMatrix.shape[1]
+		SolvedMatrix_flat = np.zeros((num_waves, num_pixels))
 
-        def solve_single(i):
-            pixel = ObservedMatrix[i, :]
-            if (np.sum(pixel) < intensity_thresh or
-                np.std(pixel) < std_thresh or
-                np.sum(pixel) < 0):
-                return np.zeros(num_waves)
-            res = lsq_linear(MixingMatrix, pixel, bounds=(0, np.inf), max_iter=max_iter, method='trf')
-            return res.x if res.success else np.zeros(num_waves)
+		def solve_single(i):
+			pixel = ObservedMatrix[i, :]
+			if (np.sum(pixel) < intensity_thresh or
+				np.std(pixel) < std_thresh or
+				np.sum(pixel) < 0):
+				return np.zeros(num_waves)
+			res = lsq_linear(MixingMatrix, pixel, bounds=(0, np.inf), max_iter=max_iter, method='trf')
+			return res.x if res.success else np.zeros(num_waves)
 
-        if parallel:
-            from joblib import Parallel, delayed
-            results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
-            SolvedMatrix_flat = np.array(results).T
-        else:
-            for i in range(num_pixels):
-                SolvedMatrix_flat[:, i] = solve_single(i)
+		if parallel:
+			from joblib import Parallel, delayed
+			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
+			SolvedMatrix_flat = np.array(results).T
+		else:
+			for i in range(num_pixels):
+				SolvedMatrix_flat[:, i] = solve_single(i)
 
-        SolvedMatrix = [SolvedMatrix_flat[n, :].reshape(YY, XX) for n in range(num_waves)]
-        UnmixedHypercube.append(SolvedMatrix)
+		SolvedMatrix = [SolvedMatrix_flat[n, :].reshape(YY, XX) for n in range(num_waves)]
+		UnmixedHypercube.append(SolvedMatrix)
 
-    UnmixedHypercube = np.array(UnmixedHypercube)
-    if Average:
-        UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
-    return UnmixedHypercube
+	UnmixedHypercube = np.array(UnmixedHypercube)
+	if Average:
+		UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
+	return UnmixedHypercube
+
+
+def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
+						intensity_thresh=1e-2, std_thresh=1e-3,
+						max_iter=5000, parallel=True, **kwargs):
+	"""
+	Unmix hypercube using non-negative least squares with Tikhonov regularization
+	promoting smoothness across wavelengths.
+
+	Parameters:
+		- MixedHypercube : array, shape (S, N, Y, X) or (N, Y, X)
+		- MixingMatrix : array, shape (num_images, num_wavelengths)
+		- lambda_smooth = 0.1 : regularization strength for spectral smoothness
+		- intensity_thresh = 1e-2: intensity threshold for skipping noisy pixels (aim for ~ 1e-2*max(Hypercube))
+		- std_thresh = 1e-3 : standard deviation threshold for skipping noisy pixels
+		- max_iter = 5000 : max iterations for NNLS solver
+		- parallel = True: use parallel joblib processing
+		- kwargs
+			- Help: Show this help message
+			- Average = True. If the input mixed hypercube containes more than one shape,
+				the function can average the unmixed arrays or leave then individually
+
+	Output:
+		-  Unmixed Hypercube
+	"""
+	Help = kwargs.get('Help', False)
+	Average = kwargs.get('Average', True)
+	if Help:
+		print(inspect.getdoc(UnmixDataSmoothNNLS))
+		return 0
+
+	if len(MixedHypercube.shape) > 3:
+		MixedHypercube_ = MixedHypercube
+	else:
+		MixedHypercube_ = np.array([MixedHypercube])
+
+	UnmixedHypercube = []
+	SS, WW, YY, XX = MixedHypercube_.shape
+	num_meas, num_waves = MixingMatrix.shape
+
+	# Construct second-difference matrix L (smoothness penalty)
+	L = -2 * np.eye(num_waves) + np.eye(num_waves, k=1) + np.eye(num_waves, k=-1)
+	A_reg_base = np.vstack([MixingMatrix, np.sqrt(lambda_smooth) * L])
+	zeros_rhs = np.zeros((num_waves,))
+
+	for s in range(SS):
+		hypercube_sub = MixedHypercube_[s]
+		NN, YY, XX = hypercube_sub.shape
+		ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T  # shape: (pixels, n_meas)
+		num_pixels = ObservedMatrix.shape[0]
+		SolvedMatrix_flat = np.zeros((num_waves, num_pixels))
+
+		def solve_single(i):
+			pixel = ObservedMatrix[i, :]
+			if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
+				return np.zeros(num_waves)
+			b_reg = np.concatenate([pixel, zeros_rhs])
+			res = lsq_linear(A_reg_base, b_reg, bounds=(0, np.inf), max_iter=max_iter, method='trf')
+			return res.x if res.success else np.zeros(num_waves)
+
+		if parallel:
+			from joblib import Parallel, delayed
+			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
+			SolvedMatrix_flat = np.array(results).T
+		else:
+			for i in range(num_pixels):
+				SolvedMatrix_flat[:, i] = solve_single(i)
+
+		SolvedMatrix = [SolvedMatrix_flat[n, :].reshape(YY, XX) for n in range(num_waves)]
+		UnmixedHypercube.append(SolvedMatrix)
+
+	UnmixedHypercube = np.array(UnmixedHypercube)
+	if Average:
+		UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
+	return UnmixedHypercube
+
 		
