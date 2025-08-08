@@ -733,3 +733,45 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 
 
 
+def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub):
+	"""
+	Function that takes all hypercubes (where hypercube computed from specific sweepw were kept individually 
+	instead of averaged) and saves frames as individual images. 
+	All images are saved in folder called {Name}_{NameSub}_RawFrames inside SavingPath, and images from sweep i are
+	saved in the folder Sweep{s}.
+
+	Input:
+		- Hypercube_all : All the hypercubes computed from all sweeps. Shape (Nsweeps, Nwav, YY, XX)
+		- SavingPath : Where to save all results (generic) (expected to end with '/')
+		- Name : General name of the data (i.e. patient)
+		- Same_Sub : Specific name for the hypercubes (i.e. lesion)
+
+
+	Outputs:
+		- All frames saved as png images in individual folders
+
+	"""
+
+    Nsweeps, Nwav, YY, XX = Hypercube_all.shape
+    GeneralDirectory = f'{Name}_{NameSub}_RawFrames'
+    try:
+        os.mkdir(f'{SavingPath}{GeneralDirectory}')
+    except FileExistsError:
+        pass
+    for s in range(0,Nsweeps):
+        DirectoryName = f'{SavingPath}{GeneralDirectory}/Sweep{s}'
+        try:
+            os.mkdir(DirectoryName)
+        except FileExistsError:
+            pass
+        
+        hypercube = Hypercube_all[s,:,:,:]
+        for w in range(0,Nwav):
+            
+            frame = hypercube[w,:,:]/(np.amax(hypercube[w,:,:]))*255
+            im = Image.fromarray(frame)
+            im = im.convert("L")
+            im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}.png')
+
+
+
