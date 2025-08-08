@@ -32,6 +32,7 @@ import HySE.ManipulateHypercube
 PythonEnvironment = get_ipython().__class__.__name__
 
 from ._optional import sitk as _sitk
+from skimage.metrics import normalized_mutual_information as nmi 
 
 
 
@@ -108,6 +109,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 		- kwargs 
 			- Buffer: sets the numner of frames to ignore on either side of a colour transition
 				Totale number of frames removed = 2*Buffer (default 6)
+			- JustBright = False : If only considering the brightest frames (of the RGB frames)
 			- ImStatic_Plateau: sets the plateau (wavelength) from which the static image is selected (default 1)
 			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
 			- PlotDiff: Whether to plot figure showing the co-registration (default False)
@@ -212,6 +214,9 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 		elif Plot_PlateauList=='None':
 			Plot_PlateauList = []
 
+	JustBright = kwargs.get('JustBright', False)
+	if JustBright:
+		print(f'Only averaging bright frames')
 
 	## Sort Wavelengths
 	order_list = np.argsort(Wavelengths_list)
@@ -279,6 +284,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 								print(f'Skipping plot for plateau={c}, index={i} because it is the static image')
 							else:
 								HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+								print(f'Saved CoRegistration plot for plateau {c} and index {i} here : {SavingPathWithName}')
 
 			
 			ImagesTemp = np.array(ImagesTemp)
@@ -354,6 +360,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 
 
 	Outputs:
+		- Hypercube_sorted
 
 	"""
 
@@ -421,7 +428,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 		if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
 			print(f'PlotIndex is outside the range of indices that will be analyse ({Buffer}, {MinIndex-Buffer})')
 			Plot_Index = int(MinIndex/2)
-			print(f'	Seeting it to {PlotIndex}')
+			print(f'	Seeting it to {Plot_Index}')
 
 
 	SaveHypercube = kwargs.get('SaveHypercube', True)
@@ -470,10 +477,10 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 			
 			offset = np.where(vals==np.amax(vals))[0][0]
 
-			# ## Average all frames
-			# for i in range(Buffer,NN-Buffer):
-			## Average only brightes frames:
-			for i in range(Buffer+offset,NN-Buffer,3):
+			## Average all frames
+			for i in range(Buffer,NN-Buffer):
+			# ## Average only brightes frames:
+			# for i in range(Buffer+offset,NN-Buffer,3):
 				im_shifted = DataSweep[c][i,:,:]
 				im_coregistered, shift_val, time_taken = CoRegisterImages(im_static, im_shifted)
 				ImagesTemp.append(im_coregistered)
@@ -598,7 +605,7 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 			- Verbose
 			- MaximumNumberOfIterations: integer (e.g. 500)
 			- Metric (default 'AdvancedMattesMutualInformation', also 'NormalizedCorrelation' and 'AdvancedKappaStatistic')
-			- Optimizer (default 'AdvancedMattesMutualInformation')
+			- Optimizer (default 'AdaptiveStochasticGradientDescent')
 			- Transform (default 'BSplineTransform'). Also:
 				Global (Parametric) Transforms:
 				- 'TranslationTransform': Only accounts for shifts (translations)
@@ -638,6 +645,8 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	Verbose = kwargs.get('Verbose', False)
 	Metric = kwargs.get('Metric', 'AdvancedMattesMutualInformation')
 	Transform = kwargs.get('Transform', 'BSplineTransform')
+	if Transform!='BSplineTransform':
+		print(f'Transform set to {Transform}')
 	Optimizer = kwargs.get('Transform', 'AdaptiveStochasticGradientDescent')
 		
 		
@@ -752,26 +761,69 @@ def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub):
 
 	"""
 
-    Nsweeps, Nwav, YY, XX = Hypercube_all.shape
-    GeneralDirectory = f'{Name}_{NameSub}_RawFrames'
-    try:
-        os.mkdir(f'{SavingPath}{GeneralDirectory}')
-    except FileExistsError:
-        pass
-    for s in range(0,Nsweeps):
-        DirectoryName = f'{SavingPath}{GeneralDirectory}/Sweep{s}'
-        try:
-            os.mkdir(DirectoryName)
-        except FileExistsError:
-            pass
-        
-        hypercube = Hypercube_all[s,:,:,:]
-        for w in range(0,Nwav):
-            
-            frame = hypercube[w,:,:]/(np.amax(hypercube[w,:,:]))*255
-            im = Image.fromarray(frame)
-            im = im.convert("L")
-            im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}.png')
+	Nsweeps, Nwav, YY, XX = Hypercube_all.shape
+	GeneralDirectory = f'{Name}_{NameSub}_RawFrames'
+	try:
+		os.mkdir(f'{SavingPath}{GeneralDirectory}')
+	except FileExistsError:
+		pass
+	for s in range(0,Nsweeps):
+		DirectoryName = f'{SavingPath}{GeneralDirectory}/Sweep{s}'
+		try:
+			os.mkdir(DirectoryName)
+		except FileExistsError:
+			pass
+		
+		hypercube = Hypercube_all[s,:,:,:]
+		for w in range(0,Nwav):
+			
+			frame = hypercube[w,:,:]/(np.amax(hypercube[w,:,:]))*255
+			im = Image.fromarray(frame)
+			im = im.convert("L")
+			im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}.png')
+
+
+def GetNMI(Data, **kwargs):
+	"""
+	Copmutes the normalised mutual information of a hypercube.
+
+	Inputs:
+		- Data : Hypercube, shape N, Y, X
+		- kwargs:
+			- Help
+
+	Outputs:
+		- NMI_average, NMT_vs_reference, NMI_pairwise
+
+	"""
+	cube = Data 
+	N, H, W = cube.shape
+	
+	#  Contrast‑normalise each slice so illumination changes between wavelengths do not bias the histogram.
+	cube_norm = cube.astype(np.float32).copy()
+	for i in range(N):
+		sl = cube_norm[i]
+		sl -= sl.min()                 # shift to zero
+		rng = np.ptp(sl)
+		cube_norm[i] = sl / (rng + 1e-7)  # scale to [0, 1]
+		
+	# Mean NMI against a single reference wavelength
+	ref_idx = 1 #N // 2                 # pick the central wavelength as reference
+	ref = cube_norm[ref_idx]
+	bins = 128                       # histogram bins; 128–256 is typical for 16‑bit data
+#     bins = 64                       # histogram bins; 128–256 is typical for 16‑bit data
+	nmi_vs_ref = np.empty(N, dtype=np.float32)
+	for i in range(N):
+		nmi_vs_ref[i] = nmi(cube_norm[i], ref, bins=bins)
+	mean_nmi = nmi_vs_ref.mean()
+#     print(f"\nMean NMI vs reference slice λ[{ref_idx}] = {mean_nmi:.4f}")
+	
+	# Pairwise NMI
+	pairwise_nmi = np.empty(N - 1, dtype=np.float32)
+	for i in range(N - 1):
+		pairwise_nmi[i] = nmi(cube_norm[i], cube_norm[i + 1], bins=bins)
+
+	return mean_nmi, nmi_vs_ref, pairwise_nmi
 
 
 

@@ -28,7 +28,7 @@ plt.rcParams["font.family"] = "arial"
 
 
 
-def FindPlottingRange(array):
+def FindPlottingRange(array, **kwargs):
 	"""
 	Function that helps finding a reasonable range for plotting 
 	Helpful when the data has several pixels with abnormally high/low values such that 
@@ -169,7 +169,7 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 		- im_coregistered
 		- kwargs:
 			- Help
-			- ShowPlot (default True)
+			- ShowPlot (default False)
 			- SavePlot (default False)
 			- SavingPathWithName (default ''): If Saving figure, indicate the path where to save it
 				Include the full name and '.png'.
@@ -182,10 +182,9 @@ def PlotCoRegistered(im_static, im_shifted, im_coregistered, **kwargs):
 	if Help:
 		print(inspect.getdoc(PlotCoRegistered))
 
-	kwargs.get('SavingPathWithName', '')
-	kwargs.get('SavePlot', False)
-	kwargs.get('ShowPlot', True)
-
+	SavingPathWithName = kwargs.get('SavingPathWithName', '')
+	SavePlot = kwargs.get('SavePlot', False)
+	ShowPlot = kwargs.get('ShowPlot', False)
 
 	images_diff_0 = np.subtract(im_shifted.astype('float64'), im_static.astype('float64'))
 	images_diff_0_avg = np.average(np.abs(images_diff_0))
