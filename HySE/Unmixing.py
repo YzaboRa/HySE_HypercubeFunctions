@@ -245,9 +245,11 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			return 0
 		if Dark is not None:
 			WhiteCalibration_ = BlurWhiteCalibration(SubtractDark(WhiteCalibration, Dark_g), Sigma)
+			print(f'Subtracting Dark and blurring White Reference with sigma = {Sigma}')
 			print(f'WC-Dark: {np.average(np.average(WhiteCalibration_, axis=1), axis=1)}')
 		else:
 			WhiteCalibration_ = BlurWhiteCalibration(WhiteCalibration, Sigma)
+			print(f'Blurring White Reference with sigma = {Sigma}')
 			print(f'WC: {np.average(np.average(WhiteCalibration_, axis=1), axis=1)}')
 
 	if (SpectralNormalisation and WhiteCalibration is None):

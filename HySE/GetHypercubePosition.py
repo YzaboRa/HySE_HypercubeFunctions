@@ -199,6 +199,11 @@ def FindHypercube(DataPath, Wavelengths_list, **kwargs):
 	
 	## Now make figure to make sure all is right
 	SweepColors = ['royalblue', 'indianred', 'limegreen', 'gold', 'darkturquoise', 'magenta', 'orangered', 'cyan', 'lime', 'hotpink']
+	if len(EdgePos)>len(SweepColors):
+		ExtraN = int((len(EdgePos)-len(SweepColors))/len(SweepColors))+1
+		NewSweepColors = SweepColors.copy()
+		for u in range(0,ExtraN):
+			SweepColors.extend(NewSweepColors)
 	fs = 9
 	
 	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(13,5))
