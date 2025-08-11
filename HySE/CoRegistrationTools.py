@@ -34,6 +34,8 @@ PythonEnvironment = get_ipython().__class__.__name__
 from ._optional import sitk as _sitk
 from skimage.metrics import normalized_mutual_information as nmi 
 
+from PIL import Image
+
 
 
 
@@ -119,6 +121,7 @@ def SweepCoRegister_WithNormalisation(DataSweep, WhiteHypercube, Dark, Wavelengt
 				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
 			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
 				(default True)
+			- BrightFramesOnly = False : If True, only averages bright frames
 
 
 	Outputs:
@@ -357,6 +360,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
 			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
 				(default True)
+			- BrightFramesOnly = False : If True, only averages bright frames
 
 
 	Outputs:
@@ -411,6 +415,8 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
 	
 
+	
+	BrightFramesOnly = kwargs.get('BrightFramesOnly', False)
 
 	Plot_PlateauList = kwargs.get('Plot_PlateauList', [5])
 	if isinstance(Plot_PlateauList, int):
@@ -477,12 +483,21 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 			
 			offset = np.where(vals==np.amax(vals))[0][0]
 
-			## Average all frames
-			for i in range(Buffer,NN-Buffer):
-			# ## Average only brightes frames:
-			# for i in range(Buffer+offset,NN-Buffer,3):
+			if BrightFramesOnly:
+				## Average only brightes frames:
+				loop_start = Buffer+offset
+				loop_end = NN-Buffer
+				loop_step = 3
+				# for i in range(Buffer+offset,NN-Buffer,3):
+			else:
+				## Average all frames
+				loop_start = Buffer
+				loop_end = NN-Buffer
+				loop_step = 1
+				# for i in range(Buffer,NN-Buffer):
+			for i in range(loop_start, loop_end, loop_step):
 				im_shifted = DataSweep[c][i,:,:]
-				im_coregistered, shift_val, time_taken = CoRegisterImages(im_static, im_shifted)
+				im_coregistered, shift_val, time_taken = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
 				ImagesTemp.append(im_coregistered)
 
 				if c<8:
@@ -590,170 +605,304 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 
 
 
+# def CoRegisterImages(im_static, im_shifted, **kwargs):
+# 	"""
+# 	Basic function that co-registers a shifted image to a defined static image.
+# 	It uses SimpleElastix funtions. 
+# 	Lines of code can be commented 
+
+
+# 	Inputs:
+# 		- im_static
+# 		- im_shifted
+# 		- kwargs:
+# 			- Affine
+# 			- Verbose
+# 			- MaximumNumberOfIterations: integer (e.g. 500)
+# 			- Metric (default 'AdvancedMattesMutualInformation', also 'MutualInformatino', 'NormalizedCorrelation' and 'AdvancedKappaStatistic')
+# 			- Optimizer (default 'AdaptiveStochasticGradientDescent')
+# 			- Transform (default 'BSplineTransform'). Also:
+# 				Global (Parametric) Transforms:
+# 				- 'TranslationTransform': Only accounts for shifts (translations)
+# 				- 'Euler2DTransform': Rigid transformations, including translation and rotation
+# 				- 'VersorTransform': Similar to Euler, rotations are represented by a versor (quaternion), which can be more numerically stable for large rotations.
+# 				- 'Similarity2DTransform': Adds isotropic scaling to the rigid transformations (translation, rotation, and uniform scaling).
+# 				- 'ScaleTransform': Allows for anisotropic scaling (different scaling factors along each axis)
+# 				- 'AffineTransform': A general linear transformation that includes translation, rotation, scaling (isotropic and anisotropic), and shearing
+# 				Deformable (Non-Parametric) Transforms
+# 				- 'BSplineTransform': uses a sparse regular grid of control points to define a smooth, non-rigid deformation field
+# 				- 'DisplacementFieldTransform': epresents the transformation as a dense grid of displacement vectors, where each pixel has a corresponding vector indicating its movement. 
+# 				This offers the highest flexibility but can be computationally more expensive and may require more memory.
+
+# 	Outputs:
+# 		- im_coregistered
+# 		- shift_val: estiimate of the maximal shift
+# 		- time_taken
+
+
+# 	"""
+# 	if _sitk is None:
+# 		raise ImportError(
+# 			"This function requires SimpleITK. "
+# 			"Install it with `pip install SimpleITK` or "
+# 			"`pip install HySE[registration]`."
+# 		)
+
+		
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(CoRegisterImages))
+# 		return 0,0,0
+
+# 	## If we don't expect complex deformations, set transform to affine
+# 	## To limit unwanted distortions
+# 	Affine = kwargs.get('Affine', False)
+# 	Verbose = kwargs.get('Verbose', False)
+# 	Metric = kwargs.get('Metric', 'AdvancedMattesMutualInformation')
+# 	Transform = kwargs.get('Transform', 'BSplineTransform')
+# 	# if Transform!='BSplineTransform':
+# 	# 	print(f'Transform set to {Transform}')
+# 	Optimizer = kwargs.get('Transform', 'AdaptiveStochasticGradientDescent')
+# 	print(f'SimpleElastix: Transform = {Transform}, Optimizer = {Optimizer}, Metric = {Metric}')
+		
+# 	t0 = time.time()
+# 	## Convert the numpy array to simple elestix format
+# 	im_static_se = _sitk.GetImageFromArray(im_static)
+# 	im_shifted_se = _sitk.GetImageFromArray(im_shifted)
+
+# 	## Create object
+# 	elastixImageFilter = _sitk.ElastixImageFilter()
+
+# 	## Turn off console
+# 	if Verbose==False:
+# 		elastixImageFilter.LogToConsoleOff()
+
+# 	## Set image parameters
+# 	elastixImageFilter.SetFixedImage(im_static_se)
+# 	elastixImageFilter.SetMovingImage(im_shifted_se)
+
+# 	## Set transform parameters
+# 	if Affine:
+# 		parameterMap = _sitk.GetDefaultParameterMap('affine')
+# 	else:
+# 		parameterMap = _sitk.GetDefaultParameterMap('translation')
+# 		## Select metric robust to intensity differences (non uniform)
+# 		parameterMap['Metric'] = [Metric] 
+# 		## Select Bspline transform, which allows for non rigid and non uniform deformations
+# 		parameterMap['Transform'] = [Transform]
+
+# 	## Tried those parameters, on Macbeth chart data (not moving), did not have significant impact
+# 	# parameterMap['AutomaticTransformInitialization'] = ['true']
+# 	# parameterMap['AutomaticTransformInitializationMethod'] = ['CenterOfGravity']
+# 	# parameterMap['HistogramMatch'] = ['true']
+# 	# parameterMap['BSplineRegularizationOrder'] = ['11'] ## default 
+
+# 	## Parameters to play with if co-registration is not optimal:
+
+# #         # Controls how long the optimizer runs
+# 	parameterMap['Optimizer'] = [Optimizer]
+# 	MaximumNumberOfIterations = kwargs.get('MaximumNumberOfIterations')
+# 	if MaximumNumberOfIterations is not None:
+# 		parameterMap['MaximumNumberOfIterations'] = [str(MaximumNumberOfIterations)] 
+
+# 	#     # You can try different metrics like AdvancedMattesMutualInformation, NormalizedCorrelation, 
+# 	#     # or AdvancedKappaStatistic for different registration scenarios.
+# 	# parameterMap['Metric'] = ['AdvancedMattesMutualInformation']
+# 	#     # Adjust the number of bins used in mutual information metrics
+# 	# parameterMap['NumberOfHistogramBins'] = ['32']
+# 	#     # Change the optimizer to AdaptiveStochasticGradientDescent for potentially better convergence
+# 	# parameterMap['Optimizer'] = ['AdaptiveStochasticGradientDescent']
+# 	#     # Controls the grid spacing for the BSpline transform
+# 	# parameterMap['FinalGridSpacingInPhysicalUnits'] = ['10.0']
+# 	#     # Refines the BSpline grid at different resolutions.
+# 	# parameterMap['GridSpacingSchedule'] = ['10.0', '5.0', '2.0']
+# 	#     # Automatically estimate the scales for the transform parameters.
+# 	# parameterMap['AutomaticScalesEstimation'] = ['true']
+# 	#     # Controls the number of resolutions used in the multi-resolution pyramid. 
+# 	#     # A higher number can lead to better registration at the cost of increased computation time.
+# 	# parameterMap['NumberOfResolutions'] = ['4']
+# 	#     # Automatically initializes the transform based on the center of mass of the images.
+# 	# parameterMap['AutomaticTransformInitialization'] = ['true']
+# 	#     # Controls the interpolation order for the final transformation.
+# 	# parameterMap['FinalBSplineInterpolationOrder'] = ['3']
+
+# #         # Adjust the maximum step length for the optimizer
+# #     parameterMap['MaximumStepLength'] = ['4.0']
+# #         # Use more samples for computing gradients
+# #     parameterMap['NumberOfSamplesForExactGradient'] = ['10000']
+# #         # Specify the grid spacing in voxels for the final resolution.
+# #     parameterMap['FinalGridSpacingInVoxels'] = ['8.0']
+# #         # Defines the spacing of the sampling grid used during optimization.
+# #     parameterMap['SampleGridSpacing'] = ['2.0']
+
+
+# 	## If required, set maximum number of iterations
+# #     parameterMap['MaximumNumberOfIterations'] = ['500']
+# 	elastixImageFilter.SetParameterMap(parameterMap)
+
+# 	## Execute
+# 	result = elastixImageFilter.Execute()
+# 	## Convert result to numpy array
+# 	im_coregistered = _sitk.GetArrayFromImage(result)
+# 	t1 = time.time()
+
+# 	## Find time taken:
+# 	time_taken = t1-t0
+
+# 	## Get an idea of difference
+# 	shift_val = np.average(np.abs(np.subtract(im_static,im_coregistered)))
+
+# 	## return 
+# 	return im_coregistered, shift_val, time_taken
+
+
 def CoRegisterImages(im_static, im_shifted, **kwargs):
 	"""
-	Basic function that co-registers a shifted image to a defined static image.
-	It uses SimpleElastix funtions. 
-	Lines of code can be commented 
-
+	Co-registers a shifted image to a defined static image using SimpleElastix.
 
 	Inputs:
 		- im_static
 		- im_shifted
-		- kwargs:
-			- Affine
-			- Verbose
-			- MaximumNumberOfIterations: integer (e.g. 500)
-			- Metric (default 'AdvancedMattesMutualInformation', also 'NormalizedCorrelation' and 'AdvancedKappaStatistic')
-			- Optimizer (default 'AdaptiveStochasticGradientDescent')
-			- Transform (default 'BSplineTransform'). Also:
-				Global (Parametric) Transforms:
-				- 'TranslationTransform': Only accounts for shifts (translations)
-				- 'Euler2DTransform': Rigid transformations, including translation and rotation
-				- 'VersorTransform': Similar to Euler, rotations are represented by a versor (quaternion), which can be more numerically stable for large rotations.
-				- 'Similarity2DTransform': Adds isotropic scaling to the rigid transformations (translation, rotation, and uniform scaling).
-				- 'ScaleTransform': Allows for anisotropic scaling (different scaling factors along each axis)
-				- 'AffineTransform': A general linear transformation that includes translation, rotation, scaling (isotropic and anisotropic), and shearing
-				Deformable (Non-Parametric) Transforms
-				- 'BSplineTransform': uses a sparse regular grid of control points to define a smooth, non-rigid deformation field
-				- 'DisplacementFieldTransform': epresents the transformation as a dense grid of displacement vectors, where each pixel has a corresponding vector indicating its movement. 
-				This offers the highest flexibility but can be computationally more expensive and may require more memory.
-
-	Outputs:
-		- im_coregistered
-		- shift_val: estiimate of the maximal shift
-		- time_taken
-
-
+		- kwargs
+			- Affine = False : use affine transform (True/False)
+			- Verbose = False : print logs (True/False)
+			- MaximumNumberOfIterations: int
+			- Metric = 'AdvancedMattesMutualInformation' : e.g. 'AdvancedMattesMutualInformation'
+			- Optimizer = 'AdaptiveStochasticGradientDescent' : e.g. 'AdaptiveStochasticGradientDescent'
+			- Transform = 'BSplineTransform' : e.g. 'BSplineTransform', 'Euler2DTransform', etc.
+			- GradientMagnitude = False: if True, register based on gradient images
+			- HistogramMatch = False: if True, match moving image histogram to fixed
+			- IntensityNorm = False: if True, z-score normalize both images
+			- Blurring = False: if True, apply Gaussian blur
+			- Signma = 2: If blurring images, blur by sigma (Gaussian)
+			- Mask: binary mask to exclude non-informative areas
 	"""
 	if _sitk is None:
-		raise ImportError(
-			"This function requires SimpleITK. "
-			"Install it with `pip install SimpleITK` or "
-			"`pip install HySE[registration]`."
-		)
+		raise ImportError("SimpleITK is required. Install it with `pip install SimpleITK`.")
 
-		
 	Help = kwargs.get('Help', False)
 	if Help:
 		print(inspect.getdoc(CoRegisterImages))
-		return 0,0,0
+		return 0, 0, 0
 
-	## If we don't expect complex deformations, set transform to affine
-	## To limit unwanted distortions
 	Affine = kwargs.get('Affine', False)
 	Verbose = kwargs.get('Verbose', False)
 	Metric = kwargs.get('Metric', 'AdvancedMattesMutualInformation')
 	Transform = kwargs.get('Transform', 'BSplineTransform')
-	if Transform!='BSplineTransform':
-		print(f'Transform set to {Transform}')
-	Optimizer = kwargs.get('Transform', 'AdaptiveStochasticGradientDescent')
-		
-		
+	Optimizer = kwargs.get('Optimizer', 'AdaptiveStochasticGradientDescent')
+	
+	HistogramMatch = kwargs.get('HistogramMatch', False)
+	IntensityNorm = kwargs.get('IntensityNorm', False)
+	GradientMagnitude = kwargs.get('GradientMagnitude', False)
+	Blurring = kwargs.get('Blurring', False)
+	Sigma = kwargs.get('Sigma', 2)
+	Mask = kwargs.get('Mask', None)
+
+	print(f'SimpleElastix: Transform = {Transform}, Optimizer = {Optimizer}, Metric = {Metric}')
+	# print(f'')
 	t0 = time.time()
-	## Convert the numpy array to simple elestix format
+
+	# Convert images to float32
+	im_static = im_static.astype(np.float32)
+	im_shifted = im_shifted.astype(np.float32)
+
+	# Optional preprocessing
+	if IntensityNorm:
+		im_static = (im_static - np.mean(im_static)) / np.std(im_static)
+		im_shifted = (im_shifted - np.mean(im_shifted)) / np.std(im_shifted)
+
+	if Blurring:
+		from scipy.ndimage import gaussian_filter
+		im_static = gaussian_filter(im_static, sigma=Sigma)
+		im_shifted = gaussian_filter(im_shifted, sigma=Sigma)
+
+	# Convert to SimpleITK
 	im_static_se = _sitk.GetImageFromArray(im_static)
 	im_shifted_se = _sitk.GetImageFromArray(im_shifted)
 
-	## Create object
-	elastixImageFilter = _sitk.ElastixImageFilter()
+	if GradientMagnitude:
+		im_static_se = _sitk.GradientMagnitude(im_static_se)
+		im_shifted_se = _sitk.GradientMagnitude(im_shifted_se)
 
-	## Turn off console
-	if Verbose==False:
+	if HistogramMatch:
+		matcher = _sitk.HistogramMatchingImageFilter()
+		matcher.SetNumberOfHistogramLevels(256)
+		matcher.SetNumberOfMatchPoints(50)
+		matcher.ThresholdAtMeanIntensityOn()
+		im_shifted_se = matcher.Execute(im_shifted_se, im_static_se)
+
+	elastixImageFilter = _sitk.ElastixImageFilter()
+	if not Verbose:
 		elastixImageFilter.LogToConsoleOff()
 
-	## Set image parameters
 	elastixImageFilter.SetFixedImage(im_static_se)
 	elastixImageFilter.SetMovingImage(im_shifted_se)
 
-	## Set transform parameters
+	# if Mask is not None:
+	# 	mask_se = _sitk.GetImageFromArray(Mask.astype(np.uint8))
+	# 	mask_se.CopyInformation(im_static_se)
+	# 	elastixImageFilter.SetFixedMask(mask_se)
+	# 	elastixImageFilter.SetMovingMask(mask_se)
+
+	if Mask is not None:
+		# Ensure correct type and values
+		if Mask.dtype != np.uint8:
+			Mask = Mask.astype(np.uint8)
+		Mask[Mask > 0] = 1  # ensure strictly binary
+
+		# Ensure same shape
+		if Mask.shape != im_static.shape:
+			raise ValueError(f"Mask shape {Mask.shape} does not match image shape {im_static.shape}")
+
+		# Create SITK mask with same geometry
+		mask_se = _sitk.GetImageFromArray(Mask)
+		mask_se.CopyInformation(im_static_se)  # match origin, spacing, direction
+
+		elastixImageFilter.SetFixedMask(mask_se)
+		elastixImageFilter.SetMovingMask(mask_se)
+
+
 	if Affine:
 		parameterMap = _sitk.GetDefaultParameterMap('affine')
 	else:
 		parameterMap = _sitk.GetDefaultParameterMap('translation')
-		## Select metric robust to intensity differences (non uniform)
-		parameterMap['Metric'] = [Metric] 
-		## Select Bspline transform, which allows for non rigid and non uniform deformations
+		parameterMap['Metric'] = [Metric]
 		parameterMap['Transform'] = [Transform]
 
-	## Tried those parameters, on Macbeth chart data (not moving), did not have significant impact
-	# parameterMap['AutomaticTransformInitialization'] = ['true']
-	# parameterMap['AutomaticTransformInitializationMethod'] = ['CenterOfGravity']
-	# parameterMap['HistogramMatch'] = ['true']
-	# parameterMap['BSplineRegularizationOrder'] = ['11'] ## default 
-
-	## Parameters to play with if co-registration is not optimal:
-
-#         # Controls how long the optimizer runs
 	parameterMap['Optimizer'] = [Optimizer]
+
 	MaximumNumberOfIterations = kwargs.get('MaximumNumberOfIterations')
 	if MaximumNumberOfIterations is not None:
-		parameterMap['MaximumNumberOfIterations'] = [str(MaximumNumberOfIterations)] 
+		parameterMap['MaximumNumberOfIterations'] = [str(MaximumNumberOfIterations)]
 
-	#     # You can try different metrics like AdvancedMattesMutualInformation, NormalizedCorrelation, 
-	#     # or AdvancedKappaStatistic for different registration scenarios.
-	# parameterMap['Metric'] = ['AdvancedMattesMutualInformation']
-	#     # Adjust the number of bins used in mutual information metrics
-	# parameterMap['NumberOfHistogramBins'] = ['32']
-	#     # Change the optimizer to AdaptiveStochasticGradientDescent for potentially better convergence
-	# parameterMap['Optimizer'] = ['AdaptiveStochasticGradientDescent']
-	#     # Controls the grid spacing for the BSpline transform
-	# parameterMap['FinalGridSpacingInPhysicalUnits'] = ['10.0']
-	#     # Refines the BSpline grid at different resolutions.
-	# parameterMap['GridSpacingSchedule'] = ['10.0', '5.0', '2.0']
-	#     # Automatically estimate the scales for the transform parameters.
-	# parameterMap['AutomaticScalesEstimation'] = ['true']
-	#     # Controls the number of resolutions used in the multi-resolution pyramid. 
-	#     # A higher number can lead to better registration at the cost of increased computation time.
-	# parameterMap['NumberOfResolutions'] = ['4']
-	#     # Automatically initializes the transform based on the center of mass of the images.
-	# parameterMap['AutomaticTransformInitialization'] = ['true']
-	#     # Controls the interpolation order for the final transformation.
-	# parameterMap['FinalBSplineInterpolationOrder'] = ['3']
-
-#         # Adjust the maximum step length for the optimizer
-#     parameterMap['MaximumStepLength'] = ['4.0']
-#         # Use more samples for computing gradients
-#     parameterMap['NumberOfSamplesForExactGradient'] = ['10000']
-#         # Specify the grid spacing in voxels for the final resolution.
-#     parameterMap['FinalGridSpacingInVoxels'] = ['8.0']
-#         # Defines the spacing of the sampling grid used during optimization.
-#     parameterMap['SampleGridSpacing'] = ['2.0']
-
-
-	## If required, set maximum number of iterations
-#     parameterMap['MaximumNumberOfIterations'] = ['500']
 	elastixImageFilter.SetParameterMap(parameterMap)
-
-	## Execute
 	result = elastixImageFilter.Execute()
-	## Convert result to numpy array
 	im_coregistered = _sitk.GetArrayFromImage(result)
 	t1 = time.time()
+	time_taken = t1 - t0
+	shift_val = np.average(np.abs(np.subtract(im_static, im_coregistered)))
 
-	## Find time taken:
-	time_taken = t1-t0
-
-	## Get an idea of difference
-	shift_val = np.average(np.abs(np.subtract(im_static,im_coregistered)))
-
-	## return 
 	return im_coregistered, shift_val, time_taken
 
 
 
-def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub):
+
+def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
 	"""
 	Function that takes all hypercubes (where hypercube computed from specific sweepw were kept individually 
 	instead of averaged) and saves frames as individual images. 
 	All images are saved in folder called {Name}_{NameSub}_RawFrames inside SavingPath, and images from sweep i are
 	saved in the folder Sweep{s}.
 
+	Modified to allow expanded hypercubes that include individual (non-averaged) frames within plateaus.
+
 	Input:
-		- Hypercube_all : All the hypercubes computed from all sweeps. Shape (Nsweeps, Nwav, YY, XX)
+		- Hypercube_all : All the hypercubes computed from all sweeps. Shape (Nsweeps, Nwav, Y, X) or (Nsweeps, Nwav, Nframes, Y, X)
 		- SavingPath : Where to save all results (generic) (expected to end with '/')
 		- Name : General name of the data (i.e. patient)
 		- Same_Sub : Specific name for the hypercubes (i.e. lesion)
+		- kwargs:
+			- Sweeps [int, int, ...] : If indicated, which sweeps to save
 
 
 	Outputs:
@@ -761,26 +910,46 @@ def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub):
 
 	"""
 
-	Nsweeps, Nwav, YY, XX = Hypercube_all.shape
+	hypercube_shape = Hypercube_all.shape
+	if len(hypercube_shape)==4:
+		Nsweeps, Nwav, YY, XX = Hypercube_all.shape
+	else:
+		Nsweeps, Nwav, Nframes, YY, XX = Hypercube_all.shape
+		# 19, 16, 3, 1004, 1155
+
+	Sweeps = kwargs.get('Sweeps')
+	if Sweeps is None:
+		Sweeps = [i for i in range(0, Nsweeps)]
+	
 	GeneralDirectory = f'{Name}_{NameSub}_RawFrames'
 	try:
 		os.mkdir(f'{SavingPath}{GeneralDirectory}')
 	except FileExistsError:
 		pass
 	for s in range(0,Nsweeps):
-		DirectoryName = f'{SavingPath}{GeneralDirectory}/Sweep{s}'
-		try:
-			os.mkdir(DirectoryName)
-		except FileExistsError:
-			pass
-		
-		hypercube = Hypercube_all[s,:,:,:]
-		for w in range(0,Nwav):
-			
-			frame = hypercube[w,:,:]/(np.amax(hypercube[w,:,:]))*255
-			im = Image.fromarray(frame)
-			im = im.convert("L")
-			im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}.png')
+		if s in Sweeps:
+			DirectoryName = f'{SavingPath}{GeneralDirectory}/Sweep{s}'
+			try:
+				os.mkdir(DirectoryName)
+			except FileExistsError:
+				pass
+
+			if len(hypercube_shape)==4:
+				hypercube = Hypercube_all[s,:,:,:]
+				for w in range(0,Nwav):
+					frame = hypercube[w,:,:]/(np.amax(hypercube[w,:,:]))*255
+					im = Image.fromarray(frame)
+					im = im.convert("L")
+					im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}.png')
+			else:
+				hypercube = Hypercube_all[s,:,:,:,:]
+				for w in range(0,Nwav):
+					for f in range(0,Nframes):
+						frame = hypercube[w,f,:,:]/(np.amax(hypercube[w,f,:,:]))*255
+						im = Image.fromarray(frame)
+						im = im.convert("L")
+						im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}_frame{f}.png')
+
 
 
 def GetNMI(Data, **kwargs):

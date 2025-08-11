@@ -55,6 +55,7 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				- Average = True. If more than one sweep is indicated, indicates whether
 					to average all sweeps before computing hypercube.
 					If false, it will output as many hypercubes as sweeps.
+				- ForCoRegistration = False. If True, keeps individual frames
 										 
 	
 	Output:
@@ -85,6 +86,10 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		return 0, 0
 	Plot = kwargs.get('Plot', False)
 	Average = kwargs.get('Average', True)
+
+	ForCoRegistration = kwargs.get('ForCoRegistration', False)
+	if ForCoRegistration:
+		print(f'Keeping individual frames for co-registration')
 
 	CropImDimensions = kwargs.get('CropImDimensions')
 	if not CropImDimensions:
@@ -149,9 +154,13 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				## Print how many frames are averaged
 				## React if number unreasonable (too small or too large)
 				if i==0: 
-					print(f'Computing hypercube: Averaging {e-s} frames')
+					if ForCoRegistration==False:
+						print(f'Computing hypercube: Averaging {e-s} frames')
 				data_sub = data[s:e,:,:]
-				data_avg = np.average(data_sub, axis=0)
+				if ForCoRegistration:
+					data_avg = data_sub
+				else:
+					data_avg = np.average(data_sub, axis=0)
 				Hypercube_n.append(data_avg)
 			else: ## Dark
 				# if Nsweep==1:
@@ -178,6 +187,8 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	# Sort hypercube according to the order_list
 	# Ensures wavelenghts are ordered from blue to red
 	if Order:
+		if ForCoRegistration:
+			print(f'Ordering hypercube when keeping all frames (ForCoRegistration = True) is not supported.')
 		if Average:
 			Hypercube_sorted = []
 			for k in range(0,Hypercube.shape[0]):
@@ -225,7 +236,10 @@ def ComputeHypercube(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				if nn<17:
 					wav = Wavelengths_sorted[nn]
 					RGB = HySE.UserTools.wavelength_to_rgb(wav)
-					ax[j,i].imshow(HypercubeToPlot[nn,:,:], cmap='gray')
+					if ForCoRegistration:
+						ax[j,i].imshow(HypercubeToPlot[nn,0,:,:], cmap='gray')
+					else:
+						ax[j,i].imshow(HypercubeToPlot[nn,:,:], cmap='gray')
 					if Order:
 						ax[j,i].set_title(f'{wav} nm', c=RGB)
 					else:
