@@ -361,6 +361,8 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
 				(default True)
 			- BrightFramesOnly = False : If True, only averages bright frames
+			- Frames = [int, int, ...] : If provided, indicates which frames from a single plateau to keep. 
+				Accepted values are 0, 1, ..., where frame 0 refers to the first frame that would normally be considered (after removing buffers)
 
 
 	Outputs:
@@ -382,6 +384,9 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	# print(MaxIndex)
 
 	Buffer = kwargs.get('Buffer', 6)
+	Frames = kwargs.get('Frames')
+	if Frames is not None:
+		print(f'Only Coregistring these Frames: {Frames}')
 
 
 	ImStatic_Plateau = kwargs.get('ImStatic_Plateau', 1)
@@ -495,73 +500,81 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 				loop_end = NN-Buffer
 				loop_step = 1
 				# for i in range(Buffer,NN-Buffer):
+			if Frames is None:
+				Nframes_tot = loop_end-loop_start
+				Frames = [i for i in range(0,Nframes_tot)]
 			for i in range(loop_start, loop_end, loop_step):
-				im_shifted = DataSweep[c][i,:,:]
-				im_coregistered, shift_val, time_taken = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
-				ImagesTemp.append(im_coregistered)
+				if i-loop_start in Frames:
+					# print(f'CoRegistering frame {i-loop_start} in {Frames}')
+					
+					im_shifted = DataSweep[c][i,:,:]
+					im_coregistered, shift_val, time_taken = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
+					ImagesTemp.append(im_coregistered)
 
-				if c<8:
-					print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
-				else:
-					print(f'      c={c}, i={i}: {Wavelengths_list[c-1]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
+					if c<8:
+						print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
+					else:
+						print(f'      c={c}, i={i}: {Wavelengths_list[c-1]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
 
-				## Plot co-registration is requested
-				if PlotDiff:
-					# print(f'c={c}, i={i}')
-					if c in Plot_PlateauList:
-						if '.png' in SavingPath:
-							NameTot = SavingPath.split('/')[-1]
-							Name = NameTot.replace('.png', '')+f'_Plateau{c}_Index{i}.png'
-							SavingPathWithName = SavingPath.replace(NameTot, Name)
-						else:
-							Name = f'_Plateau{c}_Index{i}_CoRegistration.png'
-							SavingPathWithName = SavingPath+Name
-
-						if i==Plot_Index:
-							if c==ImStatic_Plateau and i==ImStatic_Index:
-								print(f'Skipping plot for plateau={c}, index={i} because it is the static image')
+					## Plot co-registration is requested
+					if PlotDiff:
+						# print(f'c={c}, i={i}')
+						if c in Plot_PlateauList:
+							if '.png' in SavingPath:
+								NameTot = SavingPath.split('/')[-1]
+								Name = NameTot.replace('.png', '')+f'_Plateau{c}_Index{i}.png'
+								SavingPathWithName = SavingPath.replace(NameTot, Name)
 							else:
-								HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+								Name = f'_Plateau{c}_Index{i}_CoRegistration.png'
+								SavingPathWithName = SavingPath+Name
+
+							if i==Plot_Index:
+								if c==ImStatic_Plateau and i==ImStatic_Index:
+									print(f'Skipping plot for plateau={c}, index={i} because it is the static image')
+								else:
+									HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+				# else:
+				# 	print(f'Ignoring frame {i-loop_start}, not in {Frames}')
 
 			
 			ImagesTemp = np.array(ImagesTemp)
 
-			fig, ax = plt.subplots(nrows=2, ncols=4, figsize=(15, 10))
-			# DataSweep[c][i,:,:]
-			m, M = np.amin(DataSweep[c][:,:,:]), np.amax(DataSweep[c][:,:,:])
+			# fig, ax = plt.subplots(nrows=2, ncols=4, figsize=(15, 10))
+			# # DataSweep[c][i,:,:]
+			# m, M = np.amin(DataSweep[c][:,:,:]), np.amax(DataSweep[c][:,:,:])
 
-			ax[0,0].imshow(DataSweep[c][0,:,:], cmap='gray', vmin=m, vmax=M)
-			ax[0,0].set_title('frame 0 - orig')
-			# ax[0,0].imshow(im_static, cmap='gray', vmin=m, vmax=M)
-			# ax[0,0].set_title('im_static')
-			kk = int(len(ImagesTemp)/2)
-			ax[0,1].imshow(DataSweep[c][kk,:,:], cmap='gray', vmin=m, vmax=M)
-			ax[0,1].set_title(f'frame {kk} - orig')
-			ax[0,2].imshow(DataSweep[c][-1,:,:], cmap='gray', vmin=m, vmax=M)
-			ax[0,2].set_title('frame -1 - orig')
+			# ax[0,0].imshow(DataSweep[c][0,:,:], cmap='gray', vmin=m, vmax=M)
+			# ax[0,0].set_title('frame 0 - orig')
+			# # ax[0,0].imshow(im_static, cmap='gray', vmin=m, vmax=M)
+			# # ax[0,0].set_title('im_static')
+			# kk = int(len(ImagesTemp)/2)
+			# ax[0,1].imshow(DataSweep[c][kk,:,:], cmap='gray', vmin=m, vmax=M)
+			# ax[0,1].set_title(f'frame {kk} - orig')
+			# ax[0,2].imshow(DataSweep[c][-1,:,:], cmap='gray', vmin=m, vmax=M)
+			# ax[0,2].set_title('frame -1 - orig')
 
-			ax[0,3].imshow(im_static, cmap='gray', vmin=m, vmax=M)
-			ax[0,3].set_title('im_static')
+			# ax[0,3].imshow(im_static, cmap='gray', vmin=m, vmax=M)
+			# ax[0,3].set_title('im_static')
 
-			# m, M = np.amin(ImagesTemp), np.amax(ImagesTemp)
-			ax[1,0].imshow(ImagesTemp[0, :, :], cmap='gray', vmin=m, vmax=M)
-			ax[1,0].set_title('frame 0 - CR')
-			kk = int(len(ImagesTemp)/2)
-			ax[1,1].imshow(ImagesTemp[kk, :, :], cmap='gray', vmin=m, vmax=M)
-			ax[1,1].set_title(f'frame {kk} - CR')
-			ax[1,2].imshow(ImagesTemp[-1, :, :], cmap='gray', vmin=m, vmax=M)
-			ax[1,2].set_title('frame -1 - CR')
+			# # m, M = np.amin(ImagesTemp), np.amax(ImagesTemp)
+			# ax[1,0].imshow(ImagesTemp[0, :, :], cmap='gray', vmin=m, vmax=M)
+			# ax[1,0].set_title('frame 0 - CR')
+			# kk = int(len(ImagesTemp)/2)
+			# ax[1,1].imshow(ImagesTemp[kk, :, :], cmap='gray', vmin=m, vmax=M)
+			# ax[1,1].set_title(f'frame {kk} - CR')
+			# ax[1,2].imshow(ImagesTemp[-1, :, :], cmap='gray', vmin=m, vmax=M)
+			# ax[1,2].set_title('frame -1 - CR')
 
 			
-			for w in range(0,4):
-				for p in range(0,2):
-					ax[p,w].set_xticks([])
-					ax[p,w].set_yticks([])
+			# for w in range(0,4):
+			# 	for p in range(0,2):
+			# 		ax[p,w].set_xticks([])
+			# 		ax[p,w].set_yticks([])
 
-			fig.delaxes(ax[1,3])
-			plt.tight_layout()
-			plt.savefig(f'/Users/iracicot/Library/CloudStorage/OneDrive-UniversityofCambridge/Data/HySE/Patient3_20250114/Flat/test/c{c}.png')
-			plt.close()
+			# fig.delaxes(ax[1,3])
+			# plt.tight_layout()
+			# plt.savefig(f'/Users/iracicot/Library/CloudStorage/OneDrive-UniversityofCambridge/Data/HySE/Patient3_20250114/Flat/test/c{c}.png')
+			# plt.close()
 
 			print(f'  Averaging {len(ImagesTemp)} frames')
 			ImAvg = np.average(ImagesTemp, axis=0)
