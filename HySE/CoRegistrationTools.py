@@ -89,8 +89,8 @@ def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwarg
 	## ImportDatafor the sweep
 	DataSweep = HySE.Import.GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs)
 	## Compute Hypercube
-	Hypercube = SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
-	return Hypercube
+	Hypercube, AllTransforms = SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
+	return Hypercube, AllTransforms
 
 
 
@@ -467,6 +467,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	Wavelengths_sorted = Wavelengths_list[order_list]
 
 	Hypercube = []
+	AllTransforms = []
 
 	## Define static image
 	im_static = DataSweep[ImStatic_Plateau][ImStatic_Index,:,:]
@@ -506,10 +507,11 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 			for i in range(loop_start, loop_end, loop_step):
 				if i-loop_start in Frames:
 					# print(f'CoRegistering frame {i-loop_start} in {Frames}')
-					
+
 					im_shifted = DataSweep[c][i,:,:]
-					im_coregistered, shift_val, time_taken = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
+					im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
 					ImagesTemp.append(im_coregistered)
+					AllTransforms.append(coregister_transform)
 
 					if c<8:
 						print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
@@ -591,8 +593,10 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	## Sort hypercube according to the order_list
 	## Ensures wavelenghts are ordered from blue to red
 	Hypercube_sorted = []
+	AllTransforms_sorted []
 	for k in range(0,Hypercube.shape[0]):
 		Hypercube_sorted.append(Hypercube[order_list[k]])
+		AllTransforms_sorted.append(AllTransforms[order_list[k]])
 	Hypercube_sorted = np.array(Hypercube_sorted)
 
 
@@ -612,7 +616,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 		np.savez(f'{SavingPathHypercube}', Hypercube)
 		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
 
-	return Hypercube_sorted
+	return Hypercube_sorted, AllTransforms_sorted
 
 
 
@@ -787,8 +791,19 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 			- HistogramMatch = False: if True, match moving image histogram to fixed
 			- IntensityNorm = False: if True, z-score normalize both images
 			- Blurring = False: if True, apply Gaussian blur
-			- Signma = 2: If blurring images, blur by sigma (Gaussian)
+			- Sigma = 2: If blurring images, blur by sigma (Gaussian)
 			- Mask: binary mask to exclude non-informative areas
+
+	Outputs:
+		- Registered Image
+		- transform parameter map (to be applied to other data)
+			To be used:
+				transformixImageFilter = sitk.TransformixImageFilter()
+				transformixImageFilter.SetMovingImage(sitk.ReadImage("other_image.tif", sitk.sitkFloat32))
+				transformixImageFilter.SetTransformParameterMap(sitk.ReadParameterFile("TransformParameters.0.txt"))
+				transformixImageFilter.Execute()
+	
+
 	"""
 	if _sitk is None:
 		raise ImportError("SimpleITK is required. Install it with `pip install SimpleITK`.")
@@ -890,12 +905,17 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 
 	elastixImageFilter.SetParameterMap(parameterMap)
 	result = elastixImageFilter.Execute()
-	im_coregistered = _sitk.GetArrayFromImage(result)
-	t1 = time.time()
-	time_taken = t1 - t0
-	shift_val = np.average(np.abs(np.subtract(im_static, im_coregistered)))
 
-	return im_coregistered, shift_val, time_taken
+	# Save the transform
+	transformParameterMap = elastixImageFilter.GetTransformParameterMap()
+	# sitk.WriteParameterFile(transformParameterMap[0], "TransformParameters.0.txt")
+
+	im_coregistered = _sitk.GetArrayFromImage(result)
+	# t1 = time.time()
+	# time_taken = t1 - t0
+	# shift_val = np.average(np.abs(np.subtract(im_static, im_coregistered)))
+
+	return im_coregistered, transformParameterMap
 
 
 
