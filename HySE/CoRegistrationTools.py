@@ -514,9 +514,11 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 					AllTransforms.append(coregister_transform)
 
 					if c<8:
-						print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
+						# print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
+						print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}')
 					else:
-						print(f'      c={c}, i={i}: {Wavelengths_list[c-1]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
+						# print(f'      c={c}, i={i}: {Wavelengths_list[c-1]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
+						print(f'      c={c}, i={i}: {Wavelengths_list[c-1]} nm, avg {np.average(im_shifted)}')
 
 					## Plot co-registration is requested
 					if PlotDiff:
@@ -593,7 +595,7 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	## Sort hypercube according to the order_list
 	## Ensures wavelenghts are ordered from blue to red
 	Hypercube_sorted = []
-	AllTransforms_sorted []
+	AllTransforms_sorted = []
 	for k in range(0,Hypercube.shape[0]):
 		Hypercube_sorted.append(Hypercube[order_list[k]])
 		AllTransforms_sorted.append(AllTransforms[order_list[k]])

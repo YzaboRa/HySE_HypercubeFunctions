@@ -391,6 +391,7 @@ def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
 		- SavingPathWithName
 		- kwargs:
 			- fps: frame rate for the video (default 10)
+			- Normalise = False. If true, self normalise
 			- Help
 	Output:
 		Saved:
@@ -401,6 +402,12 @@ def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
 		print(inspect.getdoc(MakeHypercubeVideo))
 	
 	fps = kwargs.get('fps', 10)
+	Normalise = kwargs.get('Normalise', False)
+
+	if Normalise:
+		Hypercube_ToSave = Hypercube/np.nanmax(Hypercube)
+	else:
+		Hypercube_ToSave = Hypercube
 
 	(NN, YY, XX) = Hypercube.shape
 	if '.mp4' not in SavingPathWithName:
