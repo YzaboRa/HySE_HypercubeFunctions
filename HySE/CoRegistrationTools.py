@@ -33,6 +33,7 @@ PythonEnvironment = get_ipython().__class__.__name__
 
 from ._optional import sitk as _sitk
 from skimage.metrics import normalized_mutual_information as nmi 
+from scipy.ndimage import gaussian_filter
 
 from PIL import Image
 
@@ -775,26 +776,174 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 # 	return im_coregistered, shift_val, time_taken
 
 
+# def CoRegisterImages(im_static, im_shifted, **kwargs):
+# 	"""
+# 	Co-registers a shifted image to a defined static image using SimpleElastix.
+
+# 	Inputs:
+# 		- im_static
+# 		- im_shifted
+# 		- kwargs
+# 			- Affine = False : use affine transform (True/False)
+# 			- Verbose = False : print logs (True/False)
+# 			- MaximumNumberOfIterations: int
+# 			- Metric = 'AdvancedMattesMutualInformation' : e.g. 'AdvancedMattesMutualInformation'
+# 			- Optimizer = 'AdaptiveStochasticGradientDescent' : e.g. 'AdaptiveStochasticGradientDescent'
+# 			- Transform = 'BSplineTransform' : e.g. 'BSplineTransform', 'Euler2DTransform', etc.
+# 			- GradientMagnitude = False: if True, register based on gradient images
+# 			- HistogramMatch = False: if True, match moving image histogram to fixed
+# 			- IntensityNorm = False: if True, z-score normalize both images
+# 			- Blurring = False: if True, apply Gaussian blur
+# 			- Sigma = 2: If blurring images, blur by sigma (Gaussian)
+# 			- Mask: binary mask to exclude non-informative areas
+
+# 	Outputs:
+# 		- Registered Image
+# 		- transform parameter map (to be applied to other data)
+# 			To be used:
+# 				transformixImageFilter = sitk.TransformixImageFilter()
+# 				transformixImageFilter.SetMovingImage(sitk.ReadImage("other_image.tif", sitk.sitkFloat32))
+# 				transformixImageFilter.SetTransformParameterMap(sitk.ReadParameterFile("TransformParameters.0.txt"))
+# 				transformixImageFilter.Execute()
+	
+
+# 	"""
+# 	if _sitk is None:
+# 		raise ImportError("SimpleITK is required. Install it with `pip install SimpleITK`.")
+
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(CoRegisterImages))
+# 		return 0, 0, 0
+
+# 	Affine = kwargs.get('Affine', False)
+# 	Verbose = kwargs.get('Verbose', False)
+# 	Metric = kwargs.get('Metric', 'AdvancedMattesMutualInformation')
+# 	Transform = kwargs.get('Transform', 'BSplineTransform')
+# 	Optimizer = kwargs.get('Optimizer', 'AdaptiveStochasticGradientDescent')
+	
+# 	HistogramMatch = kwargs.get('HistogramMatch', False)
+# 	IntensityNorm = kwargs.get('IntensityNorm', False)
+# 	GradientMagnitude = kwargs.get('GradientMagnitude', False)
+# 	Blurring = kwargs.get('Blurring', False)
+# 	Sigma = kwargs.get('Sigma', 2)
+# 	Mask = kwargs.get('Mask', None)
+
+# 	print(f'SimpleElastix: Transform = {Transform}, Optimizer = {Optimizer}, Metric = {Metric}')
+# 	# print(f'')
+# 	t0 = time.time()
+
+# 	# Convert images to float32
+# 	im_static = im_static.astype(np.float32)
+# 	im_shifted = im_shifted.astype(np.float32)
+
+# 	# Optional preprocessing
+# 	if IntensityNorm:
+# 		im_static = (im_static - np.mean(im_static)) / np.std(im_static)
+# 		im_shifted = (im_shifted - np.mean(im_shifted)) / np.std(im_shifted)
+
+# 	if Blurring:
+# 		from scipy.ndimage import gaussian_filter
+# 		im_static = gaussian_filter(im_static, sigma=Sigma)
+# 		im_shifted = gaussian_filter(im_shifted, sigma=Sigma)
+
+# 	# Convert to SimpleITK
+# 	im_static_se = _sitk.GetImageFromArray(im_static)
+# 	im_shifted_se = _sitk.GetImageFromArray(im_shifted)
+
+# 	if GradientMagnitude:
+# 		im_static_se = _sitk.GradientMagnitude(im_static_se)
+# 		im_shifted_se = _sitk.GradientMagnitude(im_shifted_se)
+
+# 	if HistogramMatch:
+# 		matcher = _sitk.HistogramMatchingImageFilter()
+# 		matcher.SetNumberOfHistogramLevels(256)
+# 		matcher.SetNumberOfMatchPoints(50)
+# 		matcher.ThresholdAtMeanIntensityOn()
+# 		im_shifted_se = matcher.Execute(im_shifted_se, im_static_se)
+
+# 	elastixImageFilter = _sitk.ElastixImageFilter()
+# 	if not Verbose:
+# 		elastixImageFilter.LogToConsoleOff()
+
+# 	elastixImageFilter.SetFixedImage(im_static_se)
+# 	elastixImageFilter.SetMovingImage(im_shifted_se)
+
+# 	# if Mask is not None:
+# 	# 	mask_se = _sitk.GetImageFromArray(Mask.astype(np.uint8))
+# 	# 	mask_se.CopyInformation(im_static_se)
+# 	# 	elastixImageFilter.SetFixedMask(mask_se)
+# 	# 	elastixImageFilter.SetMovingMask(mask_se)
+
+# 	if Mask is not None:
+# 		# Ensure correct type and values
+# 		if Mask.dtype != np.uint8:
+# 			Mask = Mask.astype(np.uint8)
+# 		Mask[Mask > 0] = 1  # ensure strictly binary
+
+# 		# Ensure same shape
+# 		if Mask.shape != im_static.shape:
+# 			raise ValueError(f"Mask shape {Mask.shape} does not match image shape {im_static.shape}")
+
+# 		# Create SITK mask with same geometry
+# 		mask_se = _sitk.GetImageFromArray(Mask)
+# 		mask_se.CopyInformation(im_static_se)  # match origin, spacing, direction
+
+# 		elastixImageFilter.SetFixedMask(mask_se)
+# 		elastixImageFilter.SetMovingMask(mask_se)
+
+
+# 	if Affine:
+# 		parameterMap = _sitk.GetDefaultParameterMap('affine')
+# 	else:
+# 		parameterMap = _sitk.GetDefaultParameterMap('translation')
+# 		parameterMap['Metric'] = [Metric]
+# 		parameterMap['Transform'] = [Transform]
+
+# 	parameterMap['Optimizer'] = [Optimizer]
+
+# 	MaximumNumberOfIterations = kwargs.get('MaximumNumberOfIterations')
+# 	if MaximumNumberOfIterations is not None:
+# 		parameterMap['MaximumNumberOfIterations'] = [str(MaximumNumberOfIterations)]
+
+# 	elastixImageFilter.SetParameterMap(parameterMap)
+# 	result = elastixImageFilter.Execute()
+
+# 	# Save the transform
+# 	transformParameterMap = elastixImageFilter.GetTransformParameterMap()
+# 	# sitk.WriteParameterFile(transformParameterMap[0], "TransformParameters.0.txt")
+
+# 	im_coregistered = _sitk.GetArrayFromImage(result)
+# 	# t1 = time.time()
+# 	# time_taken = t1 - t0
+# 	# shift_val = np.average(np.abs(np.subtract(im_static, im_coregistered)))
+
+# 	return im_coregistered, transformParameterMap
+
+
 def CoRegisterImages(im_static, im_shifted, **kwargs):
 	"""
-	Co-registers a shifted image to a defined static image using SimpleElastix.
+	Co-registers a shifted image to a defined static image using SimpleElastix (v3)
 
 	Inputs:
 		- im_static
 		- im_shifted
 		- kwargs
-			- Affine = False : use affine transform (True/False)
+			- Affine = False : use affine transform only (True/False)
+			- TwoStage = False : perform an affine registration, then a non-rigid (BSpline) registration (True/False).
 			- Verbose = False : print logs (True/False)
 			- MaximumNumberOfIterations: int
-			- Metric = 'AdvancedMattesMutualInformation' : e.g. 'AdvancedMattesMutualInformation'
-			- Optimizer = 'AdaptiveStochasticGradientDescent' : e.g. 'AdaptiveStochasticGradientDescent'
-			- Transform = 'BSplineTransform' : e.g. 'BSplineTransform', 'Euler2DTransform', etc.
+			- Metric = 'AdvancedMattesMutualInformation' : e.g. 'AdvancedMattesMutualInformation', 'AdvancedMeanSquares', 'AdvancedNormalizedCorrelation', 
+				'AdvancedKappaStatistic', '', 'NormalizedMutualInformation', 'DisplacementMagnitudePenalty'
+			- Optimizer = 'AdaptiveStochasticGradientDescent' : e.g. 'AdaptiveStochasticGradientDescent', 'RegularStepGradientDescent', 'CMAES'
+			- Transform = 'BSplineTransform' : e.g. 'BSplineTransform', 'Euler2DTransform', 'Similarity2DTransform', 'AffineTransform', 'TranslationTransform'
 			- GradientMagnitude = False: if True, register based on gradient images
 			- HistogramMatch = False: if True, match moving image histogram to fixed
 			- IntensityNorm = False: if True, z-score normalize both images
 			- Blurring = False: if True, apply Gaussian blur
 			- Sigma = 2: If blurring images, blur by sigma (Gaussian)
 			- Mask: binary mask to exclude non-informative areas
+			- GridSpacing : Spacing of the B-spline control point grid. A larger value produces a stiffer, smoother transform and reduces artifacts.
 
 	Outputs:
 		- Registered Image
@@ -802,9 +951,8 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 			To be used:
 				transformixImageFilter = sitk.TransformixImageFilter()
 				transformixImageFilter.SetMovingImage(sitk.ReadImage("other_image.tif", sitk.sitkFloat32))
-				transformixImageFilter.SetTransformParameterMap(sitk.ReadParameterFile("TransformParameters.0.txt"))
+				transformixImageFilter.SetTransformParameterMap(sitk.ReadParameterFile("TransformParameters.0.0.txt"))
 				transformixImageFilter.Execute()
-	
 
 	"""
 	if _sitk is None:
@@ -816,11 +964,13 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 		return 0, 0, 0
 
 	Affine = kwargs.get('Affine', False)
+	TwoStage = kwargs.get('TwoStage', False)
 	Verbose = kwargs.get('Verbose', False)
 	Metric = kwargs.get('Metric', 'AdvancedMattesMutualInformation')
 	Transform = kwargs.get('Transform', 'BSplineTransform')
 	Optimizer = kwargs.get('Optimizer', 'AdaptiveStochasticGradientDescent')
-	
+	GridSpacing = kwargs.get('GridSpacing')
+
 	HistogramMatch = kwargs.get('HistogramMatch', False)
 	IntensityNorm = kwargs.get('IntensityNorm', False)
 	GradientMagnitude = kwargs.get('GradientMagnitude', False)
@@ -828,29 +978,41 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	Sigma = kwargs.get('Sigma', 2)
 	Mask = kwargs.get('Mask', None)
 
-	print(f'SimpleElastix: Transform = {Transform}, Optimizer = {Optimizer}, Metric = {Metric}')
-	# print(f'')
+	# Print the configuration
+	if TwoStage:
+		print(f'SimpleElastix: Two-Stage Registration (Affine -> BSpline) with GridSpacing = {GridSpacing}')
+	else:
+		print(f'SimpleElastix: Transform = {Transform}, Optimizer = {Optimizer}, Metric = {Metric}')
+
 	t0 = time.time()
+	
+	# New keyword argument for this specific debugging purpose
+	return_all_maps = kwargs.get('return_all_maps', False)
 
 	# Convert images to float32
-	im_static = im_static.astype(np.float32)
-	im_shifted = im_shifted.astype(np.float32)
+	im_static_orig = im_static.astype(np.float32)
+	im_shifted_orig = im_shifted.astype(np.float32)
+
+	# Create copies for preprocessing
+	im_static_proc = np.copy(im_static_orig)
+	im_shifted_proc = np.copy(im_shifted_orig)
 
 	# Optional preprocessing
 	if IntensityNorm:
-		im_static = (im_static - np.mean(im_static)) / np.std(im_static)
-		im_shifted = (im_shifted - np.mean(im_shifted)) / np.std(im_shifted)
+		# Z-score normalization
+		im_static_proc = (im_static_proc - np.mean(im_static_proc)) / np.std(im_static_proc)
+		im_shifted_proc = (im_shifted_proc - np.mean(im_shifted_proc)) / np.std(im_shifted_proc)
 
 	if Blurring:
-		from scipy.ndimage import gaussian_filter
-		im_static = gaussian_filter(im_static, sigma=Sigma)
-		im_shifted = gaussian_filter(im_shifted, sigma=Sigma)
+		im_static_proc = gaussian_filter(im_static_proc, sigma=Sigma)
+		im_shifted_proc = gaussian_filter(im_shifted_proc, sigma=Sigma)
 
 	# Convert to SimpleITK
-	im_static_se = _sitk.GetImageFromArray(im_static)
-	im_shifted_se = _sitk.GetImageFromArray(im_shifted)
+	im_static_se = _sitk.GetImageFromArray(im_static_proc)
+	im_shifted_se = _sitk.GetImageFromArray(im_shifted_proc)
 
 	if GradientMagnitude:
+		# Apply gradient magnitude to the preprocessed images
 		im_static_se = _sitk.GradientMagnitude(im_static_se)
 		im_shifted_se = _sitk.GradientMagnitude(im_shifted_se)
 
@@ -864,58 +1026,86 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	elastixImageFilter = _sitk.ElastixImageFilter()
 	if not Verbose:
 		elastixImageFilter.LogToConsoleOff()
+		
 
 	elastixImageFilter.SetFixedImage(im_static_se)
 	elastixImageFilter.SetMovingImage(im_shifted_se)
-
-	# if Mask is not None:
-	# 	mask_se = _sitk.GetImageFromArray(Mask.astype(np.uint8))
-	# 	mask_se.CopyInformation(im_static_se)
-	# 	elastixImageFilter.SetFixedMask(mask_se)
-	# 	elastixImageFilter.SetMovingMask(mask_se)
 
 	if Mask is not None:
 		# Ensure correct type and values
 		if Mask.dtype != np.uint8:
 			Mask = Mask.astype(np.uint8)
-		Mask[Mask > 0] = 1  # ensure strictly binary
+		Mask[Mask > 0] = 1 # ensure strictly binary
 
 		# Ensure same shape
-		if Mask.shape != im_static.shape:
-			raise ValueError(f"Mask shape {Mask.shape} does not match image shape {im_static.shape}")
+		if Mask.shape != im_static_orig.shape:
+			raise ValueError(f"Mask shape {Mask.shape} does not match image shape {im_static_orig.shape}")
 
 		# Create SITK mask with same geometry
 		mask_se = _sitk.GetImageFromArray(Mask)
-		mask_se.CopyInformation(im_static_se)  # match origin, spacing, direction
+		mask_se.CopyInformation(im_static_se) # match origin, spacing, direction
 
 		elastixImageFilter.SetFixedMask(mask_se)
 		elastixImageFilter.SetMovingMask(mask_se)
 
+	# Set up the parameter map(s) based on the registration mode
+	if TwoStage:
+		# Create a list of parameter maps for a two-stage registration
+		parameterMap_affine = _sitk.GetDefaultParameterMap('affine')
+		parameterMap_bspline = _sitk.GetDefaultParameterMap('bspline')
 
-	if Affine:
+		# Set the new grid spacing parameter
+		if GridSpacing is not None:
+			parameterMap_bspline['FinalGridSpacingInPhysicalUnits'] = [str(GridSpacing)]
+
+		# Set the user-defined parameters for the second stage
+		parameterMap_bspline['Metric'] = [Metric]
+		parameterMap_bspline['Optimizer'] = [Optimizer]
+		MaximumNumberOfIterations = kwargs.get('MaximumNumberOfIterations')
+		if MaximumNumberOfIterations is not None:
+			parameterMap_affine['MaximumNumberOfIterations'] = [str(MaximumNumberOfIterations)]
+			parameterMap_bspline['MaximumNumberOfIterations'] = [str(MaximumNumberOfIterations)]
+
+		parameterMap = [parameterMap_affine, parameterMap_bspline]
+	elif Affine:
 		parameterMap = _sitk.GetDefaultParameterMap('affine')
 	else:
 		parameterMap = _sitk.GetDefaultParameterMap('translation')
 		parameterMap['Metric'] = [Metric]
 		parameterMap['Transform'] = [Transform]
+		parameterMap['Optimizer'] = [Optimizer]
+		# Set the new grid spacing if it's a non-affine transform
+		if GridSpacing is not None:
+			if 'BSplineTransform' in Transform or 'SplineKernelTransform' in Transform:
+				parameterMap['FinalGridSpacingInPhysicalUnits'] = [str(GridSpacing)]
 
-	parameterMap['Optimizer'] = [Optimizer]
 
-	MaximumNumberOfIterations = kwargs.get('MaximumNumberOfIterations')
-	if MaximumNumberOfIterations is not None:
-		parameterMap['MaximumNumberOfIterations'] = [str(MaximumNumberOfIterations)]
+	if not TwoStage and not Affine:
+		# These are set by default for TwoStage and Affine
+		MaximumNumberOfIterations = kwargs.get('MaximumNumberOfIterations')
+		if MaximumNumberOfIterations is not None:
+			parameterMap['MaximumNumberOfIterations'] = [str(MaximumNumberOfIterations)]
 
 	elastixImageFilter.SetParameterMap(parameterMap)
 	result = elastixImageFilter.Execute()
 
+	# Apply the transform to the original, un-preprocessed image
+	transformixImageFilter = _sitk.TransformixImageFilter()
+	# This line was added to suppress log output from transformix
+	if not Verbose:
+		transformixImageFilter.LogToConsoleOff()
+
+	transformixImageFilter.SetTransformParameterMap(elastixImageFilter.GetTransformParameterMap())
+	transformixImageFilter.SetMovingImage(_sitk.GetImageFromArray(im_shifted_orig))
+	result_orig = transformixImageFilter.Execute()
+
 	# Save the transform
 	transformParameterMap = elastixImageFilter.GetTransformParameterMap()
-	# sitk.WriteParameterFile(transformParameterMap[0], "TransformParameters.0.txt")
 
-	im_coregistered = _sitk.GetArrayFromImage(result)
-	# t1 = time.time()
-	# time_taken = t1 - t0
-	# shift_val = np.average(np.abs(np.subtract(im_static, im_coregistered)))
+	im_coregistered = _sitk.GetArrayFromImage(result_orig)
+
+	if Blurring:
+		im_coregistered = gaussian_filter(im_coregistered, sigma=Sigma)
 
 	return im_coregistered, transformParameterMap
 
@@ -1029,5 +1219,167 @@ def GetNMI(Data, **kwargs):
 
 	return mean_nmi, nmi_vs_ref, pairwise_nmi
 
+
+def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list, **kwargs):
+	"""
+	Function that generates a hypercube for co-registration. 
+	Specifically, it allows to select a single specific frame to run the co-registration.
+
+	Inputs:
+		- Nsweep (int) : Which sweep in the dataset to use
+		- Nframe (int or [int, int, ...]) : Which frame(s), within this sweep, to use (clearest one).
+			If more than one frame indicated, the code will compute a hypercube for each integer indicated and then
+			concatenate all hypercubes
+		- Path : Where the data is located
+		- EdgePos : Positions of the start of each sweep
+		- Wavelengths_list
+		- kwargs:
+			- Buffer = 9 : How many frames to skip at the start and end of a sweep
+
+	Outputs:
+		- Hypercube for registration
+
+	"""
+	Buffer = kwargs.get('Buffer')
+	if Buffer is None:
+		Buffer = 9
+		print(f'Setting Buffer to default {Buffer}')
+	Hypercube_all, Dark_all = HySE.ComputeHypercube(Path, EdgePos, Wavelengths_list, Buffer=Buffer, Average=False, 
+													Order=False, Help=False, SaveFig=False, SaveArray=False, Plot=False, ForCoRegistration=True)
+	if isinstance(Nframe, int):
+		HypercubeForRegistration = Hypercube_all[Nsweep,:,Nframe,:,:]
+	elif isinstance(Nframe, list):
+		HypercubeForRegistration = []
+		for i in range(0,len(Nframe)):
+			HypercubeForRegistration_sub = Hypercube_all[Nsweep,:,Nframe[i],:,:]
+			if i==0:
+				HypercubeForRegistration = HypercubeForRegistration_sub
+			else:
+				HypercubeForRegistration = np.concatenate((HypercubeForRegistration, HypercubeForRegistration_sub), axis=0)
+	else:
+		print(f'Nframe format not accepted.')
+		HypercubeForRegistration=0
+	return HypercubeForRegistration
+
+
+def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
+	"""
+
+	Apply Simple Elastix co-registration to all sweep
+
+	Input:
+		- RawHypercube : To co-registrate. Shape [N, Y, X]
+		- Wavelengths_list
+		- kwargs:
+			- Order = False: Whether to order the coregistered image (based on Wavelenghts_list)
+			- Static_Index = 0: Which image is set as the static one (others are registered to it)
+			- SaveHypercube
+			- PlotDiff = False. If True, plots differences between static, moving and registered images
+			- SavingPath. If PlotDiff or SaveHypercbybe is True, where to save the data/figure
+
+
+	Outputs:
+		- Hypercube_Coregistered
+		- Coregistration_Transforms
+
+	"""
+
+	PlotDiff = kwargs.get('PlotDiff', False)
+
+	SavingPath = kwargs.get('SavingPath')
+	if SavingPath is None:
+		SavingPath = ''
+		if PlotDiff:
+			print(f'PlotDiff has been set to True. Indicate a SavingPath.')
+
+	Static_Index = kwargs.get('Static_Index')
+	if Static_Index is None:
+		Static_Index = 0
+		print(f'Static index set to default {Static_Index}')
+
+
+	SaveHypercube = kwargs.get('SaveHypercube', True)
+	if SaveHypercube:
+		print(f'Saving Hypercube')
+
+	Order = kwargs.get('Order', False)
+	
+	t0 = time.time()
+	(NN, YY, XX) = RawHypercube.shape
+
+
+	## Sort Wavelengths
+	order_list = np.argsort(Wavelengths_list)
+	Wavelengths_sorted = Wavelengths_list[order_list]
+
+	Hypercube = []
+	AllTransforms = []
+
+	## Define static image
+	im_static = RawHypercube[Static_Index, :,:]
+
+	for c in range(0, NN):
+		if c==Static_Index:
+			print(f'Static Image')
+			im = RawHypercube[c,:,:]
+			Hypercube.append(im)
+			AllTransforms.append(0)
+		else:
+			print(f'Working on: {c+1} /{NN}')
+			im_shifted = RawHypercube[c, :,:]
+			im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
+			Hypercube.append(im_coregistered)
+			AllTransforms.append(coregister_transform)
+
+			if PlotDiff:
+				if '.png' in SavingPath:
+					NameTot = SavingPath.split('/')[-1]
+					Name = NameTot.replace('.png', '')+f'_{c}.png'
+					SavingPathWithName = SavingPath.replace(NameTot, Name)
+				else:
+					Name = f'_{c}_CoRegistration.png'
+					SavingPathWithName = SavingPath+Name
+				HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+
+
+	tf = time.time()
+	Hypercube = np.array(Hypercube)
+	## Calculate time taken
+	time_total = tf-t0
+	minutes = int(time_total/60)
+	seconds = time_total - minutes*60
+	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
+
+	## Sort hypercube according to the order_list
+	## Ensures wavelenghts are ordered from blue to red
+	if Order:
+		Hypercube_sorted = []
+		AllTransforms_sorted = []
+		for k in range(0,Hypercube.shape[0]):
+			Hypercube_sorted.append(Hypercube[order_list[k]])
+			AllTransforms_sorted.append(AllTransforms[order_list[k]])
+		Hypercube_sorted = np.array(Hypercube_sorted)
+	else:
+		Hypercube_sorted = np.array(Hypercube)
+		AllTransforms_sorted = AllTransforms
+
+
+	if SaveHypercube:
+		if '.png' in SavingPath:
+			NameTot = SavingPath.split('/')[-1]
+			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
+			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
+			SavingPathHypercube = SavingPath.replace(NameTot, Name)
+			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
+		else:
+			Name = f'_CoregisteredHypercube.npz'
+			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
+			SavingPathHypercube = SavingPath+Name
+			SavingPathWavelengths = SavingPath+Name_wav
+
+		np.savez(f'{SavingPathHypercube}', Hypercube)
+		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
+
+	return Hypercube_sorted, AllTransforms_sorted
 
 

@@ -383,6 +383,11 @@ def PlotHypercube(Hypercube, **kwargs):
 
 
 
+
+
+
+
+
 def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
 	'''
 	Function that saves a mp4 video of the hypercube
@@ -406,6 +411,7 @@ def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
 
 	if Normalise:
 		Hypercube_ToSave = Hypercube/np.nanmax(Hypercube)
+		print(f'Normalising Hypercube by itself')
 	else:
 		Hypercube_ToSave = Hypercube
 
