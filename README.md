@@ -394,6 +394,7 @@ HypercubeForRegistration_Avg, _ = HySE.ComputeHypercube(Lesion1_Path, EdgePos_Le
 HypercubeForRegistration = HypercubeForRegistration_Avg[Nsweep,:,:,:]
 ```
 
+### Get Mask
 Co-registration performs better when the sharp black edges from the endoscopy monitor display are masked
 
 ```python
@@ -405,6 +406,7 @@ _, Mask = HySE.NormaliseMixedHypercube(Hypercube_Lesion1_all[2,:,:,:], Dark=Long
 Mask_Invert = np.invert(Mask)
 ```
 
+### Perform Co-Registration
 
 Then the co-registration. You will need to set:
 
@@ -433,6 +435,7 @@ CoregisteredHypercube, AllTransforms = HySE.CoRegisterHypercube(HypercubeForRegi
 
 ```
 
+### Save Results
 And then you might want to calculate the normalised mutual information before and after to estimate the performance of the registration, and save the registered hypercube as a video to see the results.
 
 ```python
