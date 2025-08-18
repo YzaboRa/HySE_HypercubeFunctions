@@ -269,13 +269,12 @@ def ComputeHypercube(DataPath, EdgePos, **kwargs):
 
 
 
-def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
+
+def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 	"""
 	Function to compute the hypercube. It inputs the path to the data and
 	the EdgePos output from the FindHypercube function (which indicates where
-	to find the start for each wavelenght for each identified sweep).
-	Modified from the original ComputeHypercybe() function to enalble the RGB normalisation
-	Inspired by Katie-Lou's code
+	to find the start for each wavelenght for each identified sweep)
 	
 	Input:
 	- DataPath: Path to the data
@@ -286,7 +285,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	
 	- kwargs (optional): Optional parameters
 				- Help = False 
-				- RGB
+				- Wavelengths_list: List of wavelengths as measured in the data
 				- Buffer = integer : Number of frames to ignore between neighbouring 
 					colours to avoid contamination by transition frames.
 					Might need to be adjusted for very short or very large repetitions.
@@ -295,12 +294,11 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				- SaveFig = True
 				- SaveArray = True
 				- Plot = True
-				- Wavelengths_list: List of wavelengths as measured in the data
 				- Order = False. Set to False if doing wavelength unmixing
-				- Average = True. If more than one sweep is indicated, indicates whether
+				- Average = False. If more than one sweep is indicated, indicates whether
 					to average all sweeps before computing hypercube.
 					If false, it will output as many hypercubes as sweeps.
-				- ForCoRegistration = False. If True, keeps individual frames
+				- ForCoRegistration = True. If True, keeps individual frames
 										 
 	
 	Output:
@@ -308,23 +306,21 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 						to order_list (if Order=True)
 						Shape (Nwavelengths, 1080, 1920) for HD format
 						
-	- Dark: Dark average contained in 2D array
+	- Dark: Dark average contained in 3D array (BGR)
 	
 	
 	"""
 	## Check if the user has set the Buffer size
+
 	Buffer = kwargs.get('Buffer', 6)
 	print(f'Buffer of frames to ignore between neighbouring wavelenghts set to 2x{Buffer}')
 	BufferSize = 2*Buffer
 	
-	RGB = kwargs.get('RGB', True)
-
 	Name = kwargs.get('Name', '')
 	SaveFig = kwargs.get('SaveFig', True)
-
 	Order = kwargs.get('Order', False)
 
-	Wavelengths_list = kwargs.get('Wavelengths_list')
+	Wavelengths_list = kwargs.get('Wavelengths_list', None)
 	if Wavelengths_list:
 	   ## Sort Wavelengths
 	   order_list = np.argsort(Wavelengths_list)
@@ -335,7 +331,8 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	   Order=False # Can't order by wavelengths if there's no wavelength list!
 
 	if Order:
-		print(f'Order set to True: the hypercube will be sorted by wavelength.')
+		print(f'Order set to True. Hypercube will be sorted according to the wavelengths list')
+
 
 	SaveArray = kwargs.get('SaveArray', True)
 	Help = kwargs.get('Help', False)
@@ -344,9 +341,9 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		print(inspect.getdoc(ComputeHypercube))
 		return 0, 0
 	Plot = kwargs.get('Plot', False)
-	Average = kwargs.get('Average', True)
+	Average = kwargs.get('Average', False)
 
-	ForCoRegistration = kwargs.get('ForCoRegistration', False)
+	ForCoRegistration = kwargs.get('ForCoRegistration', True)
 	if ForCoRegistration:
 		print(f'Keeping individual frames for co-registration')
 
@@ -365,13 +362,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 		
 	## Import data
-	data = HySE.Import.ImportData(DataPath, CropImDimensions=CropImDimensions)
-	
-	## Sort Wavelengths
-	order_list = np.argsort(Wavelengths_list)
-	Wavelengths_sorted = Wavelengths_list[order_list]
-	# print(f'Wavelengths_list: \n{Wavelengths_list}\n\n')
-	# print(f'Wavelengths_sorted: \n{Wavelengths_sorted}\n\n')
+	data = HySE.Import.ImportData(DataPath, CropImDimensions=CropImDimensions, RGB=True)
 
 	
 	## Set parameters
@@ -415,7 +406,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 				if i==0: 
 					if ForCoRegistration==False:
 						print(f'Computing hypercube: Averaging {e-s} frames')
-				data_sub = data[s:e,:,:]
+				data_sub = data[s:e,:,:,:]
 				if ForCoRegistration:
 					data_avg = data_sub
 				else:
@@ -431,7 +422,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 
 				s = framestart+bs
 				e = framestart+plateau_size-bs
-				data_sub = data[s:e,:,:]
+				data_sub = data[s:e,:,:,:]
 				data_avg = np.average(data_sub, axis=0)
 				Darks.append(data_avg) 
 		Hypercube.append(Hypercube_n)
@@ -460,7 +451,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 			for n in range(0,NN):
 				hypercube_sorted_sub = []
 				for k in range(0,WW):
-					hypercube_sorted_sub.append(Hypercube[n,order_list[k],:,:])
+					hypercube_sorted_sub.append(Hypercube[n,order_list[k],:,:,:])
 				Hypercube_sorted.append(hypercube_sorted_sub)
 			Hypercube_sorted = np.array(Hypercube_sorted)
 
@@ -481,10 +472,11 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 	## MakeFigure
 	if Plot:
 		if Average==False:
-			HypercubeToPlot = Hypercube_sorted[0,:,:,:]
-			print(f'Plotting hypercube for sweep 0')
+			HypercubeToPlot = Hypercube_sorted[0,:,:,:,1]
+			print(f'Plotting hypercube for sweep 0, green frame')
 		else: 
-			HypercubeToPlot = Hypercube_sorted
+			HypercubeToPlot = Hypercube_sorted[:,:,1]
+			print(f'Plotting hypercube for green frame')
 		nn = 0
 		Mavg = np.average(HypercubeToPlot)
 		Mstd = np.std(HypercubeToPlot)
@@ -519,6 +511,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, Wavelengths_list, **kwargs):
 		np.savez(f'{PathToSave}_Hypercube.npz', Hypercube_sorted)
 		np.savez(f'{PathToSave}_AutoDark.npz', Darks)
 	return Hypercube_sorted, Darks
+
 
 
 

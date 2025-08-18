@@ -208,7 +208,8 @@ def ImportData(Path, *Coords, **kwargs):
 			if (fc>=Nstart) and (fc<Nend):
 				if RGB:
 					if Trace:
-						data.append(np.average(frame))
+						# data.append(np.average(frame))
+						data.append([np.average(frame[:,:,0]), np.average(frame[:,:,1]), np.average(frame[:,:,2])])
 					else:
 						data[ii] = frame
 				else: ## bgr format
