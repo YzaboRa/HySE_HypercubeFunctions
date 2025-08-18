@@ -291,8 +291,8 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 					Might need to be adjusted for very short or very large repetitions.
 					Default to 6 
 				- Name = string
-				- SaveFig = True
-				- SaveArray = True
+				- SaveFig = False
+				- SaveArray = False
 				- Plot = True
 				- Order = False. Set to False if doing wavelength unmixing
 				- Average = False. If more than one sweep is indicated, indicates whether
@@ -310,6 +310,13 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 	
 	
 	"""
+
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(ComputeHypercube))
+		return 0, 0
+
+
 	## Check if the user has set the Buffer size
 
 	Buffer = kwargs.get('Buffer', 6)
@@ -317,7 +324,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 	BufferSize = 2*Buffer
 	
 	Name = kwargs.get('Name', '')
-	SaveFig = kwargs.get('SaveFig', True)
+	SaveFig = kwargs.get('SaveFig', False)
 	Order = kwargs.get('Order', False)
 
 	Wavelengths_list = kwargs.get('Wavelengths_list', None)
@@ -334,12 +341,8 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 		print(f'Order set to True. Hypercube will be sorted according to the wavelengths list')
 
 
-	SaveArray = kwargs.get('SaveArray', True)
-	Help = kwargs.get('Help', False)
-	if Help:
-		# print(info)
-		print(inspect.getdoc(ComputeHypercube))
-		return 0, 0
+	SaveArray = kwargs.get('SaveArray', False)
+	
 	Plot = kwargs.get('Plot', False)
 	Average = kwargs.get('Average', False)
 
@@ -508,6 +511,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 			print(f'Saved figure at {PathToSave}')
 
 	if SaveArray:
+		PathToSave = f'{Path}{time_now}_{Name}'
 		np.savez(f'{PathToSave}_Hypercube.npz', Hypercube_sorted)
 		np.savez(f'{PathToSave}_AutoDark.npz', Darks)
 	return Hypercube_sorted, Darks
