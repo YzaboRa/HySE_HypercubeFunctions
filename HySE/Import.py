@@ -116,6 +116,9 @@ def ImportData(Path, *Coords, **kwargs):
 		print(inspect.getdoc(ImportData))
 		return 0
 
+	Coords=kwargs.get("Coords")
+	if not Coords:
+		Coords=[]
 	
 	## Check if the data should be left in the raw RGB 3D format
 	RGB = kwargs.get('RGB', False)
