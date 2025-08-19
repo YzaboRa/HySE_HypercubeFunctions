@@ -373,8 +373,6 @@ def GetDark_WholeVideo(vidPath, **kwargs):
 	return dark
 
 
-
-
 def NormaliseFrames(image, image_white, image_dark):
 	"""
 	Normalises an image with white and dark references
@@ -405,9 +403,6 @@ def NormaliseFrames(image, image_white, image_dark):
 	im_n = np.divide(im_d, white_d, out=np.zeros_like(im_d), where=white_d!=0)
 
 	return im_n
-
-
-
 
 
 def Rescale(im, PercMax, Crop=True):
@@ -556,198 +551,8 @@ def ComputeSelfNormHypercube(Video,EdgePos,DarkRef=None,**kwargs):
 				## React if number unreasonable (too small or too large)
 				if i == 0:
 					print(f'Computing hypercube: Averaging {e - s} frames')
-				data_norm = Video[s:e, :, :]-DarkRef[None,:,:,:]
-				data_norm[data_norm<=0]=0 # Remove negative values after dark subtraction
-				if RefChannel:
-					if Normalise:
-						data_norm = np.divide(np.delete(data_norm,RefChannel,axis=3).mean(axis=3),data_norm[:,:,:,RefChannel],
-											  out=np.zeros(shape=np.shape(data_norm)[0:3]),where=data_norm[:, :, :, RefChannel]!=0,
-											  dtype='float32')
-					else:
-						data_norm = np.delete(data_norm,RefChannel,axis=3).mean(axis=3,dtype='float32')
-				else:
-					data_norm = data_norm.mean(axis=3,dtype='float32')
-				data_avg = np.mean(data_norm, axis=0,dtype='float32')
-				Hypercube_n.append(data_avg)
-			else:  ## Dark
-				if ComputeDarks:
-					framestart = EdgePos[n, i, 0]
-					plateau_size = EdgePos[n, i, 1]
-					s = framestart + bs
-					e = framestart + plateau_size - bs
-					data_sub = Video[s:e, :, :]
-					data_avg = np.mean(data_sub, axis=0)
-					Darks.append(data_avg)
-		Hypercube.append(Hypercube_n)
-	if ComputeDarks:
-		Darks = np.array(Darks)
-	Hypercube = np.array(Hypercube)
-	## Average sweeps
-	if Average:
-		Hypercube = np.mean(Hypercube, axis=0)
-	## Always average darks
-	if ComputeDarks:
-		Darks = np.mean(Darks, axis=0)
-
-	# Hypercube_sorted = Hypercube
-	# print(f'order_list: \n{order_list}')
-
-	## Find current path and time for saving
-	time_now = datetime.now().strftime("%Y%m%d__%I-%M-%S-%p")
-	day_now = datetime.now().strftime("%Y%m%d")
-
-	## MakeFigure
-	if Plot:
-		if Average == False:
-			HypercubeToPlot = Hypercube[0, :, :, :]
-			print(f'Plotting hypercube for sweep 0')
-		else:
-			HypercubeToPlot = Hypercube
-		nn = 0
-		Mavg = np.mean(HypercubeToPlot)
-		Mstd = np.std(HypercubeToPlot)
-		MM = Mavg + 5 * Mstd
-		fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8, 8))
-		for j in range(0, 4):
-			for i in range(0, 4):
-				if nn < 17:
-					ax[j, i].imshow(HypercubeToPlot[nn, :, :], cmap='gray')
-					ax[j, i].set_title(f'im {nn}')
-					ax[j, i].set_xticks([])
-					ax[j, i].set_yticks([])
-					nn = nn + 1
-				else:
-					ax[j, i].set_xticks([])
-					ax[j, i].set_yticks([])
-		plt.tight_layout()
-		if PathToSave:
-			plt.savefig(f'{PathToSave}_Hypercube.png')
-
-	if SaveArray:
-		if PathToSave:
-			np.savez(f'{PathToSave}_Hypercube.npz', Hypercube)
-			if ComputeDarks:
-				np.savez(f'{PathToSave}_AutoDark.npz', Darks)
-		else:
-			print("Can't save data without PathToSave")
-	if ComputeDarks:
-		return Hypercube, Darks
-	else:
-		return Hypercube
-
-def ComputeSelfNormHypercube(Video,EdgePos,DarkRef=None,**kwargs):
-	"""
-	Function to compute the hypercube. It inputs the path to the data and
-	the EdgePos output from the FindHypercube function (which indicates where
-	to find the start for each wavelenght for each identified sweep)
-
-	:param Video:
-	:param EdgePos:
-	:return:
-
-	Input:
-	- Video: Video already imported and cropped by ImportData function
-
-	- EdgePos: Position of the start of each colour for each sweep, output of FindHypercube
-			   Functions are separated to allow tweaking of parameters to properly identify
-			   individual sweeps
-
-	- kwargs (optional): Optional parameters
-				- Help = False
-				- Buffer = integer : Number of frames to ignore between neighbouring
-					colours to avoid contamination by transition frames.
-					Might need to be adjusted for very short or very large repetitions.
-					Default to 6
-				- SaveFig = False
-				- SaveArray = False
-				- Plot = True
-				# - Order = True. Set to False if doing wavelength unmixing
-				- Average = True. If more than one sweep is indicated, indicates whether
-					to average all sweeps before computing hypercube.
-					If false, it will output as many hypercubes as sweeps.
-				- ComputeDarks = False. If True, compute the average Dark frames too
-				- RefChannel = None. Index of reference channel. If None, average is taken across all channels.
-				- Normalise = False. If True, normalise to reference channel. If false, omit reference channel
-
-	Output:
-	- Hypercube_sorted: Hypercube contained in a 3D array, with wavelengths sorted according
-						to order_list (if Order=True)
-						Shape (Nwavelengths, 1080, 1920) for HD format
-
-	- Dark: Dark average contained in 2D array
-
-
-	"""
-	## Check if the user has set the Buffer size
-	RGB = kwargs.get('RGB', True)
-	Buffer = kwargs.get('Buffer', 2)
-	print(f'Buffer of frames to ignore between neighbouring wavelengths set to 2x{Buffer}')
-	BufferSize = 2 * Buffer
-
-	RefChannel = kwargs.get('RefChannel', None)
-	if RefChannel not in [None,0,1,2]:
-		print(f'RefChannel {RefChannel} not valid. Must be in [None,0,1,2]')
-	Normalise = kwargs.get('Normalise', False)
-
-	ComputeDarks = kwargs.get('ComputeDarks', False)
-	if ComputeDarks:
-		Darks = []
-
-	SaveFig = kwargs.get('SaveFig', False)
-	SaveArray = kwargs.get('SaveArray', False)
-	PathToSave = kwargs.get('PathToSave')
-
-	Help = kwargs.get('Help', False)
-	if Help:
-		# print(info)
-		print(inspect.getdoc(ComputeHypercube))
-		return 0, 0
-	Plot = kwargs.get('Plot', False)
-	Average = kwargs.get('Average', True)
-
-	if np.array(DarkRef).all() == None:
-		DarkRef = np.zeros(shape=Video.shape[1:4])
-
-	## Set parameters
-	DarkN = [8]  ## Indicate when to expect dark plateau when switching from panel 4 to 2
-	ExpectedWavelengths = 16
-	EdgeShape = EdgePos.shape
-	## Check if multiple sweeps must be averaged
-	if len(EdgeShape) == 3:
-		Nsweep, Nplateaux, _ = EdgePos.shape
-	elif len(EdgeShape) == 2:
-		Nplateaux, _ = EdgePos.shape
-		Nsweep = 1
-		print('Only one sweep')
-	else:
-		print(f'There is a problem with the shape of EdgePos: {EdgeShape}')
-	if Nplateaux != (ExpectedWavelengths + 1):
-		print(f'Nplateaux = {Nplateaux} is not what is expected. Will run into problems.')
-
-	## Compute Hypercube and Dark
-	Hypercube = []
-	bs = int(np.round(BufferSize / 2, 0))  ## Buffer size for either side of edge
-	for n in range(0, Nsweep):
-		Hypercube_n = []
-		for i in range(0, Nplateaux):
-			if i not in DarkN:  ## Skip the middle
-				# if Nsweep==1:
-				# 	framestart = EdgePos[i,0]
-				# 	plateau_size = EdgePos[i,1]
-				# else:
-				framestart = EdgePos[n, i, 0]
-				plateau_size = EdgePos[n, i, 1]
-
-				s = framestart + bs
-				e = framestart + plateau_size - bs
-				# print(f's: {s}, e: {e}')
-				s = int(s)
-				e = int(e)
-				## Print how many frames are averaged
-				## React if number unreasonable (too small or too large)
-				if i == 0:
-					print(f'Computing hypercube: Averaging {e - s} frames')
-				data_norm = Video[s:e, :, :]-DarkRef[None,:,:,:]
+				# Convert video section to float32 before normalising to avoid numerical errors
+				data_norm = Video[s:e].astype('float32')-DarkRef[None,:,:,:]
 				data_norm[data_norm<=0]=0 # Remove negative values after dark subtraction
 				if RefChannel:
 					if Normalise:
