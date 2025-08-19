@@ -361,6 +361,106 @@ HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraDa
   <img src="https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e" width="750"/>
 </p>
 
+
+
+## Co-Registration
+The co-registration must be done before the unmixing. But since it requires SimpleElastix and is only necessary for in vivo data (as opposed to testing data), I will for now put the relevant documentation here.
+TO DO: Update description to incroporate registration at the right spot.
+
+Co-registration is done with SimpleElastix, which is an open-source library that tries to make the registration tools of elastix and simpleITK more user friendly. As indicated earlier, the documentation for SimpleElastix is no longer being updated and the installation instructions typically fail. The library can nevertheless be used, although installing the right packages might take a bit of fighting.
+
+The following documation is preliminary and indicates how to reproduce the best co-registration results obtained from HySE in vivo data, and gives a rough overview of all the options now available to play with.
+
+Assuming that a video has been loaded, the trace computed and EdgePos computed with the HySE.FindHypercube() function, we may then start co-registering individual sweeps.
+
+### Get raw hypercube for co-registration
+This can be done either by averaging a given set of frames, or selecting a signle (good) frame. It is assumed that movement between individual RGB cycles is minimal (valid most of the time unless chromatic effects can be seen on the endoscopy monitor, which is very rare). Note that RGB frames have different exposure times, so there is typically one that has better SNR.
+
+The sweep of interest must first be identified. Make sure that there are good frames (bubble-free, with good visibility) for all 16 wavelengths combinatino, and that movement is not too large that the same features can be identified in the whole sweep.
+
+```python
+Nsweep = 5
+
+## ## If taking single frames
+Nframe = 1
+## (or Nframe = [1,2] if we want to co-register more frames - Note that this will result of a 'hypercube' or size (len(Nframe)*16,Y,X) )
+HypercubeForRegistration = HySE.GetHypercubeForRegistration(Nsweep, Nframe, Lesion1_Path, EdgePos_Lesion1, Wavelengths_list, Buffer=12)
+
+
+## ## If Averaging
+HypercubeForRegistration_Avg, _ = HySE.ComputeHypercube(Lesion1_Path, EdgePos_Lesion1, Wavelengths_list, Buffer=Buffer, 
+                                                    Average=False, Order=False, Help=False, SaveFig=False, SaveArray=False, 
+                                                    Plot=False, ForCoRegistration=False)
+HypercubeForRegistration = HypercubeForRegistration_Avg[Nsweep,:,:,:]
+```
+
+### Get Mask
+Co-registration performs better when the sharp black edges from the endoscopy monitor display are masked
+
+```python
+## Use the data iself, or any normalisation, to estimate the sharp edges mask (anything works)
+_, Mask = HySE.NormaliseMixedHypercube(Hypercube_Lesion1_all[2,:,:,:], Dark=LongDark, Wavelengths_list=Wavelengths_list, 
+                                       SaveFigure=False, SavingPath=SavingPath+Name, vmax=160, Plot=False)
+
+## SimpleElastix expects a mask with the inverse logic
+Mask_Invert = np.invert(Mask)
+```
+
+### Perform Co-Registration
+
+Then the co-registration. You will need to set:
+
+- GridSpacing: This is the size of the grid used in the BSpline coregistration. Small grid spacings can co-registrate details better but tend to overfit and create distortions and artefacts. Large grid size preserve the image better but can lead to poorer registration. Some of the pattern artefact created by smaller grid spacings can be averaged out with appropriate blurring. GradSpacing of 20-50 has lead to the best results (100+ tends to not co-register everything)
+- Sigma: This is the width of the Gaussian blurring function (in pixels) used to blur the image. Blurring is done twice, once on the images fed to get the coregistration transform, in order to smooth out noise that could mess with the registration, and once after registration to remove any artefact potentially introduced by the registration. Sigma of 1 has given good results.
+- TwoStage: Set to true to first perform an affine transform, that roughly aligns the images, followed by a BSpline transform, that can correct distortions. Not doing the affine first leaves the BSpline transform to do all the coregistration works, which tends to create more artefacts
+- Metric: Which metric to use when finding the best registration. 'AdvancedMattesMutualInformation' and 'NormalizedMutualInformation' give decent (and similar) results, other options can be found in the documentation (try HySE.help('CoRegistrationTools.CoRegisterImages') ), but have given worse results.
+
+  
+```python
+
+GridSpacing=20
+Sigma=1
+
+CoregisteredHypercube, AllTransforms = HySE.CoRegisterHypercube(HypercubeForRegistration, ## Raw hypercube
+                                                                Wavelengths_list, ## don't really need this
+                                                                Verbose=False, ## Set to True to see all output from SimpleElastix
+                                                                Transform='BSplineTransform', ## Transform to use. BSpline best for in vivo data, see documentation for options
+                                                                Affine=False, ## Set to true to restrict to Affine transforms
+                                                                Blurring=True, ## Set to true for blurring 
+                                                                Sigma=Sigma, ## Blurring size
+                                                                Mask=Mask_Invert, ## Inficate Mask
+                                                                TwoStage=True, ## Set to true for a affine transform followed by BSpline
+                                                                Metric='AdvancedMattesMutualInformation', # See documentations for options
+                                                                GridSpacing=GridSpacing) ## Grid Spacing
+
+```
+
+### Save Results
+And then you might want to calculate the normalised mutual information before and after to estimate the performance of the registration, and save the registered hypercube as a video to see the results.
+
+```python
+NMI_Sweep_before = HySE.GetNMI(HypercubeForRegistration)
+NMI_Sweep_after = HySE.GetNMI(CoregisteredHypercube)
+print(f'Average NMI before : {NMI_Sweep_before[0]:.4f}, Average NMI after : {NMI_Sweep_after[0]:.4f}')
+
+Info = f'Frame{Nframe}_Blurring{Sigma}_AdvMI_TwoStage_GridSpacing{GridSpacing}'
+VideoSavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_SE_{Info}_NMI{NMI_Sweep_after[0]:.2f}.mp4'
+
+## Whole image
+HySE.MakeHypercubeVideo(CoregisteredHypercube, VideoSavingPath, Normalise=True)
+
+## Cropped image
+Cropping = 100
+VideoSavingPathCropped = VideoSavingPath.replace('.mp4','_Cropped.mp4')
+HySE.MakeHypercubeVideo(CoregisteredHypercube[:,Cropping:-1*Cropping,Cropping:-1*Cropping], VideoSavingPathCropped, Normalise=True)
+
+## Not CoRegistered
+OrigVideoSavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_NoReg.mp4'
+HySE.MakeHypercubeVideo(HypercubeForRegistration, OrigVideoSavingPath)
+
+
+```
+
 ## Help 
 
 A general help function allows to print all the modules and associated functions:
