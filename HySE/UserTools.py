@@ -650,12 +650,15 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 		- kwargs:
 			- Help: print this info
 			- SavingPath: If indicated, saves the figure at the indicated path
+			- PSNR = True : Whether or not to compute PSNR for each method
 			- ChosenMethod (0). If more than one set of spectra provided, determines which
 				of those (the 'method') has the PSNR indicated for each path
 			- PlotLabels: What label to put for each provided set of spectra. If not indicated
 				a generic 'option 1', 'option 2' etc will be used
 			- WhitePatchNormalise (True). Normalises all spectral by the spectra of the white patch
 			- ClipYScale (True): Clip the y range of the plots to [-0.05,1.05]
+			- ClipXScale (True)
+			- XScale = [450,670]
 
 	Outputs:
 		- (plots figure)
@@ -674,8 +677,11 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 		SaveFig = True
 
 	ClipYScale = kwargs.get('ClipYScale', True)
+	ClipXScale = kwargs.get('ClipXScale', True)
+	XScale = kwargs.get('XScale', [450,670])
+	PSNR = kwargs.get('PSNR', True)
 
-	PlotColours = ['limegreen', 'royalblue', 'darkblue', 'orange', 'red', 'cyan', 'magenta']
+	PlotColours = ['limegreen', 'cornflowerblue', 'darkblue', 'orange', 'red', 'cyan', 'magenta']
 		
 	ChosenMethod = kwargs.get('ChosenMethod', 0)
 	WhitePatchNormalise = kwargs.get('WhitePatchNormalise', True)
@@ -721,27 +727,31 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 					spectra_WhiteNorm = PatchesSpectra[:,patchN,1]
 				ax[j,i].plot(Wavelengths_sorted, spectra_WhiteNorm, '.-', c=PlotColours[k], label=PlotLabels[k]) #PlotLinestyles[w], , label=PlotLabels[w]
 				GT_comparable = CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrumN)
-
-				PSNR = psnr(GT_comparable, spectra_WhiteNorm)
-				PSNR_Vals.append(PSNR)
+				if PSNR:
+					PSNR = psnr(GT_comparable, spectra_WhiteNorm)
+					PSNR_Vals.append(PSNR)
 
 			if ClipYScale:
 				ax[j,i].set_ylim(-0.05,1.05)
-			ax[j,i].set_xlim(450,670)
+			if ClipXScale:
+				ax[j,i].set_xlim(XScale[0],XScale[1])
 			
-			if len(PSNR_Vals)>1:
-				MaxPSNR_pos = np.where(PSNR_Vals==np.amax(PSNR_Vals))[0][0]
-			else:
-				MaxPSNR_pos = 0
-			print(f'Best method for patch {patchN+1} = {PlotLabels[MaxPSNR_pos]}')
+			if PSNR:
+				if len(PSNR_Vals)>1:
+					MaxPSNR_pos = np.where(PSNR_Vals==np.amax(PSNR_Vals))[0][0]
+				else:
+					MaxPSNR_pos = 0
+				print(f'Best method for patch {patchN+1} = {PlotLabels[MaxPSNR_pos]}')
 
 			if patchN==Nwhite:
 				ax[j,i].set_title(f'Patch {patchN+1} - white', color='black', fontsize=10)# - {itn:.0f} itn,\n {r1norm*10**6:.0f} e-6 r1norm', fontsize=12)
 				ax[j,i].legend(fontsize=8, loc='lower center')
 			else:
 #                 ax[j,i].set_title(f'Patch {patchN+1}\n PSNR = {PSNR:.2f}', color=color, fontsize=10) # fontweight="bold",
-				ax[j,i].set_title(f'Patch {patchN+1}\nSelected PSNR = {PSNR_Vals[ChosenMethod]:.2f}\nMax: {np.amax(PSNR_Vals):.2f} {PlotLabels[MaxPSNR_pos]}', 
-							  color=color, fontsize=10) # fontweight="bold",
+				if PSNR:
+					ax[j,i].set_title(f'Patch {patchN+1}\nSelected PSNR = {PSNR_Vals[ChosenMethod]:.2f}\nMax: {np.amax(PSNR_Vals):.2f} {PlotLabels[MaxPSNR_pos]}', color=color, fontsize=10)
+				else:
+					ax[j,i].set_title(f'Patch {patchN+1}', color=color, fontsize=10)
 
 			if j==4:
 				ax[j,i].set_xlabel('Wavelength [nm]')
@@ -753,7 +763,10 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 				if i!=0:
 					ax[j,i].yaxis.set_ticklabels([])
 
-	plt.suptitle(f'Spectra for {Name} - Selected Method: {ChosenMethod}')
+	if PSNR:
+		plt.suptitle(f'Spectra for {Name} - Selected Method: {ChosenMethod}')
+	else:
+		plt.suptitle(f'Spectra for {Name}')
 	plt.tight_layout()
 	if SaveFig:
 		plt.savefig(f'{SavingPath}_Patches.png')
