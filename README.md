@@ -11,23 +11,22 @@ This is a python 3 code, it requires the following packages:
 - matplotlib
 - ffmpeg
 
-The co-registration is done with simple elastix / simple itk.
+The co-registration is done with SimpleITK.
 
 Documentation available here:
 https://simpleitk.org/
-https://simpleelastix.readthedocs.io/
 
-NB: The simple elastix documentation includes complicated installation instructions that (on MacOS) always crash.
-Try first: 
+SimpleITK can be installed with
 ```python
 pip install SimpleITK
 ```
+N.B. A previous version required SimpleElastix, which cannot be installed properly - Only SimpleITK is now required
 
 It also requires those additional libraries:
 - time
 - tqdm
 
-If SimpleElastix is not installed, or cannot be imported, the code will simply ignore it. This will not be a problem as long as the co-registration functions are not used.
+If SimpleITK is not installed, or cannot be imported, the code will simply ignore it. This will not be a problem as long as the co-registration functions are not used.
 
 The code was written to be run in a jupyter notebook. Including
 ```python
@@ -364,10 +363,10 @@ HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraDa
 
 
 ## Co-Registration
-The co-registration must be done before the unmixing. But since it requires SimpleElastix and is only necessary for in vivo data (as opposed to testing data), I will for now put the relevant documentation here.
+The co-registration must be done before the unmixing. But since it requires SimpleITK and is only necessary for in vivo data (as opposed to testing data), I will for now put the relevant documentation here.
 TO DO: Update description to incroporate registration at the right spot.
 
-Co-registration is done with SimpleElastix, which is an open-source library that tries to make the registration tools of elastix and simpleITK more user friendly. As indicated earlier, the documentation for SimpleElastix is no longer being updated and the installation instructions typically fail. The library can nevertheless be used, although installing the right packages might take a bit of fighting.
+Co-registration is done with SimpleITK, which is an open-source interface trying to make the tooks of the the Insight Segmentation and Registration Toolkit (ITK) easier to use. It also uses functionalities from elastix, but all those are handled by SimpleITK directly.
 
 The following documation is preliminary and indicates how to reproduce the best co-registration results obtained from HySE in vivo data, and gives a rough overview of all the options now available to play with.
 
@@ -402,7 +401,7 @@ Co-registration performs better when the sharp black edges from the endoscopy mo
 _, Mask = HySE.NormaliseMixedHypercube(Hypercube_Lesion1_all[2,:,:,:], Dark=LongDark, Wavelengths_list=Wavelengths_list, 
                                        SaveFigure=False, SavingPath=SavingPath+Name, vmax=160, Plot=False)
 
-## SimpleElastix expects a mask with the inverse logic
+## SimpleITK expects a mask with the inverse logic
 Mask_Invert = np.invert(Mask)
 ```
 
@@ -460,6 +459,16 @@ HySE.MakeHypercubeVideo(HypercubeForRegistration, OrigVideoSavingPath)
 
 
 ```
+
+### Apply transforms to other data
+The transforms optimised during the registration are stored in the AllTransforms list output by HySE.CoRegisterHypercube() function. Each element in the list is a specific transform applied to the associated frame. Each of those transforms can also be saved as .txt files.
+
+To apply the transforms to new frames, use the ApplyTransforms() function:
+
+```python
+FramesTransformed = ApplyTransform(FramesForTransformApply, AllTransforms)
+```
+The new FramesTransformed array will now be transformed in the same way as the original data.
 
 ## Help 
 
