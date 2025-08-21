@@ -16,6 +16,7 @@ This is a python 3 code, it requires the following packages:
 - tqdm
 - inspect
 - math
+- glob
 
 The co-registration is done with SimpleITK.
 
