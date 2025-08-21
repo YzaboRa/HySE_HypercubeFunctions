@@ -37,7 +37,7 @@ from scipy.ndimage import gaussian_filter
 
 from PIL import Image
 from natsort import natsorted
-
+import glob
 
 
 
@@ -1116,7 +1116,7 @@ def ApplyTransform(Frames, Transforms, **kwargs):
 	
 	TransformedFrames = []
 	for i in range(0, Nwav):
-		print(f'\n\nTransforming image {i+1}/Nwav')
+		print(f'Transforming image {i+1}/Nwav')
 		im_shifted = Frames[i,:,:]
 		transform = Transforms[i]
 		
@@ -1126,14 +1126,14 @@ def ApplyTransform(Frames, Transforms, **kwargs):
 			TransformedFrames.append(im_shifted)
 			continue
 		else:
-			im_shifted_se = sitk.GetImageFromArray(im_shifted)
-			transformixImageFilter = sitk.TransformixImageFilter()
+			im_shifted_se = _sitk.GetImageFromArray(im_shifted)
+			transformixImageFilter = _sitk.TransformixImageFilter()
 			if Verbose==False:
 				transformixImageFilter.LogToConsoleOff()
 			transformixImageFilter.SetMovingImage(im_shifted_se)
 			transformixImageFilter.SetTransformParameterMap(transform)
 			result = transformixImageFilter.Execute()
-			im_registered = sitk.GetArrayFromImage(result)
+			im_registered = _sitk.GetArrayFromImage(result)
 			TransformedFrames.append(im_registered)
 		
 	TransformedFrames = np.array(TransformedFrames)
@@ -1165,7 +1165,7 @@ def SaveTransforms(AllTransforms, TransformsSavingPath, **kwargs):
 			pass
 		else:
 			for i in range(0,len(transform)):
-				sitk.WriteParameterFile(pm, f'{TransformsSavingPath}_Frame{n}_{i}.txt')
+				_sitk.WriteParameterFile(transform[i], f'{TransformsSavingPath}_Frame{n}_{i}.txt')
 			
 	
 def LoadTransforms(TransformsPath, **kwargs):
@@ -1211,7 +1211,7 @@ def LoadTransforms(TransformsPath, **kwargs):
 		file = Files[i]
 		Name = file.split('/')[-1]
 		Info = Name.split('Frame')[-1].replace('.txt','')
-		transform = sitk.ReadParameterFile(file)
+		transform = _sitk.ReadParameterFile(file)
 		(Frame, t) = Info.split('_')
 		if int(t)==0:
 			TransformsFrameSub = []
