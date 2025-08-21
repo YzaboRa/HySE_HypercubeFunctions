@@ -10,6 +10,12 @@ This is a python 3 code, it requires the following packages:
 - scipy
 - matplotlib
 - ffmpeg
+- natsort
+- PIL
+- imageio
+- tqdm
+- inspect
+- math
 
 The co-registration is done with SimpleITK.
 
