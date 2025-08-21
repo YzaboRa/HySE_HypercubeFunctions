@@ -645,6 +645,14 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	Sigma = kwargs.get('Sigma', 2)
 	Mask = kwargs.get('Mask', None)
 
+	## Handle cropping
+	Cropping = kwargs.get('Cropping', 0)
+	if Cropping!=0:
+		im_static = im_static[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+		im_shifted = im_shifted[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+		if Mask is not None:
+			Mask = Mask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+
 	# Print the configuration
 	if TwoStage:
 		print(f'SimpleElastix: Two-Stage Registration (Affine -> BSpline) with GridSpacing = {GridSpacing}')
@@ -969,6 +977,7 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 		- Wavelengths_list
 		- kwargs:
 			- Help
+			- Cropping = 0
 			- Order = False: Whether to order the coregistered image (based on Wavelenghts_list)
 			- Static_Index = 0: Which image is set as the static one (others are registered to it)
 			- SaveHypercube
@@ -1005,6 +1014,11 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 		print(f'Saving Hypercube')
 
 	Order = kwargs.get('Order', False)
+
+	## Handle cropping
+	Cropping = kwargs.get('Cropping', 0)
+	if Cropping!=0:
+		print(f'Image will be cropped by {Cropping} on all sides.')
 	
 	t0 = time.time()
 	(NN, YY, XX) = RawHypercube.shape
