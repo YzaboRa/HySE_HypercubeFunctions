@@ -66,8 +66,12 @@ def ComputeHypercube(DataPath, EdgePos, **kwargs):
 	
 	
 	"""
-	## Check if the user has set the Buffer size
-
+	Help = kwargs.get('Help', False)
+	if Help:
+		# print(info)
+		print(inspect.getdoc(ComputeHypercube))
+		return 0, 0
+		
 	Buffer = kwargs.get('Buffer', 6)
 	print(f'Buffer of frames to ignore between neighbouring wavelenghts set to 2x{Buffer}')
 	BufferSize = 2*Buffer
@@ -91,11 +95,6 @@ def ComputeHypercube(DataPath, EdgePos, **kwargs):
 
 
 	SaveArray = kwargs.get('SaveArray', True)
-	Help = kwargs.get('Help', False)
-	if Help:
-		# print(info)
-		print(inspect.getdoc(ComputeHypercube))
-		return 0, 0
 	Plot = kwargs.get('Plot', False)
 	Average = kwargs.get('Average', True)
 
@@ -313,7 +312,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(inspect.getdoc(ComputeHypercube))
+		print(inspect.getdoc(ComputeHypercube_RGB))
 		return 0, 0
 
 

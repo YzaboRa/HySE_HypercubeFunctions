@@ -519,7 +519,7 @@ def GetPatchPos_WithDistortion(Patch1_pos, Patch_size_x, Patch_size_y, Image_ang
 	
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(inspect.getdoc(GetPatchPos))
+		print(inspect.getdoc(GetPatchPos_WithDistortion))
 		return 0
 
 	k1 = kwargs.get('k1', 0.0)

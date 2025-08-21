@@ -64,8 +64,7 @@ def FindHypercube_RGB(DataPath, **kwargs):
 	## Check if user wants list of optional parameters
 	Help = kwargs.get('Help', False)
 	if Help:
-		# print(info)
-		print(inspect.getdoc(FindHypercube))
+		print(inspect.getdoc(FindHypercube_RGB))
 		if ReturnPeaks:
 			return 0,0,0
 		else:
