@@ -1068,44 +1068,41 @@ def ApplyTransform(Frames, Transforms, **kwargs):
 
 	Outputs:
 		- TransformedFrames
-
-
-
 	'''
-    Help = kwargs.get('Help', False)
-    if Help:
-        print(inspect.getdoc(CoRegisterImages))
-        return 0
-    Verbose = kwargs.get('Verbose', False)
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(CoRegisterImages))
+		return 0
+	Verbose = kwargs.get('Verbose', False)
 
-    (Nwav, Y, X) = Frames.shape
-    if Nwav!=len(Transforms):
-        print(f'The number of frames to register does not match the number of transforms provided')
-        return 0
-    
-    TransformedFrames = []
-    for i in range(0, Nwav):
-        print(f'\n\nTransforming image {i+1}/Nwav')
-        im_shifted = Frames[i,:,:]
-        transform = Transforms[i]
-        
-        if transform==0:
-            # this is the static frame (transform==0) – nothing to apply
-            print(f'Static image')
-            TransformedFrames.append(im_shifted)
-            continue
-        else:
-            im_shifted_se = sitk.GetImageFromArray(im_shifted)
-            transformixImageFilter = sitk.TransformixImageFilter()
-            if Verbose==False:
-                transformixImageFilter.LogToConsoleOff()
-            transformixImageFilter.SetMovingImage(im_shifted_se)
-            transformixImageFilter.SetTransformParameterMap(transform)
-            result = transformixImageFilter.Execute()
-            im_registered = sitk.GetArrayFromImage(result)
-            TransformedFrames.append(im_registered)
-        
-    TransformedFrames = np.array(TransformedFrames)
-    return TransformedFrames
+	(Nwav, Y, X) = Frames.shape
+	if Nwav!=len(Transforms):
+		print(f'The number of frames to register does not match the number of transforms provided')
+		return 0
+	
+	TransformedFrames = []
+	for i in range(0, Nwav):
+		print(f'\n\nTransforming image {i+1}/Nwav')
+		im_shifted = Frames[i,:,:]
+		transform = Transforms[i]
+		
+		if transform==0:
+			# this is the static frame (transform==0) – nothing to apply
+			print(f'Static image')
+			TransformedFrames.append(im_shifted)
+			continue
+		else:
+			im_shifted_se = sitk.GetImageFromArray(im_shifted)
+			transformixImageFilter = sitk.TransformixImageFilter()
+			if Verbose==False:
+				transformixImageFilter.LogToConsoleOff()
+			transformixImageFilter.SetMovingImage(im_shifted_se)
+			transformixImageFilter.SetTransformParameterMap(transform)
+			result = transformixImageFilter.Execute()
+			im_registered = sitk.GetArrayFromImage(result)
+			TransformedFrames.append(im_registered)
+		
+	TransformedFrames = np.array(TransformedFrames)
+	return TransformedFrames
 
 

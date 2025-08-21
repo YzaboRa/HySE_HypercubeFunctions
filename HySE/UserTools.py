@@ -491,6 +491,85 @@ def GetPatchPos(Patch1_pos, Patch_size_x, Patch_size_y, Image_angle, **kwargs):
 			index +=1
 	return np.array(Positions)
 
+def rough_radial_scaling(x, y, x_c, y_c, k1, k2, diag2):
+	dx = x - x_c
+	dy = y - y_c
+	r2 = (dx**2 + dy**2) / diag2  # normalize r^2
+	scale = 1 / (1 + k1 * r2 + k2 * r2**2)
+	return scale
+
+def GetPatchPos_WithDistortion(Patch1_pos, Patch_size_x, Patch_size_y, Image_angle, **kwargs):
+	"""
+	Estimates patch positions on a Macbeth chart with rough barrel distortion compensation.
+	Ensures all coordinates remain in the image coordinate system (positive values).
+
+	Inputs:
+		- Patch1_pos: [y0, x0] coordinate of patch 1 (top-left brown) in pixels
+		- Patch_size_x/y: average patch spacing (pixels)
+		- Image_angle: chart tilt in degrees (positive = counterclockwise)
+		- kwargs:
+			- k1, k2: barrel distortion coefficients (default 0)
+			- ImageShape: (height, width) in pixels [required]
+			- Help: prints this docstring
+
+	Output:
+		- Positions: array of [index, x, y] for each of the 30 patches (in distorted image coordinates)
+	"""
+
+	
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetPatchPos))
+		return 0
+
+	k1 = kwargs.get('k1', 0.0)
+	k2 = kwargs.get('k2', 0.0)
+	ImageShape = kwargs.get('ImageShape', None)
+
+	if ImageShape is None:
+		raise ValueError("You must supply ImageShape=(height, width) for radial correction")
+
+
+	h_px, w_px = ImageShape
+	x_c = w_px / 2
+	y_c = h_px / 2
+
+	Positions = []
+	[y0, x0] = Patch1_pos
+	angle_rad = Image_angle * np.pi / 180
+	index = 0
+	
+	diag2 = w_px**2 + h_px**2
+
+	for j in range(5):  # rows
+		for i in range(6):  # cols
+			# Estimate raw offset from patch 1
+			dx = -i * Patch_size_x * np.cos(angle_rad) + j * Patch_size_x * np.sin(angle_rad)
+			dy = -i * Patch_size_x * np.sin(angle_rad) - j * Patch_size_y * np.cos(angle_rad)
+			x_guess = x0 + dx
+			y_guess = y0 + dy
+
+			# Apply local scale adjustment for barrel distortion
+#             scale = rough_radial_scaling(x_guess, y_guess, x_c, y_c, k1, k2)
+			scale = rough_radial_scaling(x_guess, y_guess, x_c, y_c, k1, k2, diag2)
+			dx_adj = dx * scale
+			dy_adj = dy * scale
+
+			x = x0 + dx_adj
+			y = y0 + dy_adj
+			if j == 0 and i == 5:
+				y -= 15
+				x += 10
+
+			# Ensure coordinates remain positive
+			x = max(0, min(x, w_px - 1))
+			y = max(0, min(y, h_px - 1))
+
+			Positions.append([index, x, y])
+			index += 1
+
+	return np.array(Positions)
+
 def GetPatchesSpectrum(Hypercube, Sample_size, Positions, CropCoordinates, **kwargs):
 	"""
 	Function that extracts the average spectrum in each patch region, as defined by the output from the GetPatchPos() function.
