@@ -71,7 +71,7 @@ def ComputeHypercube(DataPath, EdgePos, **kwargs):
 		# print(info)
 		print(inspect.getdoc(ComputeHypercube))
 		return 0, 0
-		
+
 	Buffer = kwargs.get('Buffer', 6)
 	print(f'Buffer of frames to ignore between neighbouring wavelenghts set to 2x{Buffer}')
 	BufferSize = 2*Buffer
@@ -239,13 +239,13 @@ def ComputeHypercube(DataPath, EdgePos, **kwargs):
 		for j in range(0,4):
 			for i in range(0,4):
 				if nn<17:
-					wav = Wavelengths_sorted[nn]
 					RGB = HySE.UserTools.wavelength_to_rgb(wav)
 					if ForCoRegistration:
 						ax[j,i].imshow(HypercubeToPlot[nn,0,:,:], cmap='gray')
 					else:
 						ax[j,i].imshow(HypercubeToPlot[nn,:,:], cmap='gray')
 					if Order:
+						wav = Wavelengths_sorted[nn]
 						ax[j,i].set_title(f'{wav} nm', c=RGB)
 					else:
 						ax[j,i].set_title(f'im {nn}')
