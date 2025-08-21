@@ -794,12 +794,18 @@ def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
 		- Same_Sub : Specific name for the hypercubes (i.e. lesion)
 		- kwargs:
 			- Sweeps [int, int, ...] : If indicated, which sweeps to save
+			- Help
 
 
 	Outputs:
 		- All frames saved as png images in individual folders
 
 	"""
+
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(SaveFramesSweeps))
+		return 
 
 	hypercube_shape = Hypercube_all.shape
 	if len(hypercube_shape)==4:
@@ -856,6 +862,12 @@ def GetNMI(Data, **kwargs):
 		- NMI_average, NMT_vs_reference, NMI_pairwise
 
 	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetNMI))
+		return 0,0,0
+
+
 	cube = Data 
 	N, H, W = cube.shape
 	
@@ -900,12 +912,18 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 		- EdgePos : Positions of the start of each sweep
 		- Wavelengths_list
 		- kwargs:
+			- Help
 			- Buffer = 9 : How many frames to skip at the start and end of a sweep
 
 	Outputs:
 		- Hypercube for registration
 
 	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetHypercubeForRegistration))
+		return 0
+
 	Buffer = kwargs.get('Buffer')
 	if Buffer is None:
 		Buffer = 9
@@ -939,6 +957,7 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 		- RawHypercube : To co-registrate. Shape [N, Y, X]
 		- Wavelengths_list
 		- kwargs:
+			- Help
 			- Order = False: Whether to order the coregistered image (based on Wavelenghts_list)
 			- Static_Index = 0: Which image is set as the static one (others are registered to it)
 			- SaveHypercube
@@ -951,6 +970,10 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 		- Coregistration_Transforms
 
 	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(CoRegisterHypercube))
+		return 0, 0
 
 	PlotDiff = kwargs.get('PlotDiff', False)
 
@@ -1071,7 +1094,7 @@ def ApplyTransform(Frames, Transforms, **kwargs):
 	'''
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(inspect.getdoc(CoRegisterImages))
+		print(inspect.getdoc(ApplyTransform))
 		return 0
 	Verbose = kwargs.get('Verbose', False)
 
