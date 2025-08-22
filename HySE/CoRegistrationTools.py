@@ -1037,13 +1037,15 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 	for c in range(0, NN):
 		if c==Static_Index:
 			print(f'Static Image')
-			im = RawHypercube[c,:,:]
+			im = RawHypercube[c,Cropping:(-1*Cropping),Cropping:(-1*Cropping)]
+			# print(f'c={c}: static_im.shape = {im.shape}')
 			Hypercube.append(im)
 			AllTransforms.append(0)
 		else:
 			print(f'Working on: {c+1} /{NN}')
 			im_shifted = RawHypercube[c, :,:]
 			im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
+			# print(f'c={c}: im_coregistered.shape = {im_coregistered.shape}')
 			Hypercube.append(im_coregistered)
 			AllTransforms.append(coregister_transform)
 
@@ -1059,6 +1061,9 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 
 
 	tf = time.time()
+	# print(f'Hypercube size: len = {len(Hypercube)}')
+	# for i in range(0,len(Hypercube)):
+		# print(f'i = {i}: {Hypercube[i].shape}')
 	Hypercube = np.array(Hypercube)
 	## Calculate time taken
 	time_total = tf-t0
