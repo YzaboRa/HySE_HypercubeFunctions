@@ -360,10 +360,10 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
 			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
 				(default True)
-			- BrightFramesOnly = False : If True, only averages bright frames
 			- Frames = [int, int, ...] : If provided, indicates which frames from a single plateau to keep. 
 				Accepted values are 0, 1, ..., where frame 0 refers to the first frame that would normally be considered (after removing buffers)
-
+			- EdgeMask : Mask of size (Y,X) that masks the edges. Note that values of 1=masled pixel
+			- ReflectionsMasks : Array of masks of size (Nwav, Y, X) indicating pixels where specular reflections might mess up with the registration
 
 	Outputs:
 		- Hypercube_sorted
@@ -387,6 +387,9 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	Frames = kwargs.get('Frames')
 	if Frames is not None:
 		print(f'Only Coregistring these Frames: {Frames}')
+
+	EdgeMask = kwargs.get('EdgeMask')
+	ReflectionsMasks = kwargs.get('ReflectionsMasks')
 
 
 	ImStatic_Plateau = kwargs.get('ImStatic_Plateau', 1)
@@ -418,10 +421,9 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 	if SavingPath is None:
 		SavingPath = ''
 		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
-	
 
 	
-	BrightFramesOnly = kwargs.get('BrightFramesOnly', False)
+	# BrightFramesOnly = kwargs.get('BrightFramesOnly', False)
 
 	Plot_PlateauList = kwargs.get('Plot_PlateauList', [5])
 	if isinstance(Plot_PlateauList, int):
@@ -489,18 +491,10 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 			
 			offset = np.where(vals==np.amax(vals))[0][0]
 
-			if BrightFramesOnly:
-				## Average only brightes frames:
-				loop_start = Buffer+offset
-				loop_end = NN-Buffer
-				loop_step = 3
-				# for i in range(Buffer+offset,NN-Buffer,3):
-			else:
-				## Average all frames
-				loop_start = Buffer
-				loop_end = NN-Buffer
-				loop_step = 1
-				# for i in range(Buffer,NN-Buffer):
+
+			loop_start = Buffer
+			loop_end = NN-Buffer
+			loop_step = 1
 			if Frames is None:
 				Nframes_tot = loop_end-loop_start
 				Frames = [i for i in range(0,Nframes_tot)]
@@ -509,7 +503,15 @@ def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
 					# print(f'CoRegistering frame {i-loop_start} in {Frames}')
 
 					im_shifted = DataSweep[c][i,:,:]
-					im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
+					if EdgeMask is not None:
+						if ReflectionsMasks is not None:
+							im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, ReflectionsMasks=ReflectionsMasks[c,:,:], EdgeMask=EdgeMask, **kwargs) #, **kwargs
+						else:
+							im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, EdgeMask=EdgeMask, **kwargs) #, **kwargs
+					elif ReflectionsMasks is not None:
+						im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, ReflectionsMasks=ReflectionsMasks[c,:,:], **kwargs)
+					else:
+						im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
 					ImagesTemp.append(im_coregistered)
 					AllTransforms.append(coregister_transform)
 
@@ -607,7 +609,9 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 			- IntensityNorm = False: if True, z-score normalize both images
 			- Blurring = False: if True, apply Gaussian blur
 			- Sigma = 2: If blurring images, blur by sigma (Gaussian)
-			- Mask: binary mask to exclude non-informative areas
+			- EdgeMask: binary mask to exclude non-informative areas
+			- ReflectionsMasks: binary mask to exclude areas with specular reflections (saturating) 
+				N.B. Both EdgeMask and ReflectionsMask, if specified, are combined and inverted to be fed to the algorithm
 			- GridSpacing : Spacing of the B-spline control point grid. A larger value produces a stiffer, smoother transform and reduces artifacts.
 
 	Outputs:
@@ -641,15 +645,29 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	GradientMagnitude = kwargs.get('GradientMagnitude', False)
 	Blurring = kwargs.get('Blurring', False)
 	Sigma = kwargs.get('Sigma', 2)
-	Mask = kwargs.get('Mask', None)
+	EdgeMask = kwargs.get('EdgeMask')
+	ReflectionsMasks = kwargs.get('ReflectionsMasks')
+
+	if EdgeMask is not None:
+		if ReflectionsMasks is not None:
+			GlobalMask = np.logical_or(EdgeMask > 0, ReflectionsMasks > 0).astype(np.uint8)
+			GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
+		else:
+			GlobalMask = EdgeMask
+			GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
+	elif ReflectionsMasks is not None:
+		GlobalMask = ReflectionsMasks
+		GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
+	else:
+		GlobalMask = None
 
 	## Handle cropping
 	Cropping = kwargs.get('Cropping', 0)
 	if Cropping!=0:
 		im_static = im_static[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
 		im_shifted = im_shifted[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-		if Mask is not None:
-			Mask = Mask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+		if GlobalMask is not None:
+			GlobalMask = GlobalMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
 
 	# Print the configuration
 	if TwoStage:
@@ -704,18 +722,18 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	elastixImageFilter.SetFixedImage(im_static_se)
 	elastixImageFilter.SetMovingImage(im_shifted_se)
 
-	if Mask is not None:
+	if GlobalMask is not None:
 		# Ensure correct type and values
-		if Mask.dtype != np.uint8:
-			Mask = Mask.astype(np.uint8)
-		Mask[Mask > 0] = 1 # ensure strictly binary
+		if GlobalMask.dtype != np.uint8:
+			GlobalMask = GlobalMask.astype(np.uint8)
+		GlobalMask[GlobalMask > 0] = 1 # ensure strictly binary
 
 		# Ensure same shape
-		if Mask.shape != im_static_orig.shape:
-			raise ValueError(f"Mask shape {Mask.shape} does not match image shape {im_static_orig.shape}")
+		if GlobalMask.shape != im_static_orig.shape:
+			raise ValueError(f"GlobalMask shape {GlobalMask.shape} does not match image shape {im_static_orig.shape}")
 
 		# Create SITK mask with same geometry
-		mask_se = _sitk.GetImageFromArray(Mask)
+		mask_se = _sitk.GetImageFromArray(GlobalMask)
 		mask_se.CopyInformation(im_static_se) # match origin, spacing, direction
 
 		elastixImageFilter.SetFixedMask(mask_se)

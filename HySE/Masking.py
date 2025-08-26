@@ -281,10 +281,10 @@ def GetBestEdgeMask(Masks):
 
 	"""
 	if Masks.ndim != 3:
-        print(f'Input masks must have shape (Nwav, Y, X) -> {Masks.shape}')
-    
-    CombinedMask = np.any(Masks > 0, axis=0).astype(np.uint8)
-    return CombinedMask
+		print(f'Input masks must have shape (Nwav, Y, X) -> {Masks.shape}')
+	
+	CombinedMask = np.any(Masks > 0, axis=0).astype(np.uint8)
+	return CombinedMask
 
 
 
