@@ -268,6 +268,23 @@ def GetMask(frame, **kwargs):
 	return mask_combined
 
 
+def GetBestEdgeMask(Masks):
+	"""
+	Takes in array of shape (Nwav, Y, X) containing a mask for each wavelength
+	Outputs a single 2D mask that hides pixels that were masked for any wavelength
+
+	Inputs:
+		- Masks
+
+	Ouputs:
+		- CombinedMask
+
+	"""
+	if Masks.ndim != 3:
+        print(f'Input masks must have shape (Nwav, Y, X) -> {Masks.shape}')
+    
+    CombinedMask = np.any(Masks > 0, axis=0).astype(np.uint8)
+    return CombinedMask
 
 
 
