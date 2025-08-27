@@ -336,254 +336,262 @@ def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwarg
 
 
 
-def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
-	"""
+# def SweepCoRegister(DataSweep, Wavelengths_list, **kwargs):
+# 	"""
 
-	~~ Used in SweepCoRegister_WithNormalisation ~~
+# 	~~ Used in SweepCoRegister_WithNormalisation ~~
 
-	NB: Old function, normalisation and masking not optimal. Never tested with wavelength mixing.
-		New function to be written.
+# 	NB: Old function, normalisation and masking not optimal. Never tested with wavelength mixing.
+# 		New function to be written.
 
-	Apply Simple Elastix co-registration to all sweep with CoRegisterImages() function
+# 	Apply Simple Elastix co-registration to all sweep with CoRegisterImages() function
 
-	Input:
-		- DataSweep: List of 3D arrays. Each element in the list contains all frames in a plateau (wavelength)
-		- kwargs 
-			- Buffer: sets the numner of frames to ignore on either side of a colour transition
-				Totale number of frames removed = 2*Buffer (default 6)
-			- ImStatic_Plateau: sets the plateau (wavelength) from which the static image is selected (default 1)
-			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
-			- PlotDiff: Whether to plot figure showing the co-registration (default False)
-				If set to True, also expects:
-				- SavingPath: Where to save figure (default '')
-				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul 5)
-				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
-			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
-				(default True)
-			- Frames = [int, int, ...] : If provided, indicates which frames from a single plateau to keep. 
-				Accepted values are 0, 1, ..., where frame 0 refers to the first frame that would normally be considered (after removing buffers)
-			- EdgeMask : Mask of size (Y,X) that masks the edges. Note that values of 1=masled pixel
-			- ReflectionsMasks : Array of masks of size (Nwav, Y, X) indicating pixels where specular reflections might mess up with the registration
+# 	Input:
+# 		- DataSweep: List of 3D arrays. Each element in the list contains all frames in a plateau (wavelength)
+# 		- kwargs 
+# 			- Buffer: sets the numner of frames to ignore on either side of a colour transition
+# 				Totale number of frames removed = 2*Buffer (default 6)
+# 			- ImStatic_Plateau: sets the plateau (wavelength) from which the static image is selected (default 1)
+# 			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
+# 			- PlotDiff: Whether to plot figure showing the co-registration (default False)
+# 				If set to True, also expects:
+# 				- SavingPath: Where to save figure (default '')
+# 				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul 5)
+# 				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
+# 			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
+# 				(default True)
+# 			- Frames = [int, int, ...] : If provided, indicates which frames from a single plateau to keep. 
+# 				Accepted values are 0, 1, ..., where frame 0 refers to the first frame that would normally be considered (after removing buffers)
+# 			- EdgeMask : Mask of size (Y,X) that masks the edges. Note that values of 1=masled pixel
+# 			- ReflectionsMasks : Array of masks of size (Nwav, Y, X) indicating pixels where specular reflections might mess up with the registration
 
-	Outputs:
-		- Hypercube_sorted
+# 	Outputs:
+# 		- Hypercube_sorted
 
-	"""
+# 	"""
 
-	Help = kwargs.get('Help', False)
-	if Help:
-		# print(info)
-		print(inspect.getdoc(SweepCoRegister))
-		return 0
-
-
-	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
-	MaxIndex = np.amax(AllIndices)
-	MinIndex = np.amin(AllIndices)
-	# print(AllIndices)
-	# print(MaxIndex)
-
-	Buffer = kwargs.get('Buffer', 6)
-	Frames = kwargs.get('Frames')
-	if Frames is not None:
-		print(f'Only Coregistring these Frames: {Frames}')
-
-	EdgeMask = kwargs.get('EdgeMask')
-	ReflectionsMasks = kwargs.get('ReflectionsMasks')
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		# print(info)
+# 		print(inspect.getdoc(SweepCoRegister))
+# 		return 0
 
 
-	ImStatic_Plateau = kwargs.get('ImStatic_Plateau', 1)
-	if ImStatic_Plateau==8:
-		print(f'Careful! You have set ImStatic_Plateau to 8, which is typically a dark. If this is the case, the co-registration will fail')
+# 	AllIndices = [DataSweep[i].shape[0] for i in range(0,len(DataSweep))]
+# 	MaxIndex = np.amax(AllIndices)
+# 	MinIndex = np.amin(AllIndices)
+# 	# print(AllIndices)
+# 	# print(MaxIndex)
+
+# 	Buffer = kwargs.get('Buffer', 6)
+# 	Frames = kwargs.get('Frames')
+# 	if Frames is not None:
+# 		print(f'Only Coregistring these Frames: {Frames}')
+
+# 	EdgeMask = kwargs.get('EdgeMask')
+# 	# if EdgeMask is not None:
+# 	# 	print(f'EdgeMask shape: ')
+# 	ReflectionsMasks = kwargs.get('ReflectionsMasks')
 
 
-	ImStatic_Index = kwargs.get('ImStatic_Index')
-	if ImStatic_Index is None:
-		ImStatic_Index = 8
-		if MinIndex>ImStatic_Index:
-			ImStatic_Index = int(MinIndex/2)
-			print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
-	else:
-		if ImStatic_Index<5 or ImStatic_Index<Buffer:
-			print(f'Careful! You have set ImStatic_Index < 5 or < Buffer ')
-			print(f'	This is risks being in the range of unreliable frames too close to a colour transition.')
-		if ImStatic_Index>(MinIndex-Buffer):
-			print(f'Careful! You have set ImStatic_Index  > (MinIndex - Buffer')
-			print(f'	This is risks being in the range of unreliable frames too close to a colour transition.')
+# 	ImStatic_Plateau = kwargs.get('ImStatic_Plateau', 1)
+# 	if ImStatic_Plateau==8:
+# 		print(f'Careful! You have set ImStatic_Plateau to 8, which is typically a dark. If this is the case, the co-registration will fail')
 
 
-	PlotDiff = kwargs.get('PlotDiff', False)
-	if PlotDiff:
-		print(f'PlotDiff set to True. Use \'Plot_PlateauList=[]\' or \'All\' and Plot_Index=int to set')
+# 	ImStatic_Index = kwargs.get('ImStatic_Index')
+# 	if ImStatic_Index is None:
+# 		ImStatic_Index = 8
+# 		if MinIndex>ImStatic_Index:
+# 			ImStatic_Index = int(MinIndex/2)
+# 			print(f'ImStatic_Index is outside default range. Set to {ImStatic_Index}, please set manually with ImStatic_Index')
+# 	else:
+# 		if ImStatic_Index<5 or ImStatic_Index<Buffer:
+# 			print(f'Careful! You have set ImStatic_Index < 5 or < Buffer ')
+# 			print(f'	This is risks being in the range of unreliable frames too close to a colour transition.')
+# 		if ImStatic_Index>(MinIndex-Buffer):
+# 			print(f'Careful! You have set ImStatic_Index  > (MinIndex - Buffer')
+# 			print(f'	This is risks being in the range of unreliable frames too close to a colour transition.')
+
+
+# 	PlotDiff = kwargs.get('PlotDiff', False)
+# 	if PlotDiff:
+# 		print(f'PlotDiff set to True. Use \'Plot_PlateauList=[]\' or \'All\' and Plot_Index=int to set')
 	
 
-	SavingPath = kwargs.get('SavingPath')
-	if SavingPath is None:
-		SavingPath = ''
-		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
+# 	SavingPath = kwargs.get('SavingPath')
+# 	if SavingPath is None:
+# 		SavingPath = ''
+# 		print(f'PlotDiff has been set to True. Indicate a SavingPath.')
 
 	
-	# BrightFramesOnly = kwargs.get('BrightFramesOnly', False)
+# 	# BrightFramesOnly = kwargs.get('BrightFramesOnly', False)
 
-	Plot_PlateauList = kwargs.get('Plot_PlateauList', [5])
-	if isinstance(Plot_PlateauList, int):
-			Plot_PlateauList = [Plot_PlateauList]
+# 	Plot_PlateauList = kwargs.get('Plot_PlateauList', [5])
+# 	if isinstance(Plot_PlateauList, int):
+# 			Plot_PlateauList = [Plot_PlateauList]
 	
 
-	Plot_Index = kwargs.get('Plot_Index')
-	if Plot_Index is None:
-		Plot_Index = 14
-		print(f'MinIndex = {MinIndex}, MinIndex-Buffer = {MinIndex-Buffer}')
-		if Plot_Index>(MinIndex-Buffer):
-			Plot_Index = int(MinIndex/2)
-			print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
-	else:
-		if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
-			print(f'PlotIndex is outside the range of indices that will be analyse ({Buffer}, {MinIndex-Buffer})')
-			Plot_Index = int(MinIndex/2)
-			print(f'	Seeting it to {Plot_Index}')
+# 	Plot_Index = kwargs.get('Plot_Index')
+# 	if Plot_Index is None:
+# 		Plot_Index = 14
+# 		print(f'MinIndex = {MinIndex}, MinIndex-Buffer = {MinIndex-Buffer}')
+# 		if Plot_Index>(MinIndex-Buffer):
+# 			Plot_Index = int(MinIndex/2)
+# 			print(f'Plot_Index outside default range. Set to {Plot_Index}, please set manually with Plot_Index')
+# 	else:
+# 		if Plot_Index<Buffer or Plot_Index>(MinIndex-Buffer):
+# 			print(f'PlotIndex is outside the range of indices that will be analyse ({Buffer}, {MinIndex-Buffer})')
+# 			Plot_Index = int(MinIndex/2)
+# 			print(f'	Seeting it to {Plot_Index}')
 
 
-	SaveHypercube = kwargs.get('SaveHypercube', True)
-	if SaveHypercube:
-		print(f'Saving Hypercube')
+# 	SaveHypercube = kwargs.get('SaveHypercube', True)
+# 	if SaveHypercube:
+# 		print(f'Saving Hypercube')
 
-	print(f'Static image: plateau {ImStatic_Plateau}, index {ImStatic_Index}. Use ImStatic_Plateau and ImStatic_Index to change it.')
-	print(f'Buffer set to {Buffer}')
-
-
-	t0 = time.time()
-	Ncolours = len(DataSweep)
-	(_, YY, XX) = DataSweep[1].shape
-
-	## Deal with special cases when plateau list is input as string
-	if isinstance(Plot_PlateauList, str):
-		if Plot_PlateauList=='All':
-			Plot_PlateauList = [i for i in range(0,Ncolours)]
-		elif Plot_PlateauList=='None':
-			Plot_PlateauList = []
+# 	print(f'Static image: plateau {ImStatic_Plateau}, index {ImStatic_Index}. Use ImStatic_Plateau and ImStatic_Index to change it.')
+# 	print(f'Buffer set to {Buffer}')
 
 
-	## Sort Wavelengths
-	order_list = np.argsort(Wavelengths_list)
-	Wavelengths_sorted = Wavelengths_list[order_list]
+# 	t0 = time.time()
+# 	Ncolours = len(DataSweep)
+# 	(_, YY, XX) = DataSweep[1].shape
 
-	Hypercube = []
-	AllTransforms = []
+# 	## Deal with special cases when plateau list is input as string
+# 	if isinstance(Plot_PlateauList, str):
+# 		if Plot_PlateauList=='All':
+# 			Plot_PlateauList = [i for i in range(0,Ncolours)]
+# 		elif Plot_PlateauList=='None':
+# 			Plot_PlateauList = []
 
-	## Define static image
-	im_static = DataSweep[ImStatic_Plateau][ImStatic_Index,:,:]
 
-	## Loop through all colours (wavelengths)
-	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')
+# 	## Sort Wavelengths
+# 	order_list = np.argsort(Wavelengths_list)
+# 	Wavelengths_sorted = Wavelengths_list[order_list]
 
-	for c in range(0, Ncolours):
-		if c==8: ## ignore dark
-			# print(f'DARK')
-			pass
-		else:
-			print(f'Working on: {c} /{Ncolours}')
-			ImagesTemp = []
-			(NN, YY, XX) = DataSweep[c].shape
+# 	Hypercube = []
+# 	AllTransforms = []
 
-			## Which of the first 3 images if brightest?
-			vals = [np.average(DataSweep[c][Buffer+q,:,:]) for q in range(Buffer,Buffer+3)]
+# 	## Define static image
+# 	im_static = DataSweep[ImStatic_Plateau][ImStatic_Index,:,:]
+
+# 	## Loop through all colours (wavelengths)
+# 	print(f'\n Plot_PlateauList = {Plot_PlateauList}, Plot_Index = {Plot_Index}\n')
+
+# 	for c in range(0, Ncolours):
+# 		if c==8: ## ignore dark
+# 			# print(f'DARK')
+# 			pass
+# 		else:
+# 			print(f'Working on: {c} /{Ncolours}')
+# 			ImagesTemp = []
+# 			(NN, YY, XX) = DataSweep[c].shape
+
+# 			## Which of the first 3 images if brightest?
+# 			vals = [np.average(DataSweep[c][Buffer+q,:,:]) for q in range(Buffer,Buffer+3)]
 			
-			offset = np.where(vals==np.amax(vals))[0][0]
+# 			offset = np.where(vals==np.amax(vals))[0][0]
 
 
-			loop_start = Buffer
-			loop_end = NN-Buffer
-			loop_step = 1
-			if Frames is None:
-				Nframes_tot = loop_end-loop_start
-				Frames = [i for i in range(0,Nframes_tot)]
-			for i in range(loop_start, loop_end, loop_step):
-				if i-loop_start in Frames:
-					# print(f'CoRegistering frame {i-loop_start} in {Frames}')
+# 			loop_start = Buffer
+# 			loop_end = NN-Buffer
+# 			loop_step = 1
+# 			if Frames is None:
+# 				Nframes_tot = loop_end-loop_start
+# 				Frames = [i for i in range(0,Nframes_tot)]
+# 			for i in range(loop_start, loop_end, loop_step):
+# 				if i-loop_start in Frames:
+# 					# print(f'CoRegistering frame {i-loop_start} in {Frames}')
 
-					im_shifted = DataSweep[c][i,:,:]
-					if EdgeMask is not None:
-						if ReflectionsMasks is not None:
-							im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, ReflectionsMasks=ReflectionsMasks[c,:,:], EdgeMask=EdgeMask, **kwargs) #, **kwargs
-						else:
-							im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, EdgeMask=EdgeMask, **kwargs) #, **kwargs
-					elif ReflectionsMasks is not None:
-						im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, ReflectionsMasks=ReflectionsMasks[c,:,:], **kwargs)
-					else:
-						im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
-					ImagesTemp.append(im_coregistered)
-					AllTransforms.append(coregister_transform)
+# 					im_shifted = DataSweep[c][i,:,:]
+# 					if EdgeMask is not None:
+# 						if ReflectionsMasks is not None:
+# 							ReflectionsMasks_sub = ReflectionsMasks[c,:,:]
+# 							# print(f'Pre CoRegisterImages: \nReflectionsMasks.shape = {ReflectionsMasks}, \nReflectionsMasks_sub.shape = {ReflectionsMasks_sub.shape}')
+# 							im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, ReflectionsMasks=ReflectionsMasks_sub, EdgeMask=EdgeMask, **kwargs) #, **kwargs
+# 						else:
+# 							print(f'A')
+# 							im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, EdgeMask=EdgeMask, **kwargs) #, **kwargs
+# 					elif ReflectionsMasks is not None:
+# 						print(f'B')
+# 						ReflectionsMasks_sub = ReflectionsMasks[c,:,:]
+# 						im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, ReflectionsMasks=ReflectionsMasks_sub, **kwargs)
+# 					else:
+# 						print(f'C')
+# 						im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
+# 					ImagesTemp.append(im_coregistered)
+# 					AllTransforms.append(coregister_transform)
 
-					if c<8:
-						# print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
-						print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}')
-					else:
-						# print(f'      c={c}, i={i}: {Wavelengths_list[c-1]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
-						print(f'      c={c}, i={i}: {Wavelengths_list[c-1]} nm, avg {np.average(im_shifted)}')
+# 					if c<8:
+# 						# print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
+# 						print(f'      c={c}, i={i}: {Wavelengths_list[c]} nm, avg {np.average(im_shifted)}')
+# 					else:
+# 						# print(f'      c={c}, i={i}: {Wavelengths_list[c-1]} nm, avg {np.average(im_shifted)}, shift val {shift_val:.2f}, {time_taken:.2f} s')
+# 						print(f'      c={c}, i={i}: {Wavelengths_list[c-1]} nm, avg {np.average(im_shifted)}')
 
-					## Plot co-registration is requested
-					if PlotDiff:
-						# print(f'c={c}, i={i}')
-						if c in Plot_PlateauList:
-							if '.png' in SavingPath:
-								NameTot = SavingPath.split('/')[-1]
-								Name = NameTot.replace('.png', '')+f'_Plateau{c}_Index{i}.png'
-								SavingPathWithName = SavingPath.replace(NameTot, Name)
-							else:
-								Name = f'_Plateau{c}_Index{i}_CoRegistration.png'
-								SavingPathWithName = SavingPath+Name
+# 					## Plot co-registration is requested
+# 					if PlotDiff:
+# 						# print(f'c={c}, i={i}')
+# 						if c in Plot_PlateauList:
+# 							if '.png' in SavingPath:
+# 								NameTot = SavingPath.split('/')[-1]
+# 								Name = NameTot.replace('.png', '')+f'_Plateau{c}_Index{i}.png'
+# 								SavingPathWithName = SavingPath.replace(NameTot, Name)
+# 							else:
+# 								Name = f'_Plateau{c}_Index{i}_CoRegistration.png'
+# 								SavingPathWithName = SavingPath+Name
 
-							if i==Plot_Index:
-								if c==ImStatic_Plateau and i==ImStatic_Index:
-									print(f'Skipping plot for plateau={c}, index={i} because it is the static image')
-								else:
-									HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
-				# else:
-				# 	print(f'Ignoring frame {i-loop_start}, not in {Frames}')
+# 							if i==Plot_Index:
+# 								if c==ImStatic_Plateau and i==ImStatic_Index:
+# 									print(f'Skipping plot for plateau={c}, index={i} because it is the static image')
+# 								else:
+# 									HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+# 				# else:
+# 				# 	print(f'Ignoring frame {i-loop_start}, not in {Frames}')
 
 			
-			ImagesTemp = np.array(ImagesTemp)
+# 			ImagesTemp = np.array(ImagesTemp)
 
-			print(f'  Averaging {len(ImagesTemp)} frames')
-			ImAvg = np.average(ImagesTemp, axis=0)
-			Hypercube.append(ImAvg)
+# 			print(f'  Averaging {len(ImagesTemp)} frames')
+# 			ImAvg = np.average(ImagesTemp, axis=0)
+# 			Hypercube.append(ImAvg)
 			
-	tf = time.time()
-	Hypercube = np.array(Hypercube)
-	## Calculate time taken
-	time_total = tf-t0
-	minutes = int(time_total/60)
-	seconds = time_total - minutes*60
-	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
+	# tf = time.time()
+	# Hypercube = np.array(Hypercube)
+	# ## Calculate time taken
+	# time_total = tf-t0
+	# minutes = int(time_total/60)
+	# seconds = time_total - minutes*60
+	# print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
 
-	## Sort hypercube according to the order_list
-	## Ensures wavelenghts are ordered from blue to red
-	Hypercube_sorted = []
-	AllTransforms_sorted = []
-	for k in range(0,Hypercube.shape[0]):
-		Hypercube_sorted.append(Hypercube[order_list[k]])
-		AllTransforms_sorted.append(AllTransforms[order_list[k]])
-	Hypercube_sorted = np.array(Hypercube_sorted)
+	# ## Sort hypercube according to the order_list
+	# ## Ensures wavelenghts are ordered from blue to red
+	# Hypercube_sorted = []
+	# AllTransforms_sorted = []
+	# for k in range(0,Hypercube.shape[0]):
+	# 	Hypercube_sorted.append(Hypercube[order_list[k]])
+	# 	AllTransforms_sorted.append(AllTransforms[order_list[k]])
+	# Hypercube_sorted = np.array(Hypercube_sorted)
 
 
-	if SaveHypercube:
-		if '.png' in SavingPath:
-			NameTot = SavingPath.split('/')[-1]
-			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
-			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
-			SavingPathHypercube = SavingPath.replace(NameTot, Name)
-			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
-		else:
-			Name = f'_CoregisteredHypercube.npz'
-			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
-			SavingPathHypercube = SavingPath+Name
-			SavingPathWavelengths = SavingPath+Name_wav
+	# if SaveHypercube:
+	# 	if '.png' in SavingPath:
+	# 		NameTot = SavingPath.split('/')[-1]
+	# 		Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
+	# 		Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
+	# 		SavingPathHypercube = SavingPath.replace(NameTot, Name)
+	# 		SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
+	# 	else:
+	# 		Name = f'_CoregisteredHypercube.npz'
+	# 		Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
+	# 		SavingPathHypercube = SavingPath+Name
+	# 		SavingPathWavelengths = SavingPath+Name_wav
 
-		np.savez(f'{SavingPathHypercube}', Hypercube)
-		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
+	# 	np.savez(f'{SavingPathHypercube}', Hypercube)
+	# 	np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
 
-	return Hypercube_sorted, AllTransforms_sorted
+	# return Hypercube_sorted, AllTransforms_sorted
 
 
 
@@ -647,6 +655,10 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	Sigma = kwargs.get('Sigma', 2)
 	EdgeMask = kwargs.get('EdgeMask')
 	ReflectionsMasks = kwargs.get('ReflectionsMasks')
+	if ReflectionsMasks is not None:
+		# print(f'ReflectionsMasks shape: {ReflectionsMasks.shape}')
+		if len(ReflectionsMasks.shape)>2:
+			raise ValueError(f'ReflectionsMasks should be a 2D array!')
 
 	if EdgeMask is not None:
 		if ReflectionsMasks is not None:
@@ -999,6 +1011,8 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 			- SaveHypercube
 			- PlotDiff = False. If True, plots differences between static, moving and registered images
 			- SavingPath. If PlotDiff or SaveHypercbybe is True, where to save the data/figure
+			- EdgeMask -> Static mask
+			- AllReflectionsMasks -> Moving mask
 
 
 	Outputs:
@@ -1023,6 +1037,9 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 	if Static_Index is None:
 		Static_Index = 0
 		print(f'Static index set to default {Static_Index}')
+
+	# EdgeMask = kwargs.get('EdgeMask')
+	AllReflectionsMasks = kwargs.get('AllReflectionsMasks')
 
 
 	SaveHypercube = kwargs.get('SaveHypercube', True)
@@ -1060,7 +1077,12 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 		else:
 			print(f'Working on: {c+1} /{NN}')
 			im_shifted = RawHypercube[c, :,:]
-			im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
+			if AllReflectionsMasks is not None:
+				print(f'   Masking Reflections')
+				AllReflectionsMasks_sub = AllReflectionsMasks[c,:,:]
+				im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, ReflectionsMasks=AllReflectionsMasks_sub, **kwargs)
+			else:
+				im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
 			# print(f'c={c}: im_coregistered.shape = {im_coregistered.shape}')
 			Hypercube.append(im_coregistered)
 			AllTransforms.append(coregister_transform)

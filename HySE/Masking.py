@@ -28,57 +28,126 @@ import HySE.UserTools
 
 
 
-def RemoveSpecularReflections_Frame(frame, **kwargs):
-	"""
-	Detects and removes specular reflections from an image frame.
+# def RemoveSpecularReflections_Frame(frame, **kwargs):
+# 	"""
+# 	Detects and removes specular reflections from an image frame.
 	
-	Inputs:
-		- frame : Input 2D image (Y, X), float values (dark-subtracted, 0–~255).
-		- kwargs:
-			- Help
-			- k = 3 : Threshold factor (default). Reflection mask is frame > mean + k*std.
-				Lower k = more masking
-			- Cutoff : When specified, use this value as threshold for specular reflections
-			- NeighborhoodSize = 5 : When specified (default), used to compute median value around
-				masked area and use a fill value
-			- FillValue  : When specified, replace masked pixels by this value
+# 	Inputs:
+# 		- frame : Input 2D image (Y, X), float values (dark-subtracted, 0–~255).
+# 		- kwargs:
+# 			- Help
+# 			- k = 3 : Threshold factor (default). Reflection mask is frame > mean + k*std.
+# 				Lower k = more masking
+# 			- Cutoff : When specified, use this value as threshold for specular reflections
+# 			- NeighborhoodSize = 5 : When specified (default), used to compute median value around
+# 				masked area and use a fill value
+# 			- FillValue  : When specified, replace masked pixels by this value
 	
-	Outputs:
+# 	Outputs:
 	
-		- frame_corrected : Image with specular reflections replaced by local median values/fill value.
-		- mask :  Binary mask of specular reflections (uint8, 0 or 1).
-	"""
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(inspect.getdoc(ApplyTransform))
-		return 0, 0
-	FillValue = kwargs.get('FillValue')
-	Cutoff = kwargs.get('Cutoff')
+# 		- frame_corrected : Image with specular reflections replaced by local median values/fill value.
+# 		- mask :  Binary mask of specular reflections (uint8, 0 or 1).
+# 	"""
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(ApplyTransform))
+# 		return 0, 0
+# 	FillValue = kwargs.get('FillValue')
+# 	Cutoff = kwargs.get('Cutoff')
 	
-	# Ensure float array
-	img = frame.astype(np.float32)
+# 	# Ensure float array
+# 	img = frame.astype(np.float32)
 	
-	# Step 1: Identify reflections
-	mean_val = np.mean(img)
-	std_val = np.std(img)
-	if Cutoff is None:
-		k = kwargs.get('k', 3)
-		threshold = mean_val + k * std_val
-	else:
-		threshold = Cutoff
-	mask = (img > threshold).astype(np.uint8)
+# 	# Step 1: Identify reflections
+# 	mean_val = np.mean(img)
+# 	std_val = np.std(img)
+# 	if Cutoff is None:
+# 		k = kwargs.get('k', 3)
+# 		threshold = mean_val + k * std_val
+# 	else:
+# 		threshold = Cutoff
+# 	mask = (img > threshold).astype(np.uint8)
 
-	frame_corrected = img.copy()
-	if FillValue is not None:
-		frame_corrected[mask == 1] = FillValue
+# 	frame_corrected = img.copy()
+# 	if FillValue is not None:
+# 		frame_corrected[mask == 1] = FillValue
 		
-	else:
-		NeighborhoodSize = kwargs.get('NeighborhoodSize', 5)
-		median_img = median_filter(img, size=NeighborhoodSize)
-		frame_corrected[mask == 1] = median_img[mask == 1]
+# 	else:
+# 		NeighborhoodSize = kwargs.get('NeighborhoodSize', 5)
+# 		median_img = median_filter(img, size=NeighborhoodSize)
+# 		frame_corrected[mask == 1] = median_img[mask == 1]
 
 
-	return frame_corrected, mask
+# 	return frame_corrected, mask
+
+
+import numpy as np
+import inspect
+from scipy.ndimage import median_filter, binary_dilation
+
+def RemoveSpecularReflections_Frame(frame, **kwargs):
+    """
+    Detects and removes specular reflections from an image frame.
+    
+    Inputs:
+        - frame : Input 2D image (Y, X), float values (dark-subtracted, 0–~255).
+        - kwargs:
+            - Help
+            - k = 3 : Threshold factor (default). Reflection mask is frame > mean + k*std.
+                Lower k = more masking.
+            - Cutoff : When specified, use this value as threshold for specular reflections.
+            - NeighborhoodSize = 5 : When specified (default), used to compute median value around
+                masked area and use a fill value.
+            - FillValue : When specified, replace masked pixels by this value.
+            - Buffer = 0 : When specified, number of pixels to expand the mask around
+                detected reflections.
+    
+    Outputs:
+        - frame_corrected : Image with specular reflections replaced by local median values/fill value.
+        - mask :  Binary mask of specular reflections (uint8, 0 or 1).
+    """
+    Help = kwargs.get('Help', False)
+    if Help:
+        # Assuming ApplyTransform was a typo and you meant this function's doc
+        print(inspect.getdoc(RemoveSpecularReflections_Frame))
+        return 0, 0
+    
+    FillValue = kwargs.get('FillValue')
+    Cutoff = kwargs.get('Cutoff')
+    Buffer = kwargs.get('Buffer', 0) # Get the new Buffer argument
+    
+    # Ensure float array
+    img = frame.astype(np.float32)
+    
+    # Step 1: Identify reflections
+    mean_val = np.mean(img)
+    std_val = np.std(img)
+    if Cutoff is None:
+        k = kwargs.get('k', 3)
+        threshold = mean_val + k * std_val
+    else:
+        threshold = Cutoff
+    
+    mask = (img > threshold).astype(np.uint8)
+    
+    # Step 2: (NEW) Expand the mask by Buffer pixels if requested
+    if Buffer > 0:
+        # Use binary dilation to expand the mask. The number of iterations
+        # corresponds to the number of pixels to grow the mask by.
+        mask = binary_dilation(mask, iterations=Buffer).astype(np.uint8)
+
+    # Step 3: Replace the masked pixels
+    frame_corrected = img.copy()
+    if FillValue is not None:
+        frame_corrected[mask == 1] = FillValue
+    else:
+        NeighborhoodSize = kwargs.get('NeighborhoodSize', 5)
+        # It's better to compute the median on the original image, not one
+        # that might have already been modified.
+        median_img = median_filter(img, size=NeighborhoodSize)
+        frame_corrected[mask == 1] = median_img[mask == 1]
+        
+    return frame_corrected, mask
 
 
 def RemoveSpecularReflections(Frames, **kwargs):

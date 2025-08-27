@@ -484,9 +484,9 @@ def GetPatchPos(Patch1_pos, Patch_size_x, Patch_size_y, Image_angle, **kwargs):
 		for i in range(0,6):
 			x = x0s - Patch_size_x*np.cos(Image_angle_rad)*i
 			y = y0s - Patch_size_x*np.sin(Image_angle_rad)*i
-			if (j==0 and i==5):
-				y = y-15
-				x = x+10
+			# if (j==0 and i==5):
+			# 	y = y-15
+			# 	x = x+10
 			Positions.append([index, x, y])
 			index +=1
 	return np.array(Positions)
@@ -557,9 +557,9 @@ def GetPatchPos_WithDistortion(Patch1_pos, Patch_size_x, Patch_size_y, Image_ang
 
 			x = x0 + dx_adj
 			y = y0 + dy_adj
-			if j == 0 and i == 5:
-				y -= 15
-				x += 10
+			# if j == 0 and i == 5:
+			# 	y -= 15
+			# 	x += 10
 
 			# Ensure coordinates remain positive
 			x = max(0, min(x, w_px - 1))
