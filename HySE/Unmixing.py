@@ -199,8 +199,6 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 				for the dark and White calibration arrays
 			- SpectralNormalisation = False. If True, the white reference will be used to normalise the spectrum
 				instead of both spectrally and spatially.
-			- Wavelengths_list = list of wavelengths (unsorted)
-				Required for WhiteCalibration
 			- vmax: float. For plotting range
 			- vmin: float. For plotting range
 			- SavePlot = False
@@ -241,10 +239,10 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		print(f'White Normalising')
 		if SpectralNormalisation:
 			print(f'Only spectral normalisation')
-		Wavelengths_list = kwargs.get('Wavelengths_list')
-		if Wavelengths_list is None:
-			print(f'Please indicate Wavelengths_list (unsorted) when requesting WhiteCalibration')
-			return 0
+		# Wavelengths_list = kwargs.get('Wavelengths_list')
+		# if Wavelengths_list is None:
+		# 	print(f'Please indicate Wavelengths_list (unsorted) when requesting WhiteCalibration')
+		# 	return 0
 		if Dark is not None:
 			WhiteCalibration_ = BlurWhiteCalibration(SubtractDark(WhiteCalibration, Dark_g), Sigma)
 			print(f'Subtracting Dark and blurring White Reference with sigma = {Sigma}')
@@ -312,12 +310,18 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 				MixedHypercube_N[s,w,f,:,:] = frameN
 
 	if len(MixedHypercube.shape)==3: ## Just wavelengths, Y, X
-		MixedHypercube_N_ = MixedHypercube_N[0,:,0,:,:]
+		MixedHypercube_N_ = MixedHypercube_N[0,0,:,:,:]
 	elif len(MixedHypercube.shape)==4: 
 		if IndivFrames: ## Single sweep
+			print(f'POTENTIAL ERROR: CHECK THAT THE HYPERCUBE OUTPUT DIMENSIONS ARE CORRECT')
+			print(f'   MixedHypercube_N.shape: {MixedHypercube_N.shape}')
+			print(f'   Currently reshaped as [0,:,:,:,:]')
 			MixedHypercube_N_ = MixedHypercube_N[0,:,:,:,:]
 		else: ## One sweeo but multiple frames
-			MixedHypercube_N_ = MixedHypercube_N[:,:,0,:,:]
+			print(f'POTENTIAL ERROR: CHECK THAT THE HYPERCUBE OUTPUT DIMENSIONS ARE CORRECT')
+			print(f'   MixedHypercube_N.shape: {MixedHypercube_N.shape}')
+			print(f'   Currently reshaped as [0,:,:,:,:]')
+			MixedHypercube_N_ = MixedHypercube_N[:,0,:,:,:]
 	elif len(MixedHypercube.shape)==5:
 		MixedHypercube_N_ = MixedHypercube_N
 
