@@ -206,6 +206,7 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			- SavePlot = False
 			- SavingFigure = '' string.
 			- Plot = True
+			- IndivFrames = False : Whether or not individual frames have been kept for each instead of being averaged
 			
 		- Normalised mixed hypercube. 
 			If Dark is indicated, the normalised hypercube will be dark subtracted
@@ -233,6 +234,7 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		print(f'Dark subtraction. Avg val = {np.average(Dark):.2f}, after blurring: {np.average(Dark_g):.2f}')
 
 	SpectralNormalisation = kwargs.get('SpectralNormalisation', False)
+	IndivFrames = kwargs.get('IndivFrames', False)
 
 	WhiteCalibration = kwargs.get('WhiteCalibration')
 	if WhiteCalibration is not None:
@@ -265,10 +267,20 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		print(f'No normalisation')
 		Plot=False
 
-	if len(MixedHypercube.shape)>3:
+	# if len(MixedHypercube.shape)>3:
+	# 	MixedHypercube_ = MixedHypercube
+	# else:
+	# 	MixedHypercube_ = np.array([MixedHypercube])
+
+
+	if len(MixedHypercube.shape)==3:
+		MixedHypercube_ = np.array([[MixedHypercube]])
+	elif len(MixedHypercube.shape)==4:
+		MixedHypercube_ = np.array([MixedHypercube])
+	elif len(MixedHypercube.shape)==5:
 		MixedHypercube_ = MixedHypercube
 	else:
-		MixedHypercube_ = np.array([MixedHypercube])
+		print(f'Shape of the Mixed hypercube not supported: len(Hypercube.shape) = {len(MixedHypercube.shape)} != [3,4,5]')
 
 	if WhiteCalibration is not None:
 		Mask = HySE.Masking.GetStandardMask(WhiteCalibration_, threshold=1)
@@ -277,29 +289,69 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		Mask = HySE.Masking.GetStandardMask(MixedHypercube_[0], threshold=1)
 
 	MixedHypercube_N = np.zeros(MixedHypercube_.shape)
-	(SS, WW, YY, XX) = MixedHypercube_.shape
-	for s in range(0,SS):
-		MixedHypercube_sub = MixedHypercube_[s,:,:,:]
-		if Dark is not None:
-			MixedHypercube_subN = SubtractDark(MixedHypercube_sub, Dark_g)
-		else:
-			MixedHypercube_subN = MixedHypercube_sub
-			
+	(SS, WW, FF, YY, XX) = MixedHypercube_.shape
+	MixedHypercube_N = np.zeros(MixedHypercube_.shape)
+	for s in range(0,SS): 
 		for w in range(0,WW):
-			frame = MixedHypercube_subN[w,:,:]
-			if WhiteCalibration is None:
-				frameN = frame
-			else:
-				whiteframe = WhiteCalibration_[w,:,:]
-				if SpectralNormalisation:
-					whiteval = np.average(whiteframe)
-					frameN = frame/whiteval
+			for f in range(0,FF):
+				frame = MixedHypercube_[s,w,f,:,:]
+				if Dark is not None:
+					frameD = np.subtract(frame, Dark_g)
 				else:
-					frameN = np.divide(frame, whiteframe, out=np.zeros_like(frame), where=whiteframe!=0)
-			MixedHypercube_N[s,w,:,:] = np.ma.array(frameN, mask=Mask)
+					frameD = frame
+
+				if WhiteCalibration is None:
+					frameN = frameD
+				else:
+					whiteframe = WhiteCalibration_[w,:,:]
+					if SpectralNormalisation:
+						whiteval = np.average(whiteframe)
+						frameN = frameD/whiteval
+					else:
+						frameN = np.divide(frameD, whiteframe, out=np.zeros_like(frameD), where=whiteframe!=0)
+				MixedHypercube_N[s,w,f,:,:] = frameN
+
+	if len(MixedHypercube.shape)==3: ## Just wavelengths, Y, X
+		MixedHypercube_N_ = MixedHypercube_N[0,:,0,:,:]
+	elif len(MixedHypercube.shape)==4: 
+		if IndivFrames: ## Single sweep
+			MixedHypercube_N_ = MixedHypercube_N[0,:,:,:,:]
+		else: ## One sweeo but multiple frames
+			MixedHypercube_N_ = MixedHypercube_N[:,:,0,:,:]
+	elif len(MixedHypercube.shape)==5:
+		MixedHypercube_N_ = MixedHypercube_N
+
+		# MixedHypercube_sub = MixedHypercube_[s,:,:,:,:]
+
+		# if Dark is not None:
+		# 	MixedHypercube_subN = SubtractDark(MixedHypercube_sub, Dark_g)
+		# else:
+		# 	MixedHypercube_subN = MixedHypercube_sub
+			
+		# for w in range(0,WW):
+		# 	frame = MixedHypercube_subN[w,:,:]
+		# 	if WhiteCalibration is None:
+		# 		frameN = frame
+		# 	else:
+		# 		whiteframe = WhiteCalibration_[w,:,:]
+		# 		if SpectralNormalisation:
+		# 			whiteval = np.average(whiteframe)
+		# 			frameN = frame/whiteval
+		# 		else:
+		# 			frameN = np.divide(frame, whiteframe, out=np.zeros_like(frame), where=whiteframe!=0)
+		# 	MixedHypercube_N[s,w,:,:] = np.ma.array(frameN, mask=Mask)
 
 	if Plot:
-		HypercubeToPlot = MixedHypercube_N[0,:,:,:]
+		if len(MixedHypercube.shape)==3: ## Just wavelengths, Y, X
+			HypercubeToPlot = MixedHypercube_N_
+		elif len(MixedHypercube.shape)==4: 
+			if IndivFrames: 
+				HypercubeToPlot = MixedHypercube_N_[:,0,:,:]
+			else:
+				HypercubeToPlot = MixedHypercube_N_[0,:,:,:]
+		elif len(MixedHypercube.shape)==5:
+			HypercubeToPlot =MixedHypercube_N_[0,:,0,:,:]
+
 		nn = 0
 		Mavg = np.average(HypercubeToPlot)
 		Mstd = np.std(HypercubeToPlot)
@@ -321,10 +373,7 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			plt.savefig(f'{SavingPath}Normalised_Hypercube.png')
 		plt.show()
 
-	if MixedHypercube_N.shape[0]==1:
-		MixedHypercube_N = MixedHypercube_N[0,:,:,:]
-
-	return MixedHypercube_N, Mask
+	return MixedHypercube_N_, Mask
 
 
 def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
