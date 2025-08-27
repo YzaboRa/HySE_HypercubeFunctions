@@ -552,7 +552,7 @@ def ComputeSelfNormHypercube(Video,EdgePos,DarkRef=None,**kwargs):
 				if i == 0:
 					print(f'Computing hypercube: Averaging {e - s} frames')
 				# Convert video section to float32 before normalising to avoid numerical errors
-				data_norm = Video[s:e].astype('float32')-DarkRef[None,:,:,:]
+				data_norm = np.subtract(Video[s:e].astype('float32'),DarkRef[None,:,:,:])
 				data_norm[data_norm<=0]=0 # Remove negative values after dark subtraction
 				if RefChannel:
 					if Normalise:
