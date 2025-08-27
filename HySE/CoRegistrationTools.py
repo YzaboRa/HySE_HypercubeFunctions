@@ -53,7 +53,7 @@ def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwarg
 		- EdgePos: Positions indicating where each sections of frames is for each wavelength  
 			for all sweeps in the dataset  (output from FindHypercube)
 		- Nsweep: number of the sweep to look at
-		- Wavelnegths_list: list of the wavelengths (unsorted, as done in experiment)
+		- Wavelengths_list: list of the wavelengths (unsorted, as done in experiment)
 		- kwargs: optional inputs
 			- CropImDimensions = [xstart, xend, ystart, yend] : where to crop frames to just keep the image 
 				(default values from CCRC HD video)
