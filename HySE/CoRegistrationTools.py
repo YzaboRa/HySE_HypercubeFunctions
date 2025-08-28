@@ -1044,7 +1044,7 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 	AllReflectionsMasks = kwargs.get('AllReflectionsMasks')
 
 
-	SaveHypercube = kwargs.get('SaveHypercube', True)
+	SaveHypercube = kwargs.get('SaveHypercube', False)
 	if SaveHypercube:
 		print(f'Saving Hypercube')
 
@@ -1321,7 +1321,7 @@ def GetGlobalMask(**kwargs):
 			GlobalMask = EdgeMask
 			print(f'Global Mask = EdgeMask only')
 	elif AllReflectionsMasks is not None:
-		GlobalMask = AllReflectionsMasks[Static_Index, :,:]
+		GlobalMask = ReflectionsMask
 		print(f'Global Mask = ReflectionsMask only')
 	else:
 		## If no mask is give, return None
