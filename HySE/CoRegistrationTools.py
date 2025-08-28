@@ -720,38 +720,68 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	elastixImageFilter.SetMovingImage(im_shifted_se)
 
 	if StaticMask is not None:
-		# Ensure correct type and values
-		if StaticMask.dtype != np.uint8:
-			StaticMask = StaticMask.astype(np.uint8)
-		StaticMask[StaticMask > 0] = 1 # ensure strictly binary
+		# Ensure strictly binary (0 or 1)
+		StaticMask[StaticMask > 0] = 1
+
+		# Invert Mask (SimpleITK expects 1 to include, vs usually 1 to exclude)
+		sitk_static_mask_array = (1 - StaticMask).astype(np.uint8)
 
 		# Ensure same shape
-		if StaticMask.shape != im_static_orig.shape:
-			raise ValueError(f"StaticMask shape {StaticMask.shape} does not match image shape {im_static_orig.shape}")
+		if sitk_static_mask_array.shape != im_static_orig.shape:
+			raise ValueError(f"StaticMask shape {sitk_static_mask_array.shape} does not match image shape {im_static_orig.shape}")
 
 		# Create SITK mask with same geometry
-		staticmask_se = _sitk.GetImageFromArray(StaticMask)
-		staticmask_se.CopyInformation(im_static_se) # match origin, spacing, direction
+		staticmask_se = _sitk.GetImageFromArray(sitk_static_mask_array) # Use the inverted mask
+		staticmask_se.CopyInformation(im_static_se)
 
-		print(f'   Setting Static Mask')
+		print(f'    Setting Static Mask')
 		elastixImageFilter.SetFixedMask(staticmask_se)
 
-	if ShiftedMask is not None:
 		# Ensure correct type and values
-		if ShiftedMask.dtype != np.uint8:
-			ShiftedMask = ShiftedMask.astype(np.uint8)
-		ShiftedMask[ShiftedMask > 0] = 1 # ensure strictly binary
+		# if StaticMask.dtype != np.uint8:
+		# 	StaticMask = StaticMask.astype(np.uint8)
+		# StaticMask[StaticMask > 0] = 1 # ensure strictly binary
 
+		# # Ensure same shape
+		# if StaticMask.shape != im_static_orig.shape:
+		# 	raise ValueError(f"StaticMask shape {StaticMask.shape} does not match image shape {im_static_orig.shape}")
+
+		# # Create SITK mask with same geometry
+		# staticmask_se = _sitk.GetImageFromArray(StaticMask)
+		# staticmask_se.CopyInformation(im_static_se) # match origin, spacing, direction
+
+		# print(f'   Setting Static Mask')
+		# elastixImageFilter.SetFixedMask(staticmask_se)
+
+	if ShiftedMask is not None:
+		ShiftedMask[ShiftedMask > 0] = 1
+		sitk_shifted_mask_array = (1 - ShiftedMask).astype(np.uint8)
 		# Ensure same shape
-		if ShiftedMask.shape != im_static_orig.shape:
-			raise ValueError(f"ShiftedMask shape {ShiftedMask.shape} does not match image shape {im_shifted_orig.shape}")
+		if sitk_shifted_mask_array.shape != im_shifted_orig.shape:
+			raise ValueError(f"ShiftedMask shape {sitk_shifted_mask_array.shape} does not match image shape {im_shifted_orig.shape}")
 
 		# Create SITK mask with same geometry
-		shiftedmask_se = _sitk.GetImageFromArray(ShiftedMask)
-		shiftedmask_se.CopyInformation(im_shifted_se) # match origin, spacing, direction
+		shiftedmask_se = _sitk.GetImageFromArray(sitk_shifted_mask_array) # Use the inverted mask
+		shiftedmask_se.CopyInformation(im_shifted_se)
 
-		print(f'   Setting Shifted Mask')
+		print(f'    Setting Shifted Mask')
 		elastixImageFilter.SetMovingMask(shiftedmask_se)
+		
+		# # Ensure correct type and values
+		# if ShiftedMask.dtype != np.uint8:
+		# 	ShiftedMask = ShiftedMask.astype(np.uint8)
+		# ShiftedMask[ShiftedMask > 0] = 1 # ensure strictly binary
+
+		# # Ensure same shape
+		# if ShiftedMask.shape != im_static_orig.shape:
+		# 	raise ValueError(f"ShiftedMask shape {ShiftedMask.shape} does not match image shape {im_shifted_orig.shape}")
+
+		# # Create SITK mask with same geometry
+		# shiftedmask_se = _sitk.GetImageFromArray(ShiftedMask)
+		# shiftedmask_se.CopyInformation(im_shifted_se) # match origin, spacing, direction
+
+		# print(f'   Setting Shifted Mask')
+		# elastixImageFilter.SetMovingMask(shiftedmask_se)
 
 	# Set up the parameter map(s) based on the registration mode
 	if TwoStage:
@@ -1327,9 +1357,9 @@ def GetGlobalMask(**kwargs):
 		## If no mask is give, return None
 		GlobalMask = None
 		print(f'Global Mask = None')
-	if GlobalMask is not None:
-		## If there is a mask, invert it to be used with SimpleITK
-		GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
+	# if GlobalMask is not None:
+	# 	## If there is a mask, invert it to be used with SimpleITK
+	# 	GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
 
 	return GlobalMask
 

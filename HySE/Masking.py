@@ -21,6 +21,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 from scipy.ndimage import median_filter
+from scipy.ndimage import median_filter, binary_dilation
 
 # import HySE_ImportData
 import HySE.UserTools
@@ -81,9 +82,7 @@ import HySE.UserTools
 # 	return frame_corrected, mask
 
 
-import numpy as np
-import inspect
-from scipy.ndimage import median_filter, binary_dilation
+
 
 def RemoveSpecularReflections_Frame(frame, **kwargs):
     """
@@ -93,7 +92,7 @@ def RemoveSpecularReflections_Frame(frame, **kwargs):
         - frame : Input 2D image (Y, X), float values (dark-subtracted, 0–~255).
         - kwargs:
             - Help
-            - k = 3 : Threshold factor (default). Reflection mask is frame > mean + k*std.
+            - kval = 3 : Threshold factor (default). Reflection mask is frame > mean + k*std.
                 Lower k = more masking.
             - Cutoff : When specified, use this value as threshold for specular reflections.
             - NeighborhoodSize = 5 : When specified (default), used to compute median value around
@@ -123,8 +122,9 @@ def RemoveSpecularReflections_Frame(frame, **kwargs):
     mean_val = np.mean(img)
     std_val = np.std(img)
     if Cutoff is None:
-        k = kwargs.get('k', 3)
-        threshold = mean_val + k * std_val
+        kval = kwargs.get('kval', 3)
+        # print(f'Using k={kval}')
+        threshold = mean_val + kval * std_val
     else:
         threshold = Cutoff
     
@@ -171,12 +171,28 @@ def RemoveSpecularReflections(Frames, **kwargs):
 			value for each frame.
 		- AllMasks :  Binary masks of specular reflections (uint8, 0 or 1) for each frame.
 	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(RemoveSpecularReflections))
+		return 0
 	(Nwav, Y, X) = Frames.shape
+	k = kwargs.get('k')
+	if isinstance(k, list):
+		if len(k)!=Nwav:
+			raise ValueError(f'If setting k with a list, make sure the length of the list ({len(k)}) matches the number of images ({Nwav}')
+		else:
+			k_list = k
+	elif isinstance(k, int):
+		k_list = [k for i in range(0,Nwav)]
 	MaskedFrames = []
 	AllMasks = []
 	for n in range(0,Nwav):
 		frame = Frames[n,:,:]
-		frame_corrected, mask = RemoveSpecularReflections_Frame(frame, **kwargs)
+		if k is not None:
+			kk = k_list[n]
+			frame_corrected, mask = RemoveSpecularReflections_Frame(frame, kval=kk, **kwargs)
+		else:
+			frame_corrected, mask = RemoveSpecularReflections_Frame(frame, **kwargs)
 		MaskedFrames.append(frame_corrected)
 		AllMasks.append(mask)
 	AllMasks = np.array(AllMasks)
