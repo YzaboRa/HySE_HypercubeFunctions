@@ -38,7 +38,7 @@ from scipy.ndimage import gaussian_filter
 from PIL import Image
 from natsort import natsorted
 import glob
-
+import copy
 
 
 
@@ -46,7 +46,7 @@ import glob
 
 def CoRegisterImages(im_static, im_shifted, **kwargs):
 	"""
-	Co-registers a shifted image to a defined static image using SimpleElastix (v3)
+	Co-registers a shifted image to a defined static image using SimpleITK (v3)
 
 	Inputs:
 		- im_static
@@ -103,22 +103,22 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	StaticMask = kwargs.get('StaticMask')
 	ShiftedMask = kwargs.get('ShiftedMask')
 
-	## Handle cropping
-	Cropping = kwargs.get('Cropping', 0)
-	if Cropping!=0:
-		im_static = im_static[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-		im_shifted = im_shifted[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-		if StaticMask is not None:
-			StaticMask = StaticMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-		if ShiftedMask is not None:
-			ShiftedMask = ShiftedMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+	# ## Handle cropping
+	# Cropping = kwargs.get('Cropping', 0)
+	# if Cropping!=0:
+	# 	im_static = im_static[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+	# 	im_shifted = im_shifted[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+	# 	if StaticMask is not None:
+	# 		StaticMask = StaticMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+	# 	if ShiftedMask is not None:
+	# 		ShiftedMask = ShiftedMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
 
 
 	# Print the configuration
 	if TwoStage:
-		print(f'SimpleElastix: Two-Stage Registration (Affine -> BSpline) with GridSpacing = {GridSpacing}')
+		print(f'SimpleITK: Two-Stage Registration (Affine -> BSpline) with GridSpacing = {GridSpacing}')
 	else:
-		print(f'SimpleElastix: Transform = {Transform}, Optimizer = {Optimizer}, Metric = {Metric}')
+		print(f'SimpleITK: Transform = {Transform}, Optimizer = {Optimizer}, Metric = {Metric}')
 
 	t0 = time.time()
 	
@@ -182,7 +182,7 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 		staticmask_se = _sitk.GetImageFromArray(sitk_static_mask_array) # Use the inverted mask
 		staticmask_se.CopyInformation(im_static_se)
 
-		print(f'    Setting Static Mask')
+		# print(f'    Setting Static Mask')
 		elastixImageFilter.SetFixedMask(staticmask_se)
 
 	if ShiftedMask is not None:
@@ -196,7 +196,7 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 		shiftedmask_se = _sitk.GetImageFromArray(sitk_shifted_mask_array) # Use the inverted mask
 		shiftedmask_se.CopyInformation(im_shifted_se)
 
-		print(f'    Setting Shifted Mask')
+		# print(f'    Setting Shifted Mask')
 		elastixImageFilter.SetMovingMask(shiftedmask_se)
 
 
@@ -347,65 +347,65 @@ def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
 
 
 def GetNMI(Data, **kwargs):
-    """
-    Computes the normalised mutual information of a hypercube.
+	"""
+	Computes the normalised mutual information of a hypercube.
 
-    Inputs:
-        - Data : Hypercube, shape (N, Y, X), may contain NaNs
-        - kwargs:
-            - Help : if True, print docstring
-            - ReferenceIndex = 1 : Which image to reference to
+	Inputs:
+		- Data : Hypercube, shape (N, Y, X), may contain NaNs
+		- kwargs:
+			- Help : if True, print docstring
+			- ReferenceIndex = 1 : Which image to reference to
 
-    Outputs:
-        - NMI_average : float, mean NMI vs reference
-        - NMI_vs_reference : array of shape (N,), NMI each slice vs reference
-        - NMI_pairwise : array of shape (N-1,), pairwise NMI between consecutive slices
-    """
-    Help = kwargs.get('Help', False)
-    if Help:
-        print(inspect.getdoc(GetNMI))
-        return 0, 0, 0
+	Outputs:
+		- NMI_average : float, mean NMI vs reference
+		- NMI_vs_reference : array of shape (N,), NMI each slice vs reference
+		- NMI_pairwise : array of shape (N-1,), pairwise NMI between consecutive slices
+	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetNMI))
+		return 0, 0, 0
 
 
-    cube = Data
-    N, H, W = cube.shape
+	cube = Data
+	N, H, W = cube.shape
 
-    # Contrast-normalise each slice, ignoring NaNs
-    cube_norm = cube.astype(np.float32).copy()
-    for i in range(N):
-        sl = cube_norm[i]
-        min_val = np.nanmin(sl)
-        rng = np.nanmax(sl) - min_val
-        if rng == 0 or np.isnan(rng):
-            cube_norm[i] = np.zeros_like(sl, dtype=np.float32)
-        else:
-            cube_norm[i] = (sl - min_val) / (rng + 1e-7)
+	# Contrast-normalise each slice, ignoring NaNs
+	cube_norm = cube.astype(np.float32).copy()
+	for i in range(N):
+		sl = cube_norm[i]
+		min_val = np.nanmin(sl)
+		rng = np.nanmax(sl) - min_val
+		if rng == 0 or np.isnan(rng):
+			cube_norm[i] = np.zeros_like(sl, dtype=np.float32)
+		else:
+			cube_norm[i] = (sl - min_val) / (rng + 1e-7)
 
-    # Reference slice (e.g. index 1)
-    # ref_idx = 1
-    ref_idx = kwargs.get('ReferenceIndex', 1)
-    ref = cube_norm[ref_idx]
-    bins = 128
+	# Reference slice (e.g. index 1)
+	# ref_idx = 1
+	ref_idx = kwargs.get('ReferenceIndex', 1)
+	ref = cube_norm[ref_idx]
+	bins = 128
 
-    # Helper to mask NaNs before NMI call
-    def safe_nmi(a, b, bins=128):
-        mask = ~np.isnan(a) & ~np.isnan(b)
-        if mask.sum() == 0:   # no overlap
-            return np.nan
-        return nmi(a[mask], b[mask], bins=bins)
+	# Helper to mask NaNs before NMI call
+	def safe_nmi(a, b, bins=128):
+		mask = ~np.isnan(a) & ~np.isnan(b)
+		if mask.sum() == 0:   # no overlap
+			return np.nan
+		return nmi(a[mask], b[mask], bins=bins)
 
-    # NMI vs reference
-    nmi_vs_ref = np.empty(N, dtype=np.float32)
-    for i in range(N):
-        nmi_vs_ref[i] = safe_nmi(cube_norm[i], ref, bins=bins)
-    mean_nmi = np.nanmean(nmi_vs_ref)
+	# NMI vs reference
+	nmi_vs_ref = np.empty(N, dtype=np.float32)
+	for i in range(N):
+		nmi_vs_ref[i] = safe_nmi(cube_norm[i], ref, bins=bins)
+	mean_nmi = np.nanmean(nmi_vs_ref)
 
-    # Pairwise NMI
-    pairwise_nmi = np.empty(N - 1, dtype=np.float32)
-    for i in range(N - 1):
-        pairwise_nmi[i] = safe_nmi(cube_norm[i], cube_norm[i + 1], bins=bins)
+	# Pairwise NMI
+	pairwise_nmi = np.empty(N - 1, dtype=np.float32)
+	for i in range(N - 1):
+		pairwise_nmi[i] = safe_nmi(cube_norm[i], cube_norm[i + 1], bins=bins)
 
-    return mean_nmi, nmi_vs_ref, pairwise_nmi
+	return mean_nmi, nmi_vs_ref, pairwise_nmi
 
 
 
@@ -457,6 +457,21 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 	return HypercubeForRegistration
 
 
+
+def clone_parameter_map(transform_map):
+	"""
+	Manually clone a SimpleITK ParameterMap tuple (any number of stages)
+	so we can safely modify it without touching the original.
+	"""
+	new_map = []
+	for stage in transform_map:
+		stage_clone = {}
+		for k in stage:
+			stage_clone[k] = list(stage[k])  # copy the list
+		new_map.append(stage_clone)
+	return tuple(new_map)
+	
+
 def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 	"""
 
@@ -477,6 +492,7 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 			- SavingPath. If PlotDiff or SaveHypercbybe is True, where to save the data/figure
 			- EdgeMask -> Static mask
 			- AllReflectionsMasks -> Moving mask
+			- HideReflections = True
 
 
 	Outputs:
@@ -502,20 +518,19 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 		Static_Index = 0
 		print(f'Static index set to default {Static_Index}')
 
+	## Handle cropping
+	Cropping = kwargs.get('Cropping', 0)
+
 	EdgeMask = kwargs.get('EdgeMask')
 	AllReflectionsMasks = kwargs.get('AllReflectionsMasks')
 
+	HideReflections = kwargs.get('HideReflections', True)
 
 	SaveHypercube = kwargs.get('SaveHypercube', False)
 	if SaveHypercube:
 		print(f'Saving Hypercube')
 
 	Order = kwargs.get('Order', False)
-
-	## Handle cropping
-	Cropping = kwargs.get('Cropping', 0)
-	if Cropping!=0:
-		print(f'Image will be cropped by {Cropping} on all sides.')
 	
 	t0 = time.time()
 	(NN, YY, XX) = RawHypercube.shape
@@ -528,22 +543,38 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 	Hypercube = []
 	AllTransforms = []
 
+	if Cropping!=0:
+		print(f'Image will be cropped by {Cropping} on all sides.')
+		RawHypercube = RawHypercube[:,Cropping:(-1*Cropping),Cropping:(-1*Cropping)]
+		if EdgeMask is not None:
+			EdgeMask=EdgeMask[Cropping:(-1*Cropping),Cropping:(-1*Cropping)]
+		if AllReflectionsMasks is not None:
+			AllReflectionsMasks = AllReflectionsMasks[:,Cropping:(-1*Cropping),Cropping:(-1*Cropping)]
+
 	## Define static image
 	im_static = RawHypercube[Static_Index, :,:]
+
 	## Define static mask:
 	if AllReflectionsMasks is not None:
 		ReflectionsMask_Static = AllReflectionsMasks[Static_Index, :,:]
 	else:
 		ReflectionsMask_Static = None
 
+	# print(f'PreRegistration -- RawHypercube.shape:{RawHypercube.shape}, AllReflectionsMasks.shape:{AllReflectionsMasks.shape}')
+
 	StaticMask = GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Static)
 
 	for c in range(0, NN):
 		if c==Static_Index:
-			print(f'Static Image')
-			im = RawHypercube[c,Cropping:(-1*Cropping),Cropping:(-1*Cropping)]
-			# print(f'c={c}: static_im.shape = {im.shape}')
-			Hypercube.append(im)
+			# pass
+			im0 = copy.deepcopy(RawHypercube[c,:,:])
+			print(f'  Static image')
+			# # print(f'c={c}: static_im.shape = {im.shape}')
+
+			if HideReflections and ReflectionsMask_Shifted is not None:
+				im0[ReflectionsMask_Static>0.5] = np.nan
+
+			Hypercube.append(im0)
 			AllTransforms.append(0)
 		else:
 			print(f'Working on: {c+1} /{NN}')
@@ -554,54 +585,77 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 			else:
 				ReflectionsMask_Shifted = None
 			
+			# print(f'Applying to mask -- ReflectionsMask_Shifted.shape:{ReflectionsMask_Shifted.shape}, EdgeMask.shape:{EdgeMask.shape}')
 			ShiftedMask = GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted )
 			
 			### PREVIOUS:
 			# im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask, ShiftedMask=ShiftedMask, **kwargs)
 
 			### NOW
+			# print(f'Starting Registration')
 			# --- STEP 1 & 2: Perform Registration to get Transform Map ---
-			# StaticReflectionsMask=static_reflection_mask, 
-			# MovingReflectionsMask=moving_reflection_mask, 
 			im_coregistered_smeared, transform_map = CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask, ShiftedMask=ShiftedMask, **kwargs)
+			# print(f'Did the Registration')
+			# print(transform_map)
+			# print(f"Frame {c}: transform = {transform_map[0]['TransformParameters'][:10]}")
+			# print(ReflectionsMask_Shifted)
 
 			# --- STEP 3 & 4: Transform the Mask and Punch Holes ---
 			im_coregistered_final = im_coregistered_smeared.astype(np.float32)
 
-			if ReflectionsMask_Shifted is not None:
-				print(f'     Transforming mask to create holes...')
+			# if HideReflections and ReflectionsMask_Shifted is not None:
+			# 	mask_transform_map = clone_parameter_map(transform_map)
 				
-				# Prepare the Transformix filter for the mask
-				transformixImageFilter = _sitk.TransformixImageFilter()
-				transformixImageFilter.LogToConsoleOff() # Keep it quiet
+			# 	# force nearest neighbor interpolation
+			# 	for pm in mask_transform_map:
+			# 		pm['FinalBSplineInterpolationOrder'] = ['0']
 				
-				# Set the transform map from the image registration
-				transformixImageFilter.SetTransformParameterMap(transform_map)
-
-				# --- The Critical Part for Mask Interpolation ---
-				# Modify the parameter map to use nearest neighbor interpolation
-				transform_map[0]['FinalBSplineInterpolationOrder'] = ['0']
-				if len(transform_map) > 1: # Handle TwoStage registration
-					transform_map[1]['FinalBSplineInterpolationOrder'] = ['0']
+			# 	mask_to_transform = np.array([ReflectionsMask_Shifted])
+			# 	transforms_to_apply = [mask_transform_map]
+			# 	mask_transformed = ApplyTransform(mask_to_transform, transforms_to_apply, **kwargs)
 				
-				transformixImageFilter.SetTransformParameterMap(transform_map)
+			# 	im_coregistered_final[mask_transformed[0,:,:] > 0.3] = np.nan
 
-				# Set the moving "image" to be the mask
-				# Handle cropping for the mask just like for the image
-				if Cropping != 0:
-					ReflectionsMask_Shifted = ReflectionsMask_Shifted[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-				
-				moving_mask_sitk = _sitk.GetImageFromArray(ReflectionsMask_Shifted.astype(np.uint8))
-				transformixImageFilter.SetMovingImage(moving_mask_sitk)
 
-				# Execute and get the warped mask
-				registered_mask_sitk = transformixImageFilter.Execute()
-				registered_mask = _sitk.GetArrayFromImage(registered_mask_sitk).astype(bool)
+			# if HideReflections and ReflectionsMask_Shifted is not None:
+			# 	mask_to_transform = np.array([ReflectionsMask_Shifted])
+			# 	transforms_to_appy = [transform_map]
+			# 	mask_transformed = ApplyTransform(mask_to_transform, transforms_to_appy, **kwargs)
+			# 	im_coregistered_final[mask_transformed[0,:,:] > 0.3] = np.nan
 
-				# Punch holes in the final registered image
-				# Using np.nan is best practice for "no data" in float arrays
-				im_coregistered_final[registered_mask] = np.nan
+			
 
+			if HideReflections:
+				if ReflectionsMask_Shifted is not None:
+					# print(f'     Transforming mask to create holes...')
+					
+					# Prepare the Transformix filter for the mask
+					transformixImageFilter = _sitk.TransformixImageFilter()
+					transformixImageFilter.LogToConsoleOff() # Keep it quiet
+					
+					# Set the transform map from the image registration
+					transformixImageFilter.SetTransformParameterMap(transform_map)
+
+					# --- The Critical Part for Mask Interpolation ---
+					# Modify the parameter map to use nearest neighbor interpolation
+					transform_map[0]['FinalBSplineInterpolationOrder'] = ['0']
+					if len(transform_map) > 1: # Handle TwoStage registration
+						transform_map[1]['FinalBSplineInterpolationOrder'] = ['0']
+					
+					transformixImageFilter.SetTransformParameterMap(transform_map)
+
+					print(f"Frame {c}: transform = {transform_map[0]['TransformParameters'][:10]}")
+					
+					moving_mask_sitk = _sitk.GetImageFromArray(ReflectionsMask_Shifted.astype(np.uint8))
+					transformixImageFilter.SetMovingImage(moving_mask_sitk)
+
+					# Execute and get the warped mask
+					registered_mask_sitk = transformixImageFilter.Execute()
+					registered_mask = _sitk.GetArrayFromImage(registered_mask_sitk).astype(bool)
+
+					# Punch holes in the final registered image
+					# Using np.nan is best practice for "no data" in float arrays
+					im_coregistered_final[registered_mask] = np.nan
 
 
 			Hypercube.append(im_coregistered_final)
@@ -693,7 +747,7 @@ def ApplyTransform(Frames, Transforms, **kwargs):
 	
 	TransformedFrames = []
 	for i in range(0, Nwav):
-		print(f'Transforming image {i+1}/Nwav')
+		# print(f'Transforming image {i+1}/Nwav')
 		im_shifted = Frames[i,:,:]
 		transform = Transforms[i]
 		
