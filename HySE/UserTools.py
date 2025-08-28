@@ -801,7 +801,7 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 			for k in range(0,len(PatchesSpectra_All)):
 				PatchesSpectra = PatchesSpectra_All[k]
 				if WhitePatchNormalise:
-					spectra_WhiteNorm = np.divide(PatchesSpectra[:,patchN,1], PatchesSpectra[:,Nwhite,1])
+					spectra_WhiteNorm = np.divide(PatchesSpectra[:,patchN,1], PatchesSpectra[:,Nwhite,1]) # Taking green channel only is hard-coded here
 				else:
 					spectra_WhiteNorm = PatchesSpectra[:,patchN,1]
 				ax[j,i].plot(Wavelengths_sorted, spectra_WhiteNorm, '.-', c=PlotColours[k], label=PlotLabels[k]) #PlotLinestyles[w], , label=PlotLabels[w]
