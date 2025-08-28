@@ -42,61 +42,61 @@ import glob
 
 
 
-def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
-	"""
+# def GetCoregisteredHypercube(vidPath, EdgePos, Nsweep, Wavelengths_list, **kwargs):
+# 	"""
 
-	~~ Co-registration only ~~
+# 	~~ Co-registration only ~~
 
-	This function imports the raw data from a single sweep and computes the co-registered
-	hypercube from it.
-	Uses GetSweepData_FromPath() and SweepCoRegister() functions (which uses CoRegisterImages() for the registration)
+# 	This function imports the raw data from a single sweep and computes the co-registered
+# 	hypercube from it.
+# 	Uses GetSweepData_FromPath() and SweepCoRegister() functions (which uses CoRegisterImages() for the registration)
 
-	Inputs:
-		- vidPath: where to find the data
-		- EdgePos: Positions indicating where each sections of frames is for each wavelength  
-			for all sweeps in the dataset  (output from FindHypercube)
-		- Nsweep: number of the sweep to look at
-		- Wavelnegths_list: list of the wavelengths (unsorted, as done in experiment)
-		- kwargs: optional inputs
-			- CropImDimensions = [xstart, xend, ystart, yend] : where to crop frames to just keep the image 
-				(default values from CCRC HD video)
-			- Buffer: sets the numner of frames to ignore on either side of a colour transition
-				Totale number of frames removed = 2*Buffer (default 6)
-			- ImStatic_Plateau: sets the plateau (wavelength) from which the static image is selected (default 1)
-			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
-			- PlotDiff: Whether to plot figure showing the co-registration (default False)
-				If set to True, also expects:
-				- SavingPath: Where to save figure (default '')
-				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul 5)
-				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
-			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
-				(default True)
+# 	Inputs:
+# 		- vidPath: where to find the data
+# 		- EdgePos: Positions indicating where each sections of frames is for each wavelength  
+# 			for all sweeps in the dataset  (output from FindHypercube)
+# 		- Nsweep: number of the sweep to look at
+# 		- Wavelnegths_list: list of the wavelengths (unsorted, as done in experiment)
+# 		- kwargs: optional inputs
+# 			- CropImDimensions = [xstart, xend, ystart, yend] : where to crop frames to just keep the image 
+# 				(default values from CCRC HD video)
+# 			- Buffer: sets the numner of frames to ignore on either side of a colour transition
+# 				Totale number of frames removed = 2*Buffer (default 6)
+# 			- ImStatic_Plateau: sets the plateau (wavelength) from which the static image is selected (default 1)
+# 			- ImStatic_Index: sets which frame in the selected plateau (wavelength) as the static image (default 8)
+# 			- PlotDiff: Whether to plot figure showing the co-registration (default False)
+# 				If set to True, also expects:
+# 				- SavingPath: Where to save figure (default '')
+# 				- Plot_PlateauList: for which plateau(x) to plot figure. Aceepts a list of integers or "All" for all plateau (defaul 5)
+# 				- Plot_Index: which frame (index) to plot for each selected plateau (default 14)
+# 			- SaveHypercube: whether or not to save the hypercybe and the sorted wavelengths as npz format
+# 				(default True)
 
-		Used in SweepCoregister/CoRegisterImages:
-			- 
+# 		Used in SweepCoregister/CoRegisterImages:
+# 			- 
 
-	Output:
-	- Hypercube: Sorted hypercube
+# 	Output:
+# 	- Hypercube: Sorted hypercube
 
-		Saved:
-		if SaveHypercube=True
-		- Hypercube (as npz file) for hypercube visualiser
-		- Sorted Wavelengths (as npz file) for hypercube visualiser
+# 		Saved:
+# 		if SaveHypercube=True
+# 		- Hypercube (as npz file) for hypercube visualiser
+# 		- Sorted Wavelengths (as npz file) for hypercube visualiser
 
-		if PlotDiff=True
-		- plots of the coregistration for wavelengths in Plot_PlateauList and indices=Plot_Index
+# 		if PlotDiff=True
+# 		- plots of the coregistration for wavelengths in Plot_PlateauList and indices=Plot_Index
 
-	"""
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(inspect.getdoc(GetCoregisteredHypercube))
-		return 0
+# 	"""
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(GetCoregisteredHypercube))
+# 		return 0
 
-	## ImportDatafor the sweep
-	DataSweep = HySE.Import.GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs)
-	## Compute Hypercube
-	Hypercube, AllTransforms = SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
-	return Hypercube, AllTransforms
+# 	## ImportDatafor the sweep
+# 	DataSweep = HySE.Import.GetSweepData_FromPath(vidPath, EdgePos, Nsweep, **kwargs)
+# 	## Compute Hypercube
+# 	Hypercube, AllTransforms = SweepCoRegister(DataSweep, Wavelengths_list, **kwargs)
+# 	return Hypercube, AllTransforms
 
 
 
@@ -617,10 +617,9 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 			- IntensityNorm = False: if True, z-score normalize both images
 			- Blurring = False: if True, apply Gaussian blur
 			- Sigma = 2: If blurring images, blur by sigma (Gaussian)
-			- EdgeMask: binary mask to exclude non-informative areas
-			- ReflectionsMasks: binary mask to exclude areas with specular reflections (saturating) 
-				N.B. Both EdgeMask and ReflectionsMask, if specified, are combined and inverted to be fed to the algorithm
 			- GridSpacing : Spacing of the B-spline control point grid. A larger value produces a stiffer, smoother transform and reduces artifacts.
+			- StaticMask: Usually a combination of EdgeMask and ReflectionsMask, either, or None. Applied to the static image
+			- ShiftedMask: Usually a combination of EdgeMask and ReflectionsMask, either, or None. Applied to the shifted image
 
 	Outputs:
 		- Registered Image
@@ -653,33 +652,19 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	GradientMagnitude = kwargs.get('GradientMagnitude', False)
 	Blurring = kwargs.get('Blurring', False)
 	Sigma = kwargs.get('Sigma', 2)
-	EdgeMask = kwargs.get('EdgeMask')
-	ReflectionsMasks = kwargs.get('ReflectionsMasks')
-	if ReflectionsMasks is not None:
-		# print(f'ReflectionsMasks shape: {ReflectionsMasks.shape}')
-		if len(ReflectionsMasks.shape)>2:
-			raise ValueError(f'ReflectionsMasks should be a 2D array!')
-
-	if EdgeMask is not None:
-		if ReflectionsMasks is not None:
-			GlobalMask = np.logical_or(EdgeMask > 0, ReflectionsMasks > 0).astype(np.uint8)
-			GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
-		else:
-			GlobalMask = EdgeMask
-			GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
-	elif ReflectionsMasks is not None:
-		GlobalMask = ReflectionsMasks
-		GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
-	else:
-		GlobalMask = None
+	StaticMask = kwargs.get('StaticMask')
+	ShiftedMask = kwargs.get('ShiftedMask')
 
 	## Handle cropping
 	Cropping = kwargs.get('Cropping', 0)
 	if Cropping!=0:
 		im_static = im_static[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
 		im_shifted = im_shifted[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-		if GlobalMask is not None:
-			GlobalMask = GlobalMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+		if StaticMask is not None:
+			StaticMask = StaticMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+		if ShiftedMask is not None:
+			ShiftedMask = ShiftedMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+
 
 	# Print the configuration
 	if TwoStage:
@@ -734,22 +719,39 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	elastixImageFilter.SetFixedImage(im_static_se)
 	elastixImageFilter.SetMovingImage(im_shifted_se)
 
-	if GlobalMask is not None:
+	if StaticMask is not None:
 		# Ensure correct type and values
-		if GlobalMask.dtype != np.uint8:
-			GlobalMask = GlobalMask.astype(np.uint8)
-		GlobalMask[GlobalMask > 0] = 1 # ensure strictly binary
+		if StaticMask.dtype != np.uint8:
+			StaticMask = StaticMask.astype(np.uint8)
+		StaticMask[StaticMask > 0] = 1 # ensure strictly binary
 
 		# Ensure same shape
-		if GlobalMask.shape != im_static_orig.shape:
-			raise ValueError(f"GlobalMask shape {GlobalMask.shape} does not match image shape {im_static_orig.shape}")
+		if StaticMask.shape != im_static_orig.shape:
+			raise ValueError(f"StaticMask shape {StaticMask.shape} does not match image shape {im_static_orig.shape}")
 
 		# Create SITK mask with same geometry
-		mask_se = _sitk.GetImageFromArray(GlobalMask)
-		mask_se.CopyInformation(im_static_se) # match origin, spacing, direction
+		staticmask_se = _sitk.GetImageFromArray(StaticMask)
+		staticmask_se.CopyInformation(im_static_se) # match origin, spacing, direction
 
-		elastixImageFilter.SetFixedMask(mask_se)
-		elastixImageFilter.SetMovingMask(mask_se)
+		print(f'   Setting Static Mask')
+		elastixImageFilter.SetFixedMask(staticmask_se)
+
+	if ShiftedMask is not None:
+		# Ensure correct type and values
+		if ShiftedMask.dtype != np.uint8:
+			ShiftedMask = ShiftedMask.astype(np.uint8)
+		ShiftedMask[ShiftedMask > 0] = 1 # ensure strictly binary
+
+		# Ensure same shape
+		if ShiftedMask.shape != im_static_orig.shape:
+			raise ValueError(f"ShiftedMask shape {ShiftedMask.shape} does not match image shape {im_shifted_orig.shape}")
+
+		# Create SITK mask with same geometry
+		shiftedmask_se = _sitk.GetImageFromArray(ShiftedMask)
+		shiftedmask_se.CopyInformation(im_shifted_se) # match origin, spacing, direction
+
+		print(f'   Setting Shifted Mask')
+		elastixImageFilter.SetMovingMask(shiftedmask_se)
 
 	# Set up the parameter map(s) based on the registration mode
 	if TwoStage:
@@ -1038,7 +1040,7 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 		Static_Index = 0
 		print(f'Static index set to default {Static_Index}')
 
-	# EdgeMask = kwargs.get('EdgeMask')
+	EdgeMask = kwargs.get('EdgeMask')
 	AllReflectionsMasks = kwargs.get('AllReflectionsMasks')
 
 
@@ -1066,6 +1068,13 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 
 	## Define static image
 	im_static = RawHypercube[Static_Index, :,:]
+	## Define static mask:
+	if AllReflectionsMasks is not None:
+		ReflectionsMask_Static = AllReflectionsMasks[Static_Index, :,:]
+	else:
+		ReflectionsMask_Static = None
+
+	StaticMask = GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Static)
 
 	for c in range(0, NN):
 		if c==Static_Index:
@@ -1078,12 +1087,12 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 			print(f'Working on: {c+1} /{NN}')
 			im_shifted = RawHypercube[c, :,:]
 			if AllReflectionsMasks is not None:
-				print(f'   Masking Reflections')
-				AllReflectionsMasks_sub = AllReflectionsMasks[c,:,:]
-				im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, ReflectionsMasks=AllReflectionsMasks_sub, **kwargs)
+				# print(f'   Masking Reflections')
+				ReflectionsMask_Shifted = AllReflectionsMasks[c,:,:]
 			else:
-				im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, **kwargs) #, **kwargs
-			# print(f'c={c}: im_coregistered.shape = {im_coregistered.shape}')
+				ReflectionsMask_Shifted = None
+			ShiftedMask = GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted )
+			im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask, ShiftedMask=ShiftedMask, **kwargs)
 			Hypercube.append(im_coregistered)
 			AllTransforms.append(coregister_transform)
 
@@ -1277,5 +1286,58 @@ def LoadTransforms(TransformsPath, **kwargs):
 			AllTransforms.append(TransformsFrameSub)
 		
 	return AllTransforms
+
+
+def GetGlobalMask(**kwargs):
+	'''
+	Function that inputs optional arguments only, to output a global mask 
+	(for static or shifted images) that can be either a combination of the edge
+	and reflections mask, only one of those, or none, depending on what masks are available.
+
+	Inputs:
+		- kwargs:
+			- EdgeMask
+			- ReflectionsMask
+
+
+	Outputs:
+		- GlobalMask
+
+	'''
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetGlobalMask))
+		return 
+	EdgeMask = kwargs.get('EdgeMask')
+	ReflectionsMask = kwargs.get('ReflectionsMask')
+
+	if EdgeMask is not None:
+		if ReflectionsMask is not None: 
+			## If there is both an EdgeMask and a StaticMask, combine them
+			GlobalMask = np.logical_or(EdgeMask > 0, ReflectionsMask > 0).astype(np.uint8)
+			print(f'Global Mask = EdgeMask + ReflectionsMask')
+		else:
+			## Otherwise the global mask will be whaterver mask is given
+			GlobalMask = EdgeMask
+			print(f'Global Mask = EdgeMask only')
+	elif AllReflectionsMasks is not None:
+		GlobalMask = AllReflectionsMasks[Static_Index, :,:]
+		print(f'Global Mask = ReflectionsMask only')
+	else:
+		## If no mask is give, return None
+		GlobalMask = None
+		print(f'Global Mask = None')
+	if GlobalMask is not None:
+		## If there is a mask, invert it to be used with SimpleITK
+		GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
+
+	return GlobalMask
+
+
+
+
+
+
+
 			
 
