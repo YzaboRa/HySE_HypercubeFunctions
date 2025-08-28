@@ -1320,7 +1320,7 @@ def GetGlobalMask(**kwargs):
 			## Otherwise the global mask will be whaterver mask is given
 			GlobalMask = EdgeMask
 			print(f'Global Mask = EdgeMask only')
-	elif AllReflectionsMasks is not None:
+	elif ReflectionsMask is not None:
 		GlobalMask = ReflectionsMask
 		print(f'Global Mask = ReflectionsMask only')
 	else:
