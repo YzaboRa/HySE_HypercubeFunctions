@@ -531,7 +531,10 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 		print(f'Saving Hypercube')
 
 	Order = kwargs.get('Order', False)
-	
+	Blurring = kwargs.get('Blurring', False)
+	Sigma = kwargs.get('Sigma', 2)
+
+
 	t0 = time.time()
 	(NN, YY, XX) = RawHypercube.shape
 
@@ -572,6 +575,8 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 			# # print(f'c={c}: static_im.shape = {im.shape}')
 
 			if HideReflections and ReflectionsMask_Shifted is not None:
+				if Blurring:
+					im0 = gaussian_filter(im0, sigma=Sigma)
 				im0[ReflectionsMask_Static>0.5] = np.nan
 
 			Hypercube.append(im0)
