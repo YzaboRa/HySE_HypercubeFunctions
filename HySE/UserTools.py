@@ -816,7 +816,8 @@ def correlation_coefficient(spec1, spec2):
 	Outputs
 		- Correlation
 	"""
-	return np.corrcoef(spec1, spec2)[0, 1]
+	correlation = np.corrcoef(spec1, spec2)[0, 1]
+	return np.abs(correlation)
 
 def spectral_angle_mapper(spec1, spec2, eps=1e-8, **kwargs):
 	"""
@@ -1044,144 +1045,109 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 		plt.savefig(f'{SavingPath}_Patches.png', dpi=300)
 	plt.show()
 
-# def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData, MacBeth_RGB, Name, **kwargs):
-# 	'''
-# 	Function to plot the spectra extracted from the patches of macbeth colour chart
+
+def GetPatchesMetrics(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData, MacBeth_RGB, Name, **kwargs):
+	'''
+	Function to compute how close a reconstructed spectra is to a ground truth spectra.
+	Designed to look at each patches in a Macbeth chart.
+	Uses three metrics:
+		- PSNR
+		- Pearson Correlation
+		- SAM
+
+
+	Inputs:
+		- PatchesSpectra_All: an array, or a list of arrays. Each array is expected of the shape
+			(Nwavelengths (16), Npatches (30), 3). Uses the output of the GetPatchesSpectrum()
+			function.
+		- Wavelengths_sorted: list of sorted wavelengths
+		- MacBethSpectraData: Ground truth spectra for the macbeth patches
+		- kwargs:
+			- Help: print this info
+			- ChosenMethod (0). If more than one set of spectra provided, determines which
+				of those (the 'method') has its metric indicated for each path.
+			- WhitePatchNormalise (True). Normalises all spectral by the spectra of the white patch
+
+	Outputs:
+		- all_patches_PSNR
+		- all_patches_Correlation
+		- all_patches_SAM
+		- (printout of the averages)
 	
-# 	Inputs:
-# 		- PatchesSpectra_All: an array, or a list of arrays. Each array is expected of the shape
-# 			(Nwavelengths (16), Npatches (30), 3). Uses the output of the GetPatchesSpectrum()
-# 			function.
-# 		- Wavelengths_sorted: list of sorted wavelengths
-# 		- MacBethSpectraData: Ground truth spectra for the macbeth patches
-# 		- MacBeth_RGB: MacBeth RBG values for each patch (for plotting)
-# 		- Name: Name of the dataset (for saving)
+
+	'''
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(PlotPatchesSpectra))
+		return 0,0,0
+
+	ChosenMethod = kwargs.get('ChosenMethod', 0)
+	WhitePatchNormalise = kwargs.get('WhitePatchNormalise', True)
+
+	all_patches_PSNR = [] 
+	all_patches_Correlation = [] 
+	all_patches_SAM = [] 
 		
-# 		- kwargs:
-# 			- Help: print this info
-# 			- SavingPath: If indicated, saves the figure at the indicated path
-# 			- PSNR = True : Whether or not to compute PSNR for each method
-# 			- ChosenMethod (0). If more than one set of spectra provided, determines which
-# 				of those (the 'method') has the PSNR indicated for each path
-# 			- PlotLabels: What label to put for each provided set of spectra. If not indicated
-# 				a generic 'option 1', 'option 2' etc will be used
-# 			- WhitePatchNormalise (True). Normalises all spectral by the spectra of the white patch
-# 			- ClipYScale (True): Clip the y range of the plots to [-0.05,1.05]
-# 			- ClipXScale (True)
-# 			- XScale = [450,670]
-
-# 	Outputs:
-# 		- (plots figure)
-	
-	
-# 	'''
-# 	Help = kwargs.get('Help', False)
-# 	if Help:
-# 		print(inspect.getdoc(PlotPatchesSpectra))
-# 		return
-
-# 	SavingPath = kwargs.get('SavingPath')
-# 	if SavingPath is None:
-# 		SaveFig = False
-# 	else:
-# 		SaveFig = True
-
-# 	ClipYScale = kwargs.get('ClipYScale', True)
-# 	ClipXScale = kwargs.get('ClipXScale', True)
-# 	XScale = kwargs.get('XScale', [450,670])
-# 	PSNR = kwargs.get('PSNR', True)
-
-# 	PlotColours = ['limegreen', 'cornflowerblue', 'orange', 'red', 'darkblue', 'cyan', 'magenta']
+	if not isinstance(PatchesSpectra_All, list):
+		PatchesSpectra_All = [PatchesSpectra_All]
 		
-# 	ChosenMethod = kwargs.get('ChosenMethod', 0)
-# 	WhitePatchNormalise = kwargs.get('WhitePatchNormalise', True)
-		
-# 	## If there is only one spectra to plot per patch, place in list to fit in code
-# 	if isinstance(PatchesSpectra_All, list)==False:
-# 		PatchesSpectra_All = [PatchesSpectra_All]
-		
-# 	PlotLabels = kwargs.get('PlotLabels')
-# 	if PlotLabels is None:
-# 		print(f'Indicate PlotLabels for more descriptive plot')
-# 		Plotlabels = [f'Option {i}' for i in range(0,len(PatchesSpectra_All))]
 
-# 	WavelengthRange_start = np.round(int(np.amin(Wavelengths_sorted))/10,0)*10
-# 	WavelengthRange_end = np.round(np.amax(Wavelengths_sorted)/10,0)*10
-# 	print(f'Wavelength range: {WavelengthRange_start} : {WavelengthRange_end}')
+	WavelengthRange_start = np.round(int(np.amin(Wavelengths_sorted)) / 10.0) * 10
+	WavelengthRange_end = np.round(np.amax(Wavelengths_sorted) / 10.0) * 10
+	print(f'Wavelength range: {WavelengthRange_start} : {WavelengthRange_end}')
 
-# 	idx_min_gtruth = find_closest(MacBethSpectraData[:,0], WavelengthRange_start)
-# 	idx_max_gtruth = find_closest(MacBethSpectraData[:,0], WavelengthRange_end)
+	idx_min_gtruth = find_closest(MacBethSpectraData[:, 0], WavelengthRange_start)
+	idx_max_gtruth = find_closest(MacBethSpectraData[:, 0], WavelengthRange_end)
 
-# 	Nwhite=8-1
-# 	NN = len(Wavelengths_sorted)
-# 	White_truth = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth,Nwhite+1]
-# 	GroundTruthWavelengths = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth,0]
+	Nwhite = 8 - 1 # Index for the white patch (patch #8)
+	White_truth = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth, Nwhite + 1]
+	GroundTruthWavelengths = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth, 0]
 
-# 	fig, ax = plt.subplots(nrows=5, ncols=6, figsize=(14,12))
-# 	for i in range(0,6):
-# 		for j in range(0,5):
-# 			patchN = i + j*6
-# 			color=(MacBeth_RGB[patchN,0]/255, MacBeth_RGB[patchN,1]/255, MacBeth_RGB[patchN,2]/255)
-# 			GroundTruthSpectrum = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth,patchN+1]
-# 			if WhitePatchNormalise:
-# 				GroundTruthSpectrumN = np.divide(GroundTruthSpectrum, White_truth)
-# 			else:
-# 				GroundTruthSpectrumN = GroundTruthSpectrum
-# 			ax[j,i].plot(GroundTruthWavelengths, GroundTruthSpectrumN, color='black', lw=4, label='Truth')
-# 			PSNR_Vals = []
-# 			for k in range(0,len(PatchesSpectra_All)):
-# 				PatchesSpectra = PatchesSpectra_All[k]
-# 				if WhitePatchNormalise:
-# 					spectra_WhiteNorm = np.divide(PatchesSpectra[:,patchN,1], PatchesSpectra[:,Nwhite,1])
-# 				else:
-# 					spectra_WhiteNorm = PatchesSpectra[:,patchN,1]
-
-# 				ax[j,i].plot(Wavelengths_sorted, spectra_WhiteNorm, '.-', c=PlotColours[k], label=PlotLabels[k]) #PlotLinestyles[w], , label=PlotLabels[w]
-# 				GT_comparable = CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrumN)
-# 				if PSNR:
-# 					PSNR = psnr(GT_comparable, spectra_WhiteNorm)
-# 					PSNR_Vals.append(PSNR)
-
-# 			if ClipYScale:
-# 				ax[j,i].set_ylim(-0.05,1.05)
-# 			if ClipXScale:
-# 				ax[j,i].set_xlim(XScale[0],XScale[1])
+	for i in range(6):
+		for j in range(5):
+			patchN = i + j * 6
+			color = (MacBeth_RGB[patchN, 0] / 255, MacBeth_RGB[patchN, 1] / 255, MacBeth_RGB[patchN, 2] / 255)
 			
-# 			if PSNR:
-# 				if len(PSNR_Vals)>1:
-# 					MaxPSNR_pos = np.where(PSNR_Vals==np.amax(PSNR_Vals))[0][0]
-# 				else:
-# 					MaxPSNR_pos = 0
-# 				print(f'Best method for patch {patchN+1} = {PlotLabels[MaxPSNR_pos]}')
+			GroundTruthSpectrum = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth, patchN + 1]
+			if WhitePatchNormalise:
+				GroundTruthSpectrumN = np.divide(GroundTruthSpectrum, White_truth)
+			else:
+				GroundTruthSpectrumN = GroundTruthSpectrum
+							
+			for k in range(len(PatchesSpectra_All)):
+				PatchesSpectra = PatchesSpectra_All[k]
+				if WhitePatchNormalise:
+					spectra_WhiteNorm = np.divide(PatchesSpectra[:, patchN, 1], PatchesSpectra[:, Nwhite, 1])
+				else:
+					spectra_WhiteNorm = PatchesSpectra[:, patchN, 1]
+				
+				# Interpolate ground truth to match our measurement wavelengths for comparison
+				GT_comparable = CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrumN)
 
-# 			if patchN==Nwhite:
-# 				ax[j,i].set_title(f'Patch {patchN+1} - white', color='black', fontsize=10)# - {itn:.0f} itn,\n {r1norm*10**6:.0f} e-6 r1norm', fontsize=12)
-# 				ax[j,i].legend(fontsize=8, loc='lower center')
-# 			else:
-# #                 ax[j,i].set_title(f'Patch {patchN+1}\n PSNR = {PSNR:.2f}', color=color, fontsize=10) # fontweight="bold",
-# 				if PSNR:
-# 					ax[j,i].set_title(f'Patch {patchN+1}\nSelected PSNR = {PSNR_Vals[ChosenMethod]:.2f}\nMax: {np.amax(PSNR_Vals):.2f} {PlotLabels[MaxPSNR_pos]}', color=color, fontsize=10)
-# 				else:
-# 					ax[j,i].set_title(f'Patch {patchN+1}', color=color, fontsize=10)
+				## PSNR
+				metric_val = psnr(GT_comparable, spectra_WhiteNorm)
+				all_patches_PSNR.append(metric_val)
 
-# 			if j==4:
-# 				ax[j,i].set_xlabel('Wavelength [nm]')
-# 			if j!=4:
-# 				ax[j,i].xaxis.set_ticklabels([])
-# 			if i==0:
-# 				ax[j,i].set_ylabel('Normalized intensity')
-# 			if ClipYScale:
-# 				if i!=0:
-# 					ax[j,i].yaxis.set_ticklabels([])
+				## Correlation
+				metric_val = correlation_coefficient(GT_comparable, spectra_WhiteNorm)
+				all_patches_Correlation.append(metric_val)
 
-# 	if PSNR:
-# 		plt.suptitle(f'Spectra for {Name} - Selected Method: {ChosenMethod}')
-# 	else:
-# 		plt.suptitle(f'Spectra for {Name}')
-# 	plt.tight_layout()
-# 	if SaveFig:
-# 		plt.savefig(f'{SavingPath}_Patches.png')
-# 	plt.show()
+				## SAM
+				metric_val = spectral_angle_mapper(GT_comparable, spectra_WhiteNorm)
+				all_patches_SAM.append(metric_val)
+
+		
+	avg_PSNR = np.mean(np.abs(all_patches_PSNR))
+	avg_Correlation = np.mean(np.abs(all_patches_Correlation))
+	avg_SAM = np.mean(np.abs(all_patches_SAM))
+	
+	print(f'Average Values for each Metric:')
+	print(f'   PSNR:        {avg_PSNR:.2f} dB')
+	print(f'   Correlation: {avg_Correlation:.2f}')
+	print(f'   SAM:         {avg_SAM:.2f} °')
+
+	return all_patches_PSNR, all_patches_Correlation, all_patches_SAM
+	
 
 
 
