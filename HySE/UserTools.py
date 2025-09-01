@@ -1142,11 +1142,15 @@ def GetPatchesMetrics(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData
 	avg_PSNR = np.mean(all_patches_PSNR)
 	avg_Correlation = np.mean(np.abs(all_patches_Correlation))
 	avg_SAM = np.mean(np.abs(all_patches_SAM))
+
+	std_PSNR = np.std(all_patches_PSNR)
+	std_Correlation = np.std(np.abs(all_patches_Correlation))
+	std_SAM = np.std(np.abs(all_patches_SAM))
 	
 	print(f'Average Values for each Metric:')
-	print(f'   PSNR:        {avg_PSNR:.2f} dB')
-	print(f'   Correlation: {avg_Correlation:.2f}')
-	print(f'   SAM:         {avg_SAM:.2f} °')
+	print(f'   PSNR:        {avg_PSNR:.2f} +/- {std_PSNR:.2f} dB')
+	print(f'   Correlation: {avg_Correlation:.3f} +/- {std_Correlation:.3f}')
+	print(f'   SAM:         {avg_SAM:.2f} +/- {std_SAM:.2f} °')
 
 	return all_patches_PSNR, all_patches_Correlation, all_patches_SAM
 	
