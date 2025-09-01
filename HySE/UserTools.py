@@ -1094,7 +1094,7 @@ def GetPatchesMetrics(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData
 
 	WavelengthRange_start = np.round(int(np.amin(Wavelengths_sorted)) / 10.0) * 10
 	WavelengthRange_end = np.round(np.amax(Wavelengths_sorted) / 10.0) * 10
-	print(f'Wavelength range: {WavelengthRange_start} : {WavelengthRange_end}')
+	# print(f'Wavelength range: {WavelengthRange_start} : {WavelengthRange_end}')
 
 	idx_min_gtruth = find_closest(MacBethSpectraData[:, 0], WavelengthRange_start)
 	idx_max_gtruth = find_closest(MacBethSpectraData[:, 0], WavelengthRange_end)
@@ -1124,20 +1124,22 @@ def GetPatchesMetrics(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData
 				# Interpolate ground truth to match our measurement wavelengths for comparison
 				GT_comparable = CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrumN)
 
-				## PSNR
-				metric_val = psnr(GT_comparable, spectra_WhiteNorm)
-				all_patches_PSNR.append(metric_val)
+				if patchN!=Nwhite: ## Ignore white patch since it's used to normalise
 
-				## Correlation
-				metric_val = correlation_coefficient(GT_comparable, spectra_WhiteNorm)
-				all_patches_Correlation.append(metric_val)
+					## PSNR
+					metric_val = psnr(GT_comparable, spectra_WhiteNorm)
+					all_patches_PSNR.append(metric_val)
 
-				## SAM
-				metric_val = spectral_angle_mapper(GT_comparable, spectra_WhiteNorm)
-				all_patches_SAM.append(metric_val)
+					## Correlation
+					metric_val = correlation_coefficient(GT_comparable, spectra_WhiteNorm)
+					all_patches_Correlation.append(metric_val)
+
+					## SAM
+					metric_val = spectral_angle_mapper(GT_comparable, spectra_WhiteNorm)
+					all_patches_SAM.append(metric_val)
 
 		
-	avg_PSNR = np.mean(np.abs(all_patches_PSNR))
+	avg_PSNR = np.mean(all_patches_PSNR)
 	avg_Correlation = np.mean(np.abs(all_patches_Correlation))
 	avg_SAM = np.mean(np.abs(all_patches_SAM))
 	
