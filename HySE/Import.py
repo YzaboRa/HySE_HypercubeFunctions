@@ -86,7 +86,7 @@ def ImportData(Path, *Coords, **kwargs):
 		- **Info: (optional) --> RGB, Trace
 		
 			- RGB = True if you want not to flatten the imported frames into 2D
-					(defaul is RGB = False)
+					(default is RGB = False)
 			
 			- Trace = True if you want to only calculate the average of each frame
 					  Can be used to identify hypercube for large datasets 
