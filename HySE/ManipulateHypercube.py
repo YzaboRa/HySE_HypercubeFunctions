@@ -593,10 +593,12 @@ def GetDark_WholeVideo(vidPath, **kwargs):
 		- kwargs:
 			- Help: Print this help information
 			- CropImDimensions: Cropping coordinates to extract endoscopy image from raw frame
-				Form: [xmin, xmax, ymin, ymax] 
+				Form: [xmin, xmax, ymin, ymax]
+			- RGB = True:
 
 	Ouput:
-		- LongDark: 2D numpy array
+		- LongDark: 2D numpy array (if RGB=False),3D numpy array (if RGB=True)
+
 	"""
 	Help = kwargs.get('Help', False)
 	if Help:
@@ -604,12 +606,13 @@ def GetDark_WholeVideo(vidPath, **kwargs):
 		print(inspect.getdoc(GetLongDark))
 		return 0
 
+	RGB = kwargs.get('RGB', False)
+
 	CropImDimensions = kwargs.get('CropImDimensions')
 	if CropImDimensions is None:
-		DataAll = HySE.Import.ImportData(vidPath)
+		DataAll = HySE.Import.ImportData(vidPath,RGB=RGB)
 	else:
-		DataAll = HySE.Import.ImportData(vidPath, CropImDimensions=CropImDimensions)
-	 # DataAll = Import.ImportData(vidPath, **kwargs)
+		DataAll = HySE.Import.ImportData(vidPath,RGB=RGB, CropImDimensions=CropImDimensions)
 
 	L = len(DataAll)
 	print(f'Dataset size:  {L}')
@@ -635,7 +638,6 @@ def GetDark_WholeVideo(vidPath, **kwargs):
 	dark = np.average(np.array(Darks), axis=0)
 	std_est = np.average(STDs)
 	print(f'Dark from video ({len(DataAll)} frames -> {chunk_size*N}). Average value: {np.average(dark):.2f}, std: {std_est:.2f}')
-	dark = np.average(frames,axis=0)
 	return dark
 
 
