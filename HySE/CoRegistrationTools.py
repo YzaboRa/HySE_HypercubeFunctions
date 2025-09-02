@@ -15,6 +15,7 @@ import matplotlib
 from matplotlib import pyplot as plt
 import imageio
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.widgets import RectangleSelector
 # import SimpleITK as sitk
 import time
 from tqdm import trange
@@ -42,6 +43,396 @@ import copy
 
 
 
+####  -------   HELPER FUNCTIONS   -------
+####  ------------------------------------
+
+def GetGlobalMask(**kwargs):
+	'''
+	Function that inputs optional arguments only, to output a global mask 
+	(for static or shifted images) that can be either a combination of the edge
+	and reflections mask, only one of those, or none, depending on what masks are available.
+
+	Inputs:
+		- kwargs:
+			- EdgeMask
+			- ReflectionsMask
+
+
+	Outputs:
+		- GlobalMask
+
+	'''
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetGlobalMask))
+		return 
+	EdgeMask = kwargs.get('EdgeMask')
+	ReflectionsMask = kwargs.get('ReflectionsMask')
+
+	if EdgeMask is not None:
+		if ReflectionsMask is not None: 
+			## If there is both an EdgeMask and a StaticMask, combine them
+			GlobalMask = np.logical_or(EdgeMask > 0, ReflectionsMask > 0).astype(np.uint8)
+			print(f'Global Mask = EdgeMask + ReflectionsMask')
+		else:
+			## Otherwise the global mask will be whaterver mask is given
+			GlobalMask = EdgeMask
+			print(f'Global Mask = EdgeMask only')
+	elif ReflectionsMask is not None:
+		GlobalMask = ReflectionsMask
+		print(f'Global Mask = ReflectionsMask only')
+	else:
+		## If no mask is give, return None
+		GlobalMask = None
+		print(f'Global Mask = None')
+	# if GlobalMask is not None:
+	# 	## If there is a mask, invert it to be used with SimpleITK
+	# 	GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
+
+	return GlobalMask
+
+
+def GetNMI(Data, **kwargs):
+	"""
+	Computes the normalised mutual information of a hypercube.
+
+	Inputs:
+		- Data : Hypercube, shape (N, Y, X), may contain NaNs
+		- kwargs:
+			- Help : if True, print docstring
+			- ReferenceIndex = 1 : Which image to reference to
+
+	Outputs:
+		- NMI_average : float, mean NMI vs reference
+		- NMI_vs_reference : array of shape (N,), NMI each slice vs reference
+		- NMI_pairwise : array of shape (N-1,), pairwise NMI between consecutive slices
+	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetNMI))
+		return 0, 0, 0
+
+
+	cube = Data
+	N, H, W = cube.shape
+
+	# Contrast-normalise each slice, ignoring NaNs
+	cube_norm = cube.astype(np.float32).copy()
+	for i in range(N):
+		sl = cube_norm[i]
+		min_val = np.nanmin(sl)
+		rng = np.nanmax(sl) - min_val
+		if rng == 0 or np.isnan(rng):
+			cube_norm[i] = np.zeros_like(sl, dtype=np.float32)
+		else:
+			cube_norm[i] = (sl - min_val) / (rng + 1e-7)
+
+	# Reference slice (e.g. index 1)
+	# ref_idx = 1
+	ref_idx = kwargs.get('ReferenceIndex', 1)
+	ref = cube_norm[ref_idx]
+	bins = 128
+
+	# Helper to mask NaNs before NMI call
+	def safe_nmi(a, b, bins=128):
+		mask = ~np.isnan(a) & ~np.isnan(b)
+		if mask.sum() == 0:   # no overlap
+			return np.nan
+		return nmi(a[mask], b[mask], bins=bins)
+
+	# NMI vs reference
+	nmi_vs_ref = np.empty(N, dtype=np.float32)
+	for i in range(N):
+		nmi_vs_ref[i] = safe_nmi(cube_norm[i], ref, bins=bins)
+	mean_nmi = np.nanmean(nmi_vs_ref)
+
+	# Pairwise NMI
+	pairwise_nmi = np.empty(N - 1, dtype=np.float32)
+	for i in range(N - 1):
+		pairwise_nmi[i] = safe_nmi(cube_norm[i], cube_norm[i + 1], bins=bins)
+
+	return mean_nmi, nmi_vs_ref, pairwise_nmi
+
+
+
+def get_interactive_roi(image, title='Select Registration ROI'):
+	"""
+	Displays an image and allows the user to select a rectangular ROI.
+	
+	Returns:
+		A tuple of (y_start, y_end, x_start, x_end) or None if window is closed.
+	"""
+	roi_coords = {}
+
+	def line_select_callback(eclick, erelease):
+		"""Callback for processing the rectangle selector's click and release events."""
+		x1, y1 = int(eclick.xdata), int(eclick.ydata)
+		x2, y2 = int(erelease.xdata), int(erelease.ydata)
+		roi_coords['x_start'] = min(x1, x2)
+		roi_coords['x_end'] = max(x1, x2)
+		roi_coords['y_start'] = min(y1, y2)
+		roi_coords['y_end'] = max(y1, y2)
+
+	fig, ax = plt.subplots(figsize=(10, 8))
+	
+	# Normalize image for better visualization
+	p2, p98 = np.percentile(image, (2, 98))
+	img_display = np.clip((image - p2) / (p98 - p2), 0, 1)
+	
+	ax.imshow(img_display, cmap='gray')
+	ax.set_title(f"{title}\nDraw a rectangle and close the window to continue.")
+	
+	rs = RectangleSelector(ax, line_select_callback,
+						   useblit=True,
+						   button=[1],  # Left mouse button
+						   minspanx=5, minspany=5,
+						   spancoords='pixels',
+						   interactive=True,
+						   props=dict(facecolor='cyan', edgecolor='cyan', alpha=0.3, fill=True))
+
+	plt.show(block=True) # This will pause execution until you close the plot window
+
+	if 'x_start' in roi_coords:
+		return (roi_coords['y_start'], roi_coords['y_end'], 
+				roi_coords['x_start'], roi_coords['x_end'])
+	else:
+		print("No ROI selected. Proceeding without interactive crop.")
+		return None
+
+
+
+
+def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
+	"""
+	Function that takes all hypercubes (where hypercube computed from specific sweepw were kept individually 
+	instead of averaged) and saves frames as individual images. 
+	All images are saved in folder called {Name}_{NameSub}_RawFrames inside SavingPath, and images from sweep i are
+	saved in the folder Sweep{s}.
+
+	Modified to allow expanded hypercubes that include individual (non-averaged) frames within plateaus.
+
+	Input:
+		- Hypercube_all : All the hypercubes computed from all sweeps. Shape (Nsweeps, Nwav, Y, X) or (Nsweeps, Nwav, Nframes, Y, X)
+		- SavingPath : Where to save all results (generic) (expected to end with '/')
+		- Name : General name of the data (i.e. patient)
+		- NameSub : Specific name for the hypercubes (i.e. lesion)
+		- kwargs:
+			- Sweeps [int, int, ...] : If indicated, which sweeps to save
+			- Frames [int] : If indicated, which frames inside a given sweep to save
+			- Help
+
+
+	Outputs:
+		- All frames saved as png images in individual folders
+
+	"""
+
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(SaveFramesSweeps))
+		return 
+
+	hypercube_shape = Hypercube_all.shape
+	if len(hypercube_shape)==4:
+		Nsweeps, Nwav, YY, XX = Hypercube_all.shape
+	else:
+		Nsweeps, Nwav, Nframes, YY, XX = Hypercube_all.shape
+		# 19, 16, 3, 1004, 1155
+
+	Sweeps = kwargs.get('Sweeps')
+	if Sweeps is None:
+		Sweeps = [i for i in range(0, Nsweeps)]
+	else:
+		print(f'Only saving sweeps {Sweeps}')
+
+	Frames = kwargs.get('Frames')
+	if Frames is None:
+		Frames = [i for i in range(0, Frames)]
+	else:
+		print(f'Only saving frames {Frames}')
+	
+	GeneralDirectory = f'{Name}_{NameSub}_RawFrames'
+	try:
+		os.mkdir(f'{SavingPath}{GeneralDirectory}')
+	except FileExistsError:
+		pass
+	for s in range(0,Nsweeps):
+		if s in Sweeps:
+			DirectoryName = f'{SavingPath}{GeneralDirectory}/Sweep{s}'
+			try:
+				os.mkdir(DirectoryName)
+			except FileExistsError:
+				pass
+
+			if len(hypercube_shape)==4:
+				hypercube = Hypercube_all[s,:,:,:]
+				for w in range(0,Nwav):
+					frame = hypercube[w,:,:]/(np.amax(hypercube[w,:,:]))*255
+					im = Image.fromarray(frame)
+					im = im.convert("L")
+					im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}.png')
+			else:
+				hypercube = Hypercube_all[s,:,:,:,:]
+				for w in range(0,Nwav):
+					for f in range(0,Nframes):
+						if f in Frames:
+							frame = hypercube[w,f,:,:]/(np.amax(hypercube[w,f,:,:]))*255
+							im = Image.fromarray(frame)
+							im = im.convert("L")
+							im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}_frame{f}.png')
+
+
+
+
+
+####  -------   DEAL WITH TRANSFORMS   -------
+####  ----------------------------------------
+
+
+
+def ApplyTransform(Frames, Transforms, **kwargs):
+	'''
+	Functions that inputs the list of all transforms generated by HySE.CoRegisterHypercube() and applies 
+	it to new frames.
+	Note that the transforms can be saved as .txt files as well
+
+	Inputs:
+		- Frames : Array, shape (N, Y, X)
+		- Transforms : List, length N (one transform per 2D frame)
+		- kwargs :
+			- Help
+			- Verbose = False : If true, prints default console output from SimpleITK
+
+	Outputs:
+		- TransformedFrames
+	'''
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(ApplyTransform))
+		return 0
+	Verbose = kwargs.get('Verbose', False)
+
+	(Nwav, Y, X) = Frames.shape
+	if Nwav!=len(Transforms):
+		print(f'The number of frames to register does not match the number of transforms provided')
+		return 0
+	
+	TransformedFrames = []
+	for i in range(0, Nwav):
+		# print(f'Transforming image {i+1}/Nwav')
+		im_shifted = Frames[i,:,:]
+		transform = Transforms[i]
+		
+		if transform==0:
+			# this is the static frame (transform==0) – nothing to apply
+			print(f'Static image')
+			TransformedFrames.append(im_shifted)
+			continue
+		else:
+			im_shifted_se = _sitk.GetImageFromArray(im_shifted)
+			transformixImageFilter = _sitk.TransformixImageFilter()
+			if Verbose==False:
+				transformixImageFilter.LogToConsoleOff()
+			transformixImageFilter.SetMovingImage(im_shifted_se)
+			transformixImageFilter.SetTransformParameterMap(transform)
+			result = transformixImageFilter.Execute()
+			im_registered = _sitk.GetArrayFromImage(result)
+			TransformedFrames.append(im_registered)
+		
+	TransformedFrames = np.array(TransformedFrames)
+	return TransformedFrames
+
+
+def SaveTransforms(AllTransforms, TransformsSavingPath, **kwargs):
+	'''
+	Function that saves all the transforms output from the coregistration pipeline (AllTransforms) as txt files.
+	
+	Inputs:
+		- AllTransforms (Output from CoRegisterHypercube())
+		- TransformsSavingPath : Where to save files (do not add extension)
+		- kwargs
+			- Help
+	Ouput:
+	
+	'''
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(SaveTransforms))
+		return 
+	
+	N = len(AllTransforms)
+	for n in range(0,N):
+		transform = AllTransforms[n]
+		if transform==0:
+#             print('Static image')
+			pass
+		else:
+			for i in range(0,len(transform)):
+				_sitk.WriteParameterFile(transform[i], f'{TransformsSavingPath}_Frame{n}_{i}.txt')
+			
+	
+def LoadTransforms(TransformsPath, **kwargs):
+	'''
+	Function that loads previously saved coregistration transforms to apply to new frames.
+	Looks for all the txt files in the indicated path, and checks for the number of transforms applied
+	to each frame.
+	Assumes that the files were generated by SaveTransforms() and that TransformPath is the same path
+	indicated in SaveTransforms() when creating the files.
+	
+	Input:
+		- TransformsPath: Path where the files are located. Assumes .txt files and format
+			of the shape Frame{n}_{i}, where n is the frame and i is the transform
+			For TwoStage tranform, i=0 is the affine transform and i=1 is the BSpline transform
+		- kwargs:
+			- Help
+			
+	Output:
+		- AllTransforms : list of (lists) containting all the transforms. 
+			len(AllTransforms) = number of frames. 
+			If more than one transform is applied per frame (TwoStage), each element in AllTransforms will
+			be a list containing all the transforms applied to this given frame.
+	
+	'''
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(LoadTransforms))
+		return 
+	Files = natsorted(glob.glob(TransformsPath+'*.txt'))
+
+	TransformInfo = []
+	for i in range(0,len(Files)):
+		file = Files[i]
+		Name = file.split('/')[-1]
+		Info = Name.split('Frame')[-1].replace('.txt','')
+		(Frame, t) = Info.split('_')
+		TransformInfo.append(int(t))
+
+	NTransformsPerFrame = np.amax(TransformInfo)
+	
+	AllTransforms = []
+	for i in range(0,len(Files)):
+		file = Files[i]
+		Name = file.split('/')[-1]
+		Info = Name.split('Frame')[-1].replace('.txt','')
+		transform = _sitk.ReadParameterFile(file)
+		(Frame, t) = Info.split('_')
+		if int(t)==0:
+			TransformsFrameSub = []
+		TransformsFrameSub.append(transform)
+		if int(t)==NTransformsPerFrame:
+			AllTransforms.append(TransformsFrameSub)
+		
+	return AllTransforms
+
+
+
+
+
+
+
+
+####  -------   MAIN COREGISTRATION FUNCTIONS   -------
+####  -------------------------------------------------
 
 
 def CoRegisterImages(im_static, im_shifted, **kwargs):
@@ -102,17 +493,6 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	Sigma = kwargs.get('Sigma', 2)
 	StaticMask = kwargs.get('StaticMask')
 	ShiftedMask = kwargs.get('ShiftedMask')
-
-	# ## Handle cropping
-	# Cropping = kwargs.get('Cropping', 0)
-	# if Cropping!=0:
-	# 	im_static = im_static[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-	# 	im_shifted = im_shifted[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-	# 	if StaticMask is not None:
-	# 		StaticMask = StaticMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-	# 	if ShiftedMask is not None:
-	# 		ShiftedMask = ShiftedMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
-
 
 	# Print the configuration
 	if TwoStage:
@@ -262,216 +642,9 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 	return im_coregistered, transformParameterMap
 
 
+#### ----------------------------------------------------------------------
 
-
-def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
-	"""
-	Function that takes all hypercubes (where hypercube computed from specific sweepw were kept individually 
-	instead of averaged) and saves frames as individual images. 
-	All images are saved in folder called {Name}_{NameSub}_RawFrames inside SavingPath, and images from sweep i are
-	saved in the folder Sweep{s}.
-
-	Modified to allow expanded hypercubes that include individual (non-averaged) frames within plateaus.
-
-	Input:
-		- Hypercube_all : All the hypercubes computed from all sweeps. Shape (Nsweeps, Nwav, Y, X) or (Nsweeps, Nwav, Nframes, Y, X)
-		- SavingPath : Where to save all results (generic) (expected to end with '/')
-		- Name : General name of the data (i.e. patient)
-		- NameSub : Specific name for the hypercubes (i.e. lesion)
-		- kwargs:
-			- Sweeps [int, int, ...] : If indicated, which sweeps to save
-			- Frames [int] : If indicated, which frames inside a given sweep to save
-			- Help
-
-
-	Outputs:
-		- All frames saved as png images in individual folders
-
-	"""
-
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(inspect.getdoc(SaveFramesSweeps))
-		return 
-
-	hypercube_shape = Hypercube_all.shape
-	if len(hypercube_shape)==4:
-		Nsweeps, Nwav, YY, XX = Hypercube_all.shape
-	else:
-		Nsweeps, Nwav, Nframes, YY, XX = Hypercube_all.shape
-		# 19, 16, 3, 1004, 1155
-
-	Sweeps = kwargs.get('Sweeps')
-	if Sweeps is None:
-		Sweeps = [i for i in range(0, Nsweeps)]
-	else:
-		print(f'Only saving sweeps {Sweeps}')
-
-	Frames = kwargs.get('Frames')
-	if Frames is None:
-		Frames = [i for i in range(0, Frames)]
-	else:
-		print(f'Only saving frames {Frames}')
-	
-	GeneralDirectory = f'{Name}_{NameSub}_RawFrames'
-	try:
-		os.mkdir(f'{SavingPath}{GeneralDirectory}')
-	except FileExistsError:
-		pass
-	for s in range(0,Nsweeps):
-		if s in Sweeps:
-			DirectoryName = f'{SavingPath}{GeneralDirectory}/Sweep{s}'
-			try:
-				os.mkdir(DirectoryName)
-			except FileExistsError:
-				pass
-
-			if len(hypercube_shape)==4:
-				hypercube = Hypercube_all[s,:,:,:]
-				for w in range(0,Nwav):
-					frame = hypercube[w,:,:]/(np.amax(hypercube[w,:,:]))*255
-					im = Image.fromarray(frame)
-					im = im.convert("L")
-					im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}.png')
-			else:
-				hypercube = Hypercube_all[s,:,:,:,:]
-				for w in range(0,Nwav):
-					for f in range(0,Nframes):
-						if f in Frames:
-							frame = hypercube[w,f,:,:]/(np.amax(hypercube[w,f,:,:]))*255
-							im = Image.fromarray(frame)
-							im = im.convert("L")
-							im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}_frame{f}.png')
-
-
-
-
-def GetNMI(Data, **kwargs):
-	"""
-	Computes the normalised mutual information of a hypercube.
-
-	Inputs:
-		- Data : Hypercube, shape (N, Y, X), may contain NaNs
-		- kwargs:
-			- Help : if True, print docstring
-			- ReferenceIndex = 1 : Which image to reference to
-
-	Outputs:
-		- NMI_average : float, mean NMI vs reference
-		- NMI_vs_reference : array of shape (N,), NMI each slice vs reference
-		- NMI_pairwise : array of shape (N-1,), pairwise NMI between consecutive slices
-	"""
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(inspect.getdoc(GetNMI))
-		return 0, 0, 0
-
-
-	cube = Data
-	N, H, W = cube.shape
-
-	# Contrast-normalise each slice, ignoring NaNs
-	cube_norm = cube.astype(np.float32).copy()
-	for i in range(N):
-		sl = cube_norm[i]
-		min_val = np.nanmin(sl)
-		rng = np.nanmax(sl) - min_val
-		if rng == 0 or np.isnan(rng):
-			cube_norm[i] = np.zeros_like(sl, dtype=np.float32)
-		else:
-			cube_norm[i] = (sl - min_val) / (rng + 1e-7)
-
-	# Reference slice (e.g. index 1)
-	# ref_idx = 1
-	ref_idx = kwargs.get('ReferenceIndex', 1)
-	ref = cube_norm[ref_idx]
-	bins = 128
-
-	# Helper to mask NaNs before NMI call
-	def safe_nmi(a, b, bins=128):
-		mask = ~np.isnan(a) & ~np.isnan(b)
-		if mask.sum() == 0:   # no overlap
-			return np.nan
-		return nmi(a[mask], b[mask], bins=bins)
-
-	# NMI vs reference
-	nmi_vs_ref = np.empty(N, dtype=np.float32)
-	for i in range(N):
-		nmi_vs_ref[i] = safe_nmi(cube_norm[i], ref, bins=bins)
-	mean_nmi = np.nanmean(nmi_vs_ref)
-
-	# Pairwise NMI
-	pairwise_nmi = np.empty(N - 1, dtype=np.float32)
-	for i in range(N - 1):
-		pairwise_nmi[i] = safe_nmi(cube_norm[i], cube_norm[i + 1], bins=bins)
-
-	return mean_nmi, nmi_vs_ref, pairwise_nmi
-
-
-
-def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list, **kwargs):
-	"""
-	Function that generates a hypercube for co-registration. 
-	Specifically, it allows to select a single specific frame to run the co-registration.
-
-	Inputs:
-		- Nsweep (int) : Which sweep in the dataset to use
-		- Nframe (int or [int, int, ...]) : Which frame(s), within this sweep, to use (clearest one).
-			If more than one frame indicated, the code will compute a hypercube for each integer indicated and then
-			concatenate all hypercubes
-		- Path : Where the data is located
-		- EdgePos : Positions of the start of each sweep
-		- Wavelengths_list
-		- kwargs:
-			- Help
-			- Buffer = 9 : How many frames to skip at the start and end of a sweep
-
-	Outputs:
-		- Hypercube for registration
-
-	"""
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(inspect.getdoc(GetHypercubeForRegistration))
-		return 0
-
-	Buffer = kwargs.get('Buffer')
-	if Buffer is None:
-		Buffer = 9
-		print(f'Setting Buffer to default {Buffer}')
-	Hypercube_all, Dark_all = HySE.ComputeHypercube(Path, EdgePos, Wavelengths_list, Buffer=Buffer, Average=False, 
-													Order=False, Help=False, SaveFig=False, SaveArray=False, Plot=False, ForCoRegistration=True)
-	if isinstance(Nframe, int):
-		HypercubeForRegistration = Hypercube_all[Nsweep,:,Nframe,:,:]
-	elif isinstance(Nframe, list):
-		HypercubeForRegistration = []
-		for i in range(0,len(Nframe)):
-			HypercubeForRegistration_sub = Hypercube_all[Nsweep,:,Nframe[i],:,:]
-			if i==0:
-				HypercubeForRegistration = HypercubeForRegistration_sub
-			else:
-				HypercubeForRegistration = np.concatenate((HypercubeForRegistration, HypercubeForRegistration_sub), axis=0)
-	else:
-		print(f'Nframe format not accepted.')
-		HypercubeForRegistration=0
-	return HypercubeForRegistration
-
-
-
-def clone_parameter_map(transform_map):
-	"""
-	Manually clone a SimpleITK ParameterMap tuple (any number of stages)
-	so we can safely modify it without touching the original.
-	"""
-	new_map = []
-	for stage in transform_map:
-		stage_clone = {}
-		for k in stage:
-			stage_clone[k] = list(stage[k])  # copy the list
-		new_map.append(stage_clone)
-	return tuple(new_map)
-	
-
+## Original basic function:
 def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 	"""
 
@@ -600,34 +773,9 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 			# print(f'Starting Registration')
 			# --- STEP 1 & 2: Perform Registration to get Transform Map ---
 			im_coregistered_smeared, transform_map = CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask, ShiftedMask=ShiftedMask, **kwargs)
-			# print(f'Did the Registration')
-			# print(transform_map)
-			# print(f"Frame {c}: transform = {transform_map[0]['TransformParameters'][:10]}")
-			# print(ReflectionsMask_Shifted)
 
 			# --- STEP 3 & 4: Transform the Mask and Punch Holes ---
 			im_coregistered_final = im_coregistered_smeared.astype(np.float32)
-
-			# if HideReflections and ReflectionsMask_Shifted is not None:
-			# 	mask_transform_map = clone_parameter_map(transform_map)
-				
-			# 	# force nearest neighbor interpolation
-			# 	for pm in mask_transform_map:
-			# 		pm['FinalBSplineInterpolationOrder'] = ['0']
-				
-			# 	mask_to_transform = np.array([ReflectionsMask_Shifted])
-			# 	transforms_to_apply = [mask_transform_map]
-			# 	mask_transformed = ApplyTransform(mask_to_transform, transforms_to_apply, **kwargs)
-				
-			# 	im_coregistered_final[mask_transformed[0,:,:] > 0.3] = np.nan
-
-
-			# if HideReflections and ReflectionsMask_Shifted is not None:
-			# 	mask_to_transform = np.array([ReflectionsMask_Shifted])
-			# 	transforms_to_appy = [transform_map]
-			# 	mask_transformed = ApplyTransform(mask_to_transform, transforms_to_appy, **kwargs)
-			# 	im_coregistered_final[mask_transformed[0,:,:] > 0.3] = np.nan
-
 			
 
 			if HideReflections:
@@ -641,7 +789,6 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 					# Set the transform map from the image registration
 					transformixImageFilter.SetTransformParameterMap(transform_map)
 
-					# --- The Critical Part for Mask Interpolation ---
 					# Modify the parameter map to use nearest neighbor interpolation
 					transform_map[0]['FinalBSplineInterpolationOrder'] = ['0']
 					if len(transform_map) > 1: # Handle TwoStage registration
@@ -659,7 +806,6 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 					registered_mask = _sitk.GetArrayFromImage(registered_mask_sitk).astype(bool)
 
 					# Punch holes in the final registered image
-					# Using np.nan is best practice for "no data" in float arrays
 					im_coregistered_final[registered_mask] = np.nan
 
 
@@ -679,8 +825,6 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 
 	tf = time.time()
 	# print(f'Hypercube size: len = {len(Hypercube)}')
-	# for i in range(0,len(Hypercube)):
-		# print(f'i = {i}: {Hypercube[i].shape}')
 	Hypercube = np.array(Hypercube)
 	## Calculate time taken
 	time_total = tf-t0
@@ -722,187 +866,559 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 
 
 
+## Fancier version
+def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
+	"""
 
-def ApplyTransform(Frames, Transforms, **kwargs):
-	'''
-	Functions that inputs the list of all transforms generated by HySE.CoRegisterHypercube() and applies 
-	it to new frames.
-	Note that the transforms can be saved as .txt files as well
+	Apply Simple Elastix co-registration to all sweep
 
-	Inputs:
-		- Frames : Array, shape (N, Y, X)
-		- Transforms : List, length N (one transform per 2D frame)
-		- kwargs :
-			- Help
-			- Verbose = False : If true, prints default console output from SimpleITK
+	Uses CoRegisterImages
 
-	Outputs:
-		- TransformedFrames
-	'''
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(inspect.getdoc(ApplyTransform))
-		return 0
-	Verbose = kwargs.get('Verbose', False)
-
-	(Nwav, Y, X) = Frames.shape
-	if Nwav!=len(Transforms):
-		print(f'The number of frames to register does not match the number of transforms provided')
-		return 0
-	
-	TransformedFrames = []
-	for i in range(0, Nwav):
-		# print(f'Transforming image {i+1}/Nwav')
-		im_shifted = Frames[i,:,:]
-		transform = Transforms[i]
-		
-		if transform==0:
-			# this is the static frame (transform==0) – nothing to apply
-			print(f'Static image')
-			TransformedFrames.append(im_shifted)
-			continue
-		else:
-			im_shifted_se = _sitk.GetImageFromArray(im_shifted)
-			transformixImageFilter = _sitk.TransformixImageFilter()
-			if Verbose==False:
-				transformixImageFilter.LogToConsoleOff()
-			transformixImageFilter.SetMovingImage(im_shifted_se)
-			transformixImageFilter.SetTransformParameterMap(transform)
-			result = transformixImageFilter.Execute()
-			im_registered = _sitk.GetArrayFromImage(result)
-			TransformedFrames.append(im_registered)
-		
-	TransformedFrames = np.array(TransformedFrames)
-	return TransformedFrames
-
-
-def SaveTransforms(AllTransforms, TransformsSavingPath, **kwargs):
-	'''
-	Function that saves all the transforms output from the coregistration pipeline (AllTransforms) as txt files.
-	
-	Inputs:
-		- AllTransforms (Output from CoRegisterHypercube())
-		- TransformsSavingPath : Where to save files (do not add extension)
-		- kwargs
-			- Help
-	Ouput:
-	
-	'''
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(inspect.getdoc(SaveTransforms))
-		return 
-	
-	N = len(AllTransforms)
-	for n in range(0,N):
-		transform = AllTransforms[n]
-		if transform==0:
-#             print('Static image')
-			pass
-		else:
-			for i in range(0,len(transform)):
-				_sitk.WriteParameterFile(transform[i], f'{TransformsSavingPath}_Frame{n}_{i}.txt')
-			
-	
-def LoadTransforms(TransformsPath, **kwargs):
-	'''
-	Function that loads previously saved coregistration transforms to apply to new frames.
-	Looks for all the txt files in the indicated path, and checks for the number of transforms applied
-	to each frame.
-	Assumes that the files were generated by SaveTransforms() and that TransformPath is the same path
-	indicated in SaveTransforms() when creating the files.
-	
 	Input:
-		- TransformsPath: Path where the files are located. Assumes .txt files and format
-			of the shape Frame{n}_{i}, where n is the frame and i is the transform
-			For TwoStage tranform, i=0 is the affine transform and i=1 is the BSpline transform
+		- RawHypercube : To co-registrate. Shape [N, Y, X]
+		- Wavelengths_list
 		- kwargs:
 			- Help
-			
-	Output:
-		- AllTransforms : list of (lists) containting all the transforms. 
-			len(AllTransforms) = number of frames. 
-			If more than one transform is applied per frame (TwoStage), each element in AllTransforms will
-			be a list containing all the transforms applied to this given frame.
-	
-	'''
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(inspect.getdoc(LoadTransforms))
-		return 
-	Files = natsorted(glob.glob(TransformsPath+'*.txt'))
-
-	TransformInfo = []
-	for i in range(0,len(Files)):
-		file = Files[i]
-		Name = file.split('/')[-1]
-		Info = Name.split('Frame')[-1].replace('.txt','')
-		(Frame, t) = Info.split('_')
-		TransformInfo.append(int(t))
-
-	NTransformsPerFrame = np.amax(TransformInfo)
-	
-	AllTransforms = []
-	for i in range(0,len(Files)):
-		file = Files[i]
-		Name = file.split('/')[-1]
-		Info = Name.split('Frame')[-1].replace('.txt','')
-		transform = _sitk.ReadParameterFile(file)
-		(Frame, t) = Info.split('_')
-		if int(t)==0:
-			TransformsFrameSub = []
-		TransformsFrameSub.append(transform)
-		if int(t)==NTransformsPerFrame:
-			AllTransforms.append(TransformsFrameSub)
-		
-	return AllTransforms
-
-
-def GetGlobalMask(**kwargs):
-	'''
-	Function that inputs optional arguments only, to output a global mask 
-	(for static or shifted images) that can be either a combination of the edge
-	and reflections mask, only one of those, or none, depending on what masks are available.
-
-	Inputs:
-		- kwargs:
-			- EdgeMask
-			- ReflectionsMask
+			- Cropping = 0
+			- Order = False: Whether to order the coregistered image (based on Wavelenghts_list)
+			- Static_Index = 0: Which image is set as the static one (others are registered to it)
+			- SaveHypercube
+			- PlotDiff = False. If True, plots differences between static, moving and registered images
+			- SavingPath. If PlotDiff or SaveHypercbybe is True, where to save the data/figure
+			- EdgeMask -> Static mask
+			- AllReflectionsMasks -> Moving mask
+			- HideReflections = True
+			- InteractiveMasks (False): If True, opens a window for the user to select
+				a mask on the static image, and then a corresponding mask on each
+				moving image to guide the registration.
+			- AllROICoordinates : If indicated, the code will use the provided coordinates instead of
+				prompting the user.
 
 
 	Outputs:
-		- GlobalMask
+		- Hypercube_Coregistered: The final co-registered hypercube.
+		- Coregistration_Transforms: The list of transformation maps.
+		- CombinedMask: A single 2D boolean mask where True indicates a pixel that
+			is invalid in at least one of the co-registered frames.
+		- AllROICoordinates: List of all the coordinates (y_start, y_end, x_start, x_end)
+			(to be used for other coregistrations with CoRegisterHypercubeAndMas(AllROICoordinates=AllROICoordinates))
 
-	'''
+	"""
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(inspect.getdoc(GetGlobalMask))
-		return 
+		print(inspect.getdoc(CoRegisterHypercubeAndMask))
+		return 0, 0, 0
+
+	InteractiveMasks = kwargs.get('InteractiveMasks', False)
+
+	# Other parameters
+	PlotDiff = kwargs.get('PlotDiff', False)
+
+	SavingPath = kwargs.get('SavingPath')
+	if SavingPath is None:
+		SavingPath = ''
+		if PlotDiff:
+			print(f'PlotDiff has been set to True. Indicate a SavingPath.')
+
+	Static_Index = kwargs.get('Static_Index')
+	if Static_Index is None:
+		Static_Index = 0
+		print(f'Static index set to default {Static_Index}')
+
+	## Handle cropping
+	Cropping = kwargs.get('Cropping', 0)
+
 	EdgeMask = kwargs.get('EdgeMask')
-	ReflectionsMask = kwargs.get('ReflectionsMask')
+	AllReflectionsMasks = kwargs.get('AllReflectionsMasks')
 
-	if EdgeMask is not None:
-		if ReflectionsMask is not None: 
-			## If there is both an EdgeMask and a StaticMask, combine them
-			GlobalMask = np.logical_or(EdgeMask > 0, ReflectionsMask > 0).astype(np.uint8)
-			print(f'Global Mask = EdgeMask + ReflectionsMask')
-		else:
-			## Otherwise the global mask will be whaterver mask is given
-			GlobalMask = EdgeMask
-			print(f'Global Mask = EdgeMask only')
-	elif ReflectionsMask is not None:
-		GlobalMask = ReflectionsMask
-		print(f'Global Mask = ReflectionsMask only')
+	HideReflections = kwargs.get('HideReflections', True)
+
+	SaveHypercube = kwargs.get('SaveHypercube', False)
+	if SaveHypercube:
+		print(f'Saving Hypercube')
+
+	Order = kwargs.get('Order', False)
+	Blurring = kwargs.get('Blurring', False)
+	Sigma = kwargs.get('Sigma', 2)
+
+	t0 = time.time()
+	(NN, YY, XX) = RawHypercube.shape
+
+	Cropping = kwargs.get('Cropping', 0)
+	if Cropping != 0 and not InteractiveMasks:
+		RawHypercube = RawHypercube[:, Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+		if EdgeMask is not None:
+			EdgeMask = EdgeMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+		if AllReflectionsMasks is not None:
+			AllReflectionsMasks = AllReflectionsMasks[:, Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+
+	(NN_crop, YY_crop, XX_crop) = RawHypercube.shape
+	CombinedMask = np.zeros((YY_crop, XX_crop), dtype=bool)
+	im_static = RawHypercube[Static_Index, :, :]
+
+	Hypercube = []
+	AllTransforms = []
+	AllROICoordinates = kwargs.get('AllROICoordinates')
+	if AllROICoordinates is None:
+		PromptUser = True
+		AllROICoordinates = []
 	else:
-		## If no mask is give, return None
-		GlobalMask = None
-		print(f'Global Mask = None')
-	# if GlobalMask is not None:
-	# 	## If there is a mask, invert it to be used with SimpleITK
-	# 	GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
+		PromptUser = False
 
-	return GlobalMask
+	StaticMask_interactive = None
+	if InteractiveMasks:
+		print("--- Interactive Mask Selection ---")
 
+		# 1. Get the mask for the static image (the target)
+		if PromptUser:
+			static_roi = get_interactive_roi(im_static, title='Select ROI on STATIC image (this is the target)')
+		else:
+			static_roi = AllROICoordinates[Static_Index]
+		if static_roi:
+			y_start, y_end, x_start, x_end = static_roi
+			StaticMask_interactive = np.zeros_like(im_static, dtype=np.uint8)
+			StaticMask_interactive[y_start:y_end, x_start:x_end] = 1 # 1 means "focus here"
+
+	if AllReflectionsMasks is not None:
+		ReflectionsMask_Static = AllReflectionsMasks[Static_Index, :, :]
+	else:
+		ReflectionsMask_Static = None
+
+	for c in range(0, NN):
+		if c == Static_Index:
+			im0 = copy.deepcopy(im_static)
+			AllTransforms.append(0)
+			print(f'Static Image')
+			if PromptUser:
+				AllROICoordinates.append(static_roi)
+				
+			if Blurring:
+				im0 = gaussian_filter(im0, sigma=Sigma)
+			
+			if StaticMask_interactive is not None:
+				im0[StaticMask_interactive] = np.nan
+				
+			if HideReflections is not None:
+				im0[ReflectionsMask_Static > 0.5] = np.nan
+
+			Hypercube.append(im0)
+			AllTransforms.append(0)
+
+		else:
+			print(f'Working on: {c+1} /{NN}')
+			im_shifted = RawHypercube[c, :, :]
+
+			StaticMask_for_reg = None
+			ShiftedMask_for_reg = None
+
+			if InteractiveMasks and StaticMask_interactive is not None:
+				# 2. For each moving image, get its corresponding mask
+				if PromptUser:
+					shifted_roi = get_interactive_roi(im_shifted, title=f'Select ROI on MOVING image {c+1}/{NN}')
+					AllROICoordinates.append(shifted_roi)
+				else:
+					shifted_roi = AllROICoordinates[c]
+				if shifted_roi:
+					y_start, y_end, x_start, x_end = shifted_roi
+			
+					if AllReflectionsMasks is not None:
+						ReflectionsMask_Shifted = AllReflectionsMasks[c, :, :]
+					else:
+						ReflectionsMask_Shifted = None
+					ShiftedMask_for_reg_orig = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted)
+					print(np.average(ShiftedMask_for_reg_orig))
+
+					ShiftedMask_interactive = np.zeros_like(im_shifted, dtype=np.uint8)
+					ShiftedMask_interactive[y_start:y_end, x_start:x_end] = 1
+
+					# Use these interactive masks for the registration
+					# NOTE: SimpleITK masks are inverted (0=ignore), so we pass them as is,
+					# and CoRegisterImages should handle the inversion (1-mask).
+					StaticMask_for_reg = (1 - StaticMask_interactive)
+					ShiftedMask_for_reg = (1 - ShiftedMask_interactive)
+
+			else:
+
+				if AllReflectionsMasks is not None:
+					ReflectionsMask_Shifted = AllReflectionsMasks[c, :, :]
+				else:
+					ReflectionsMask_Shifted = None
+				ShiftedMask_for_reg = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted)
+
+			# 3. Perform the masked registration
+			im_coregistered_smeared, transform_map = HySE.CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask_for_reg,
+																		   ShiftedMask=ShiftedMask_for_reg,**kwargs)
+
+			im_coregistered_final = im_coregistered_smeared.astype(np.float32)
+
+			if HideReflections and ShiftedMask_for_reg is not None:
+				## a. Create "Hole-Punch Mask". 
+				##    This mask is True for every pixel to remove
+				##    Start with a mask that is True everywhere outside the ROI.
+				hole_punch_mask_moving = np.ones_like(im_shifted, dtype=np.uint8)
+				hole_punch_mask_moving[y_start:y_end, x_start:x_end] = 0 # Set the ROI interior to False (we want to keep it)
+
+				## b. Now, add the reflections to the mask. 
+				##    Set reflection pixels to True (we want to remove them).
+				if ReflectionsMask_Shifted is not None:
+					hole_punch_mask_moving[ReflectionsMask_Shifted > 0.5] = 1
+
+				## c. Now warp this combined hole-punch mask.
+				transformixImageFilter = _sitk.TransformixImageFilter()
+				transformixImageFilter.LogToConsoleOff()
+
+				## Set the transform map from the image registration
+				transformixImageFilter.SetTransformParameterMap(transform_map)
+
+				## Modify the parameter map to use nearest neighbor interpolation
+				transform_map[0]['FinalBSplineInterpolationOrder'] = ['0']
+				if len(transform_map) > 1: # Handle TwoStage registration
+					transform_map[1]['FinalBSplineInterpolationOrder'] = ['0']
+
+				transformixImageFilter.SetTransformParameterMap(transform_map)
+
+				moving_mask_sitk = _sitk.GetImageFromArray(hole_punch_mask_moving)
+
+				transformixImageFilter.SetMovingImage(moving_mask_sitk)
+
+				registered_mask_sitk = transformixImageFilter.Execute()
+				registered_mask = _sitk.GetArrayFromImage(registered_mask_sitk).astype(bool)
+
+				## e. Punch holes in the final registered image
+				im_coregistered_final[registered_mask] = np.nan
+
+			Hypercube.append(im_coregistered_final)
+			AllTransforms.append(transform_map)
+
+		# After each frame (static or moving) is processed, update the combined mask.
+		current_frame = Hypercube[-1]
+		# An invalid pixel is one that is NaN (from reflections) or 0 (from registration edges)
+		invalid_pixels_mask = np.isnan(current_frame) | (current_frame == 0)
+		CombinedMask = CombinedMask | invalid_pixels_mask
+
+		# Optional Plotting
+		if PlotDiff and c != Static_Index:
+			if '.png' in SavingPath:
+				NameTot = SavingPath.split('/')[-1]
+				Name = NameTot.replace('.png', '')+f'_{c}.png'
+				SavingPathWithName = SavingPath.replace(NameTot, Name)
+			else:
+				Name = f'_{c}_CoRegistration.png'
+				SavingPathWithName = SavingPath+Name
+			HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+
+
+	tf = time.time()
+	Hypercube = np.array(Hypercube)
+	time_total = tf - t0
+	minutes = int(time_total / 60)
+	seconds = time_total - minutes * 60
+	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
+
+	# Sort hypercube, transforms, and the combined mask according to the order_list
+	if Order:
+		Hypercube_sorted = Hypercube[order_list]
+		# Reorder transforms list
+		AllTransforms_sorted = [AllTransforms[i] for i in order_list]
+	else:
+		Hypercube_sorted = Hypercube
+		AllTransforms_sorted = AllTransforms
+
+	if SaveHypercube:
+		if '.png' in SavingPath:
+			NameTot = SavingPath.split('/')[-1]
+			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
+			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
+			SavingPathHypercube = SavingPath.replace(NameTot, Name)
+			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
+		else:
+			Name = f'_CoregisteredHypercube.npz'
+			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
+			SavingPathHypercube = SavingPath+Name
+			SavingPathWavelengths = SavingPath+Name_wav
+
+		np.savez(f'{SavingPathHypercube}', Hypercube)
+		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
+
+	return Hypercube, AllTransforms, CombinedMask, AllROICoordinates # Example return
+
+
+
+
+#### ----------------------------------------------------------------------
+
+
+def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list, **kwargs):
+	"""
+	Function that generates a hypercube for co-registration. 
+	Specifically, it allows to select a single specific frame to run the co-registration.
+
+	Inputs:
+		- Nsweep (int) : Which sweep in the dataset to use
+		- Nframe (int or [int, int, ...]) : Which frame(s), within this sweep, to use (clearest one).
+			If more than one frame indicated, the code will compute a hypercube for each integer indicated and then
+			concatenate all hypercubes
+		- Path : Where the data is located
+		- EdgePos : Positions of the start of each sweep
+		- Wavelengths_list
+		- kwargs:
+			- Help
+			- Buffer = 9 : How many frames to skip at the start and end of a sweep
+
+	Outputs:
+		- Hypercube for registration
+
+	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(GetHypercubeForRegistration))
+		return 0
+
+	Buffer = kwargs.get('Buffer')
+	if Buffer is None:
+		Buffer = 9
+		print(f'Setting Buffer to default {Buffer}')
+	Hypercube_all, Dark_all = HySE.ComputeHypercube(Path, EdgePos, Wavelengths_list, Buffer=Buffer, Average=False, 
+													Order=False, Help=False, SaveFig=False, SaveArray=False, Plot=False, ForCoRegistration=True)
+	if isinstance(Nframe, int):
+		HypercubeForRegistration = Hypercube_all[Nsweep,:,Nframe,:,:]
+	elif isinstance(Nframe, list):
+		HypercubeForRegistration = []
+		for i in range(0,len(Nframe)):
+			HypercubeForRegistration_sub = Hypercube_all[Nsweep,:,Nframe[i],:,:]
+			if i==0:
+				HypercubeForRegistration = HypercubeForRegistration_sub
+			else:
+				HypercubeForRegistration = np.concatenate((HypercubeForRegistration, HypercubeForRegistration_sub), axis=0)
+	else:
+		print(f'Nframe format not accepted.')
+		HypercubeForRegistration=0
+	return HypercubeForRegistration
+
+
+
+# def clone_parameter_map(transform_map):
+# 	"""
+# 	Manually clone a SimpleITK ParameterMap tuple (any number of stages)
+# 	so we can safely modify it without touching the original.
+# 	"""
+# 	new_map = []
+# 	for stage in transform_map:
+# 		stage_clone = {}
+# 		for k in stage:
+# 			stage_clone[k] = list(stage[k])  # copy the list
+# 		new_map.append(stage_clone)
+# 	return tuple(new_map)
+	
+
+
+# def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
+# 	"""
+
+# 	Apply Simple Elastix co-registration to all sweep
+
+# 	Uses CoRegisterImages
+
+# 	Input:
+# 		- RawHypercube : To co-registrate. Shape [N, Y, X]
+# 		- Wavelengths_list
+# 		- kwargs:
+# 			- Help
+# 			- Cropping = 0
+# 			- Order = False: Whether to order the coregistered image (based on Wavelenghts_list)
+# 			- Static_Index = 0: Which image is set as the static one (others are registered to it)
+# 			- SaveHypercube
+# 			- PlotDiff = False. If True, plots differences between static, moving and registered images
+# 			- SavingPath. If PlotDiff or SaveHypercbybe is True, where to save the data/figure
+# 			- EdgeMask -> Static mask
+# 			- AllReflectionsMasks -> Moving mask
+# 			- HideReflections = True
+
+
+# 	Outputs:
+# 		- Hypercube_Coregistered: The final co-registered hypercube.
+# 		- Coregistration_Transforms: The list of transformation maps.
+# 		- CombinedMask: A single 2D boolean mask where True indicates a pixel that
+# 			is invalid in at least one of the co-registered frames.
+
+# 	"""
+		
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(CoRegisterHypercubeAndMask))
+# 		return 0, 0, 0
+
+# 	PlotDiff = kwargs.get('PlotDiff', False)
+
+# 	SavingPath = kwargs.get('SavingPath')
+# 	if SavingPath is None:
+# 		SavingPath = ''
+# 		if PlotDiff:
+# 			print(f'PlotDiff has been set to True. Indicate a SavingPath.')
+
+# 	Static_Index = kwargs.get('Static_Index')
+# 	if Static_Index is None:
+# 		Static_Index = 0
+# 		print(f'Static index set to default {Static_Index}')
+
+# 	## Handle cropping
+# 	Cropping = kwargs.get('Cropping', 0)
+
+# 	EdgeMask = kwargs.get('EdgeMask')
+# 	AllReflectionsMasks = kwargs.get('AllReflectionsMasks')
+
+# 	HideReflections = kwargs.get('HideReflections', True)
+
+# 	SaveHypercube = kwargs.get('SaveHypercube', False)
+# 	if SaveHypercube:
+# 		print(f'Saving Hypercube')
+
+# 	Order = kwargs.get('Order', False)
+# 	Blurring = kwargs.get('Blurring', False)
+# 	Sigma = kwargs.get('Sigma', 2)
+
+# 	t0 = time.time()
+# 	(NN, YY, XX) = RawHypercube.shape
+
+# 	## Sort Wavelengths
+# 	order_list = np.argsort(Wavelengths_list)
+# 	Wavelengths_sorted = Wavelengths_list[order_list]
+
+# 	Hypercube = []
+# 	AllTransforms = []
+
+# 	if Cropping != 0:
+# 		print(f'Image will be cropped by {Cropping} on all sides.')
+# 		RawHypercube = RawHypercube[:, Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+# 		if EdgeMask is not None:
+# 			EdgeMask = EdgeMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+# 		if AllReflectionsMasks is not None:
+# 			AllReflectionsMasks = AllReflectionsMasks[:, Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+	
+# 	# Initialize the combined mask for tracking invalid pixels
+# 	# We get the shape from the potentially cropped raw hypercube.
+# 	(NN_crop, YY_crop, XX_crop) = RawHypercube.shape
+# 	CombinedMask = np.zeros((YY_crop, XX_crop), dtype=bool)
+
+# 	## Define static image
+# 	im_static = RawHypercube[Static_Index, :, :]
+
+# 	## Define static mask:
+# 	if AllReflectionsMasks is not None:
+# 		ReflectionsMask_Static = AllReflectionsMasks[Static_Index, :, :]
+# 	else:
+# 		ReflectionsMask_Static = None
+
+# 	StaticMask = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Static)
+
+# 	for c in range(0, NN):
+# 		# Process the static image
+# 		if c == Static_Index:
+# 			im0 = copy.deepcopy(RawHypercube[c, :, :])
+# 			print(f'  Static image')
+
+# 			if HideReflections and ReflectionsMask_Static is not None:
+# 				if Blurring:
+# 					im0 = gaussian_filter(im0, sigma=Sigma)
+# 				im0[ReflectionsMask_Static > 0.5] = np.nan
+			
+# 			Hypercube.append(im0)
+# 			AllTransforms.append(0) # Placeholder for transform
+		
+# 		# Process moving images
+# 		else:
+# 			print(f'Working on: {c+1} /{NN}')
+# 			im_shifted = RawHypercube[c, :, :]
+			
+# 			if AllReflectionsMasks is not None:
+# 				ReflectionsMask_Shifted = AllReflectionsMasks[c, :, :]
+# 			else:
+# 				ReflectionsMask_Shifted = None
+			
+# 			ShiftedMask = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted)
+# 			im_coregistered_smeared, transform_map = HySE.CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask, ShiftedMask=ShiftedMask, **kwargs)
+# 			im_coregistered_final = im_coregistered_smeared.astype(np.float32)
+
+# 			if HideReflections and ReflectionsMask_Shifted is not None:
+# 				# ## Prepare the Transformix filter for the mask
+# 				transformixImageFilter = _sitk.TransformixImageFilter()
+# 				transformixImageFilter.LogToConsoleOff() # Keep it quiet
+
+# 				# Set the transform map from the image registration
+# 				transformixImageFilter.SetTransformParameterMap(transform_map)
+
+# 				# Modify the parameter map to use nearest neighbor interpolation
+# 				transform_map[0]['FinalBSplineInterpolationOrder'] = ['0']
+# 				if len(transform_map) > 1: # Handle TwoStage registration
+# 					transform_map[1]['FinalBSplineInterpolationOrder'] = ['0']
+
+# 				transformixImageFilter.SetTransformParameterMap(transform_map)
+
+# 				print(f"Frame {c}: transform = {transform_map[0]['TransformParameters'][:10]}")
+
+# 				moving_mask_sitk = _sitk.GetImageFromArray(ReflectionsMask_Shifted.astype(np.uint8))
+# 				transformixImageFilter.SetMovingImage(moving_mask_sitk)
+
+# 				# Execute and get the warped mask
+# 				registered_mask_sitk = transformixImageFilter.Execute()
+# 				registered_mask = _sitk.GetArrayFromImage(registered_mask_sitk).astype(bool)
+
+# 				# Punch holes in the final registered image
+# 				im_coregistered_final[registered_mask] = np.nan
+
+
+# 			Hypercube.append(im_coregistered_final)
+# 			AllTransforms.append(transform_map)
+
+# 		# After each frame (static or moving) is processed, update the combined mask.
+# 		current_frame = Hypercube[-1]
+# 		# An invalid pixel is one that is NaN (from reflections) or 0 (from registration edges)
+# 		invalid_pixels_mask = np.isnan(current_frame) | (current_frame == 0)
+# 		CombinedMask = CombinedMask | invalid_pixels_mask
+		
+# 		# Optional Plotting
+# 		if PlotDiff and c != Static_Index:
+# 			if '.png' in SavingPath:
+# 				NameTot = SavingPath.split('/')[-1]
+# 				Name = NameTot.replace('.png', '')+f'_{c}.png'
+# 				SavingPathWithName = SavingPath.replace(NameTot, Name)
+# 			else:
+# 				Name = f'_{c}_CoRegistration.png'
+# 				SavingPathWithName = SavingPath+Name
+# 			HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+
+# 	tf = time.time()
+# 	Hypercube = np.array(Hypercube)
+# 	time_total = tf - t0
+# 	minutes = int(time_total / 60)
+# 	seconds = time_total - minutes * 60
+# 	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
+
+# 	# Sort hypercube, transforms, and the combined mask according to the order_list
+# 	if Order:
+# 		Hypercube_sorted = Hypercube[order_list]
+# 		# Reorder transforms list
+# 		AllTransforms_sorted = [AllTransforms[i] for i in order_list]
+# 	else:
+# 		Hypercube_sorted = Hypercube
+# 		AllTransforms_sorted = AllTransforms
+
+# 	if SaveHypercube:
+# 		if '.png' in SavingPath:
+# 			NameTot = SavingPath.split('/')[-1]
+# 			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
+# 			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
+# 			SavingPathHypercube = SavingPath.replace(NameTot, Name)
+# 			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
+# 		else:
+# 			Name = f'_CoregisteredHypercube.npz'
+# 			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
+# 			SavingPathHypercube = SavingPath+Name
+# 			SavingPathWavelengths = SavingPath+Name_wav
+
+# 		np.savez(f'{SavingPathHypercube}', Hypercube)
+# 		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
+# 	return Hypercube_sorted, AllTransforms_sorted, CombinedMask
 
 
 
