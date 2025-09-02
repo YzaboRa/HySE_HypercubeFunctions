@@ -54,8 +54,10 @@ def GetGlobalMask(**kwargs):
 
 	Inputs:
 		- kwargs:
+			- Help
 			- EdgeMask
 			- ReflectionsMask
+			- PrintInfo = True
 
 
 	Outputs:
@@ -68,23 +70,28 @@ def GetGlobalMask(**kwargs):
 		return 
 	EdgeMask = kwargs.get('EdgeMask')
 	ReflectionsMask = kwargs.get('ReflectionsMask')
+	PrintInfo = kwargs.get('PrintInfo', True)
 
 	if EdgeMask is not None:
 		if ReflectionsMask is not None: 
 			## If there is both an EdgeMask and a StaticMask, combine them
 			GlobalMask = np.logical_or(EdgeMask > 0, ReflectionsMask > 0).astype(np.uint8)
-			print(f'Global Mask = EdgeMask + ReflectionsMask')
+			if PrintInfo:
+				print(f'Global Mask = EdgeMask + ReflectionsMask')
 		else:
 			## Otherwise the global mask will be whaterver mask is given
 			GlobalMask = EdgeMask
-			print(f'Global Mask = EdgeMask only')
+			if PrintInfo:
+				print(f'Global Mask = EdgeMask only')
 	elif ReflectionsMask is not None:
 		GlobalMask = ReflectionsMask
-		print(f'Global Mask = ReflectionsMask only')
+		if PrintInfo:
+			print(f'Global Mask = ReflectionsMask only')
 	else:
 		## If no mask is give, return None
 		GlobalMask = None
-		print(f'Global Mask = None')
+		if PrintInfo:
+			print(f'Global Mask = None')
 	# if GlobalMask is not None:
 	# 	## If there is a mask, invert it to be used with SimpleITK
 	# 	GlobalMask = np.invert(GlobalMask) ## SimpleITK uses invert logic
@@ -764,7 +771,7 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 				ReflectionsMask_Shifted = None
 			
 			# print(f'Applying to mask -- ReflectionsMask_Shifted.shape:{ReflectionsMask_Shifted.shape}, EdgeMask.shape:{EdgeMask.shape}')
-			ShiftedMask = GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted )
+			ShiftedMask = GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted, PrintInfo=False)
 			
 			### PREVIOUS:
 			# im_coregistered, coregister_transform = CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask, ShiftedMask=ShiftedMask, **kwargs)
@@ -974,7 +981,8 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 			static_roi = get_interactive_roi(im_static, title='Select ROI on STATIC image (this is the target)')
 		else:
 			static_roi = AllROICoordinates[Static_Index]
-		if static_roi:
+			# print(static_roi)
+		if static_roi is not None:
 			y_start, y_end, x_start, x_end = static_roi
 			StaticMask_interactive = np.zeros_like(im_static, dtype=np.uint8)
 			StaticMask_interactive[y_start:y_end, x_start:x_end] = 1 # 1 means "focus here"
@@ -983,6 +991,7 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 		ReflectionsMask_Static = AllReflectionsMasks[Static_Index, :, :]
 	else:
 		ReflectionsMask_Static = None
+	StaticMask = GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Static)
 
 	for c in range(0, NN):
 		if c == Static_Index:
@@ -999,7 +1008,7 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 				im0[StaticMask_interactive] = np.nan
 				
 			if HideReflections is not None:
-				im0[ReflectionsMask_Static > 0.5] = np.nan
+				im0[StaticMask > 0.5] = np.nan
 
 			Hypercube.append(im0)
 			AllTransforms.append(0)
@@ -1018,15 +1027,14 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 					AllROICoordinates.append(shifted_roi)
 				else:
 					shifted_roi = AllROICoordinates[c]
-				if shifted_roi:
+				if shifted_roi is not None:
 					y_start, y_end, x_start, x_end = shifted_roi
 			
 					if AllReflectionsMasks is not None:
 						ReflectionsMask_Shifted = AllReflectionsMasks[c, :, :]
 					else:
 						ReflectionsMask_Shifted = None
-					ShiftedMask_for_reg_orig = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted)
-					print(np.average(ShiftedMask_for_reg_orig))
+					ShiftedMask_for_reg_orig = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted, PrintInfo=False)
 
 					ShiftedMask_interactive = np.zeros_like(im_shifted, dtype=np.uint8)
 					ShiftedMask_interactive[y_start:y_end, x_start:x_end] = 1
@@ -1043,7 +1051,7 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 					ReflectionsMask_Shifted = AllReflectionsMasks[c, :, :]
 				else:
 					ReflectionsMask_Shifted = None
-				ShiftedMask_for_reg = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted)
+				ShiftedMask_for_reg = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted, PrintInfo=False)
 
 			# 3. Perform the masked registration
 			im_coregistered_smeared, transform_map = HySE.CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask_for_reg,
