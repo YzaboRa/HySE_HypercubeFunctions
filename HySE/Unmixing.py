@@ -597,4 +597,101 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
 		UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
 	return UnmixedHypercube
 
+
+import numpy as np
+import inspect
+from scipy.optimize import lsq_linear
+# Assuming HySE and joblib are available
+
+def UnmixDataSmoothNNLSPrior(MixedHypercube, MixingMatrix, prior_spectrum,
+                            lambda_smooth=0.1, lambda_prior=0.1,
+                            intensity_thresh=1e-2, std_thresh=1e-3,
+                            max_iter=5000, parallel=True, **kwargs):
+    """
+    Unmix hypercube using NNLS with two regularizers:
+    1. Tikhonov regularization promoting spectral smoothness.
+    2. A penalty term that pulls the solution towards a known prior_spectrum.
+
+    Parameters:
+        - MixedHypercube : array, shape (S, N, Y, X) or (N, Y, X)
+        - MixingMatrix : array, shape (num_images, num_wavelengths)
+        - prior_spectrum : array, shape (num_wavelengths,). Your calibration/reference.
+        - lambda_smooth = 0.1 : Regularization for spectral smoothness.
+        - lambda_prior = 0.1 : Regularization for closeness to the prior.
+        ... (rest of the parameters are the same) ...
+
+    Output:
+        - Unmixed Hypercube
+    """
+    Help = kwargs.get('Help', False)
+    Average = kwargs.get('Average', True)
+    if Help:
+        print(inspect.getdoc(UnmixDataSmoothPriorNNLS))
+        return 0
+
+    if len(MixedHypercube.shape) > 3:
+        MixedHypercube_ = MixedHypercube
+    else:
+        MixedHypercube_ = np.array([MixedHypercube])
+
+    UnmixedHypercube = []
+    SS, WW, YY, XX = MixedHypercube_.shape
+    num_meas, num_waves = MixingMatrix.shape
+
+    # --- NEW: Check shape of the prior spectrum ---
+    if prior_spectrum.shape[0] != num_waves:
+        raise ValueError(f"Shape of prior_spectrum ({prior_spectrum.shape[0]}) does not match "
+                         f"number of wavelengths in MixingMatrix ({num_waves}).")
+
+    # --- MODIFIED: Construct the "triple-decker" problem matrix ---
+    # 1. Smoothness penalty matrix (L)
+    L = -2 * np.eye(num_waves) + np.eye(num_waves, k=1) + np.eye(num_waves, k=-1)
+    
+    # 2. Prior penalty matrix (Identity matrix, I)
+    I = np.eye(num_waves)
+    
+    # 3. Stack all three matrices
+    A_reg_base = np.vstack([
+        MixingMatrix,
+        np.sqrt(lambda_smooth) * L,
+        np.sqrt(lambda_prior) * I
+    ])
+
+    # Prepare the constant parts of the right-hand side (b) vector
+    zeros_rhs_smooth = np.zeros((num_waves,))
+    # --- NEW: The target for the prior penalty ---
+    prior_rhs = np.sqrt(lambda_prior) * prior_spectrum
+
+    for s in range(SS):
+        hypercube_sub = MixedHypercube_[s]
+        ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T
+        num_pixels = ObservedMatrix.shape[0]
+        SolvedMatrix_flat = np.zeros((num_waves, num_pixels))
+
+        def solve_single(i):
+            pixel = ObservedMatrix[i, :]
+            if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
+                return np.zeros(num_waves)
+            
+            # --- MODIFIED: Construct the augmented b vector for each pixel ---
+            b_reg = np.concatenate([pixel, zeros_rhs_smooth, prior_rhs])
+            
+            res = lsq_linear(A_reg_base, b_reg, bounds=(0, np.inf), max_iter=max_iter, method='trf')
+            return res.x if res.success else np.zeros(num_waves)
+
+        if parallel:
+            from joblib import Parallel, delayed
+            results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
+            SolvedMatrix_flat = np.array(results).T
+        else:
+            for i in range(num_pixels):
+                SolvedMatrix_flat[:, i] = solve_single(i)
+
+        SolvedMatrix = [SolvedMatrix_flat[n, :].reshape(YY, XX) for n in range(num_waves)]
+        UnmixedHypercube.append(SolvedMatrix)
+
+    UnmixedHypercube = np.array(UnmixedHypercube)
+    if Average:
+        UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
+    return UnmixedHypercube
 		
