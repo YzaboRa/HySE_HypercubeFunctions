@@ -19,6 +19,158 @@ plt.rcParams["font.family"] = "arial"
 import HySE.Masking
 
 
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import inspect
+
+def MakeMixingMatrix_Flexible(Panel1_Wavelengths, Arduino_MixingMatrix_P1,
+                              Panel2_Wavelengths, Arduino_MixingMatrix_P2, **kwargs):
+    '''
+    Computes a mixing matrix based on the Arduino matrices used during data recording.
+    This version allows for a variable number of wavelengths to be combined in each image.
+
+    Inputs:
+        - Panel1_Wavelengths: List of wavelengths available in the first panel (e.g., REDs).
+        - Arduino_MixingMatrix_P1: A list of lists. Each inner list contains the indices
+          of wavelengths from Panel1_Wavelengths to be combined for a single image.
+          Example: [[0, 1], [2, 3, 4], [5]] for 3 images.
+
+        - Panel2_Wavelengths: List of wavelengths available in the second panel (e.g., BLUEs).
+        - Arduino_MixingMatrix_P2: A list of lists, similar to P1 but for Panel2_Wavelengths.
+
+        - kwargs:
+            - Help: Print this information message
+            - FromCalib = False: If true, use the single wavelength calibration hypercube
+                to compute the mixing matrix.
+            - Hypercube_WhiteCalib: Hypercube computed from the single wavelength calibration.
+                Required if setting FromCalib to True.
+            - UseMean = False: Sets the mean value of the calibration instead of the maximal value.
+                Only used if FromCalib = True.
+            - Plot=True: Plot the resulting mixing matrix.
+            - Title : string
+            - SaveFig = False: Save the plot to a file.
+            - SavingPath = '': Path to save the figure.
+
+    Outputs:
+        - MixingMatrix: The computed mixing matrix. Dimensions are (total_images, total_unique_wavelengths).
+    '''
+
+    # --- Argument Handling ---
+    Help = kwargs.get('Help', False)
+    FromCalib = kwargs.get('FromCalib', False)
+    UseMean = kwargs.get('UseMean', False)
+    Plot = kwargs.get('Plot', True)
+    Title = kwargs.get('Title', '')
+    SaveFig = kwargs.get('SaveFig', False)
+    SavingPath = kwargs.get('SavingPath', '')
+
+    if Help:
+        print(inspect.getdoc(MakeMixingMatrix_Flexible))
+        return None
+
+    if FromCalib:
+        print('Computing mixing matrix from single wavelength calibration')
+        Hypercube_WhiteCalib = kwargs.get('Hypercube_WhiteCalib')
+        if Hypercube_WhiteCalib is None:
+            print('MakeMixingMatrix error:')
+            print('FromCalib has been set to True. Please provide Hypercube_WhiteCalib.')
+            return None
+    else:
+        print('Computing binary mixing matrix')
+
+    # --- Setup Matrix Dimensions ---
+    # Combine all wavelengths and find the unique sorted list to define the matrix columns
+    All_Wavelengths = list(Panel1_Wavelengths) + list(Panel2_Wavelengths)
+    Wavelengths_sorted = np.unique(All_Wavelengths)
+    N_unique_wavs = len(Wavelengths_sorted)
+
+    # The number of rows is the total number of combined images from both panels
+    N_images_P1 = len(Arduino_MixingMatrix_P1)
+    N_images_P2 = len(Arduino_MixingMatrix_P2)
+    N_total_images = N_images_P1 + N_images_P2
+
+    # Initialize the potentially non-square mixing matrix
+    MixingMatrix = np.zeros((N_total_images, N_unique_wavs))
+
+    # --- Populate Mixing Matrix (Generalized Loop) ---
+    # We group panel data to process them sequentially without repeating code
+    panel_data = [
+        (Panel1_Wavelengths, Arduino_MixingMatrix_P1),
+        (Panel2_Wavelengths, Arduino_MixingMatrix_P2)
+    ]
+    
+    current_row_index = 0
+    for panel_wavs, arduino_matrix in panel_data:
+        # Iterate through each defined image combination (inner lists)
+        for image_indices in arduino_matrix:
+            # For each individual wavelength index in the current combination
+            for wav_local_idx in image_indices:
+                wav_nm = panel_wavs[wav_local_idx]
+                # Find the column index in the final sorted list of all wavelengths
+                wav_col_k = np.where(Wavelengths_sorted == wav_nm)[0][0]
+
+                # Determine the amplitude (either 1 or from calibration)
+                if FromCalib:
+                    if UseMean:
+                        wav_k_amp = np.nanmean(Hypercube_WhiteCalib[wav_col_k, :, :])
+                    else:
+                        wav_k_amp = np.nanmax(Hypercube_WhiteCalib[wav_col_k, :, :])
+                else:
+                    wav_k_amp = 1
+                
+                # Assign the amplitude to the correct cell
+                MixingMatrix[current_row_index, wav_col_k] = wav_k_amp
+            
+            current_row_index += 1 # Move to the next row for the next image
+
+    # --- Compute Determinant (only if matrix is square) ---
+    if MixingMatrix.shape[0] == MixingMatrix.shape[1]:
+        Matrix_Det = np.linalg.det(MixingMatrix)
+        if np.isclose(Matrix_Det, 0):
+            print(f'WARNING! Matrix determinant is close to 0: {Matrix_Det}')
+        else:
+            print(f'Matrix determinant: {Matrix_Det}')
+    else:
+        print(f'Matrix is not square ({MixingMatrix.shape}), determinant not applicable.')
+
+    # --- Plotting ---
+    if Plot:
+        N_rows, N_cols = MixingMatrix.shape
+        row_ticks = np.arange(N_rows)
+        col_ticks = np.arange(N_cols)
+        row_labels = [f'im {i+1}' for i in row_ticks]
+        col_labels = [f'{w:.0f}' for w in Wavelengths_sorted] # Format for clarity
+
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(max(5, N_cols*0.4), max(5, N_rows*0.4)))
+        im = ax.imshow(MixingMatrix, cmap='magma', aspect='auto')
+        
+        ax.set_xticks(col_ticks)
+        ax.set_yticks(row_ticks)
+        ax.set_xticklabels(col_labels, rotation=90)
+        ax.set_yticklabels(row_labels)
+
+        ax.set_xlabel('Individual Wavelengths [nm]')
+        ax.set_ylabel('Combined Image Index')
+        
+        if FromCalib:
+            fig.colorbar(im, ax=ax, label='Weight')
+
+        if FromCalib:
+            title = 'Mixing Matrix - From Calibration' + (' (mean)' if UseMean else ' (max)')
+        else:
+            title = 'Mixing Matrix - Binary'
+        title = title+Title
+        ax.set_title(title)
+        
+        plt.tight_layout()
+        if SaveFig and SavingPath:
+            plt.savefig(SavingPath)
+            print(f"Figure saved to {SavingPath}")
+        
+        plt.show()
+
+    return MixingMatrix
+
 
 def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
 	'''
