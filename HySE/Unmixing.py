@@ -159,7 +159,7 @@ def MakeMixingMatrix_Flexible(Panel1_Wavelengths, Arduino_MixingMatrix_P1,
             title = 'Mixing Matrix - From Calibration' + (' (mean)' if UseMean else ' (max)')
         else:
             title = 'Mixing Matrix - Binary'
-        title = title+Title
+        title = title+'\n'+Title
         ax.set_title(title)
         
         plt.tight_layout()
