@@ -54,126 +54,204 @@ sys.path.append(PathToFunctions)
 import Hyse
 
 ## Indicate which wavelengths were used (Panel4, Panel2), in nm
-Wavelengths_list = np.array([486,572,478,646,584,511,617,540, 643,606,563,498,594,526,630,553])
+## 3 wav split hybrid, wavelengths 1:
+##                     0.   1.   2.   3.   4.   5.   6.   7
+Panel2_Wavelengths = [625, 606, 584, 560, 543, 511, 486, 418]
+Panel4_Wavelengths = [646, 617, 594, 576, 569, 526, 503, 478]
+
+Wavelengths_list = np.array(Panel2_Wavelengths+Panel4_Wavelengths)
 Wavelengths_list_sorted = np.sort(Wavelengths_list)
 
 ## Indicate the mixing matrix that was used in the Arduino code:
-Arduino_MixingMatrix = np.array([[0,3,6],
-                                 [1,4,7],
-                                 [2,5,0],
-                                 [3,6,1],
-                                 [4,7,2],
-                                 [5,0,3],
-                                 [6,1,4],
-                                 [7,2,5]])
+Arduino_MixingMatrix = [[4, 5, 6],
+                        [1, 4, 6],
+                        [1, 5, 6],
+                        [1, 4, 5],
+                        [4, 5, 6, 7],
+                        [2, 3],
+                        [0, 3],
+                        [0, 2]]
 
 ## Locate the data to analyse
 DataPath_General = '{Path_to_data}/Data/'
 
-WhiteCalibration_Path = DataPath_General+'2025-03-28_13-24-53_Config1_White_Calib.mp4'
-WhiteHySE_Path = DataPath_General+'2025-03-28_13-28-23_Config1_White_HySE.mp4'
-MacbethHySE_Path = DataPath_General+'2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5.mp4'
 
-Name = '2025-03-28_14-06-19_Config1_Macbeth_HySE_R2DR5'
+DataPath = DataPath_General+'{Video_Name}.mp4'
+Name = '3Wavs1_StaticMacbeth'
 
 ## Define Saving path:
-SavingPath = '/Users/iracicot/Library/CloudStorage/OneDrive-UniversityofCambridge/Data/CCRC/20250328/Results_MultipleSweeps/'
-```
-
-### Compute raw arrays
-
-Then raw videos are imported to extract raw (mixed) arrays. 
-The code has automatic detections features, but clinical data tends to be too noisy for those to work properly. In these cases, a blind variation allows to input the start position and width of each sweeps.
-
-Mixed clinical data will typically consist of three types of videos:
-* WhiteCalibration: This is a dataset obtained by imaging a white reference one wavelength at a time
-* WhiteHySE: This is a dataset obtained by imaging a white reference with the mixed wavelengths illumination
-* DataHySE: This is a dataset obtained by imaging am object of interest (macbeth chart for tests, or tissue) with the mixed wavelengths illumination
-
-
-```python
-############################
-####### 1. White Calibration
-############################
-
-## Input the position of the sweep starts (might require iterating)
-StartFrames = [148,1066,1984,2901,3820]
-
-## Identify all full sweeps present in the dataset. When using the blind method, use:
-##   Blind=True
-##   StartFrames=StartFrames
-##   PlateauSize={Estimated_Plateau_Size}
-EdgePos_WhiteCalib = HySE.FindHypercube(WhiteCalibration_Path, Wavelengths_list, PlateauSize=45, PrintPeaks=False, Blind=True, StartFrames=StartFrames, PeakHeight=0.1, 
-                             SaveFig=False, PlotGradient=False, PeakDistance=30, MaxPlateauSize=60)
+SavingPath = '{Path_to_save}'
 
 ```
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/a8f41de6-3ada-44a0-88ae-c6d5dffb5fb8" width="700"/>
-</p>
+
+### Dark
+Use a video of dark frames to calculate the dark.
 
 ```python
-
-## Compute array from sweeps
-Hypercube_WhiteCalib, Dark_WhiteCalib = HySE.ComputeHypercube(WhiteCalibration_Path, EdgePos_WhiteCalib, Wavelengths_list, 
-                                                              Order=True, SaveFig=False, SaveArray=False, Help=False, PlotHypercube=False)
-```
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/0ce86d23-41f9-496b-aad2-77f85d78d0bc" width="500"/>
-</p>
-
-```python
-
-############################
-####### 2. White mixed wavelengths
-############################
-
-StartFrames = [489, 1012, 1534, 2056]
-
-## Note that the expected PlateauSize will depend on the repeat used during recording
-EdgePos_WhiteHySE = HySE.FindHypercube(WhiteHySE_Path, Wavelengths_list, PlateauSize=27, PrintPeaks=False, Blind=True, StartFrames=StartFrames, PeakHeight=0.1, 
-                             SaveFig=False, PlotGradient=False, PeakDistance=30, MaxPlateauSize=60)
-
-Hypercube_WhiteHySE, Dark_WhiteHySE = HySE.ComputeHypercube(WhiteHySE_Path, EdgePos_WhiteHySE, Wavelengths_list, 
-                                                              Order=False, SaveFig=False, SaveArray=False, Help=False, PlotHypercube=True)
-
-
-############################
-####### 3. Data mixed wavelengths
-############################
-
-## This example uses test data from a macbeth chart
-StartFrames = [220,567,922,1270,1624,1972,2326] 
-
-EdgePos_MacbethHySE = HySE.FindHypercube(MacbethHySE_Path, Wavelengths_list, PlateauSize=18, PrintPeaks=False, Blind=True, StartFrames=StartFrames, PeakHeight=0.1, 
-                             SaveFig=False, PlotGradient=False, PeakDistance=30, MaxPlateauSize=60)
-
-Hypercube_MacbethHySE_avg, Dark_MacbethHySE_avg = HySE.ComputeHypercube(MacbethHySE_Path, EdgePos_MacbethHySE, Wavelengths_list, Buffer=6, Average=True,
-                                                                Order=False, Help=False, SaveFig=False, SaveArray=False, PlotHypercube=True)
-
-## In some cases, we might want to keep each sweep individual (instead of averaging them all). This can be done with the 'Average' input:
-Hypercube_MacbethHySE_all, Dark_MacbethHySE_all = HySE.ComputeHypercube(MacbethHySE_Path, EdgePos_MacbethHySE, Wavelengths_list, Buffer=6, Average=False,
-                                                                Order=False, Help=False, SaveFig=False, SaveArray=False, PlotHypercube=True)
-
-############################
-####### 4. Dark
-############################
-
-## The function that computes the array (or the raw, mixed hypercube) also outputs a dark computed from the short dark in the middle of
-##     each sweeps (between panels 2 and 4). This dark is however not always reliable, and for short repeats is the average of a small number
-##     frames. It is preferable to use the long darks between each sweeps to calculate a dark frame, when possible
-
-## In this example, the WhiteCalibration dataset includes an extra plateau at the end of the sweep, when red light was flashed
-##     to clearly indicate the end of the sweep. The 'ExtraWav' parameter allows to account for this.
-##     The 'Buffer' parameter allows to control how many frames a thrown out on either side of the selection
-LongDark = HySE.GetLongDark(WhiteCalibration_Path, EdgePos_WhiteCalib, ExtraWav=1, Buffer=30)
-
-## Plotting the dark can help make sure the estimate is adequate
+LongDark = HySE.GetDark_WholeVideo(DarkPath) #, CropImDimensions=CropImDimensions
 HySE.PlotDark(LongDark)
 ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/372215d3-dd7f-4275-864d-54b38a1339c5" width="400"/>
 </p>
+
+
+### Trace
+
+Identify sweeps by plotting the trace to find at which frames each one starts. Updated to keep RGB chanels distinct.
+
+```python
+## Start with:
+StartFrames = []
+## And then populate the position of the first green frame for each sweep:
+StartFrames = [160, 334, 508, 683]
+
+EdgePos_Data = HySE.FindHypercube_RGB(DataPath, PlateauSize=9, StartFrames=StartFrames, SaveFig=False, MaxPlateauSize=20, fps=60)
+```
+
+### Extract Frames
+Knowing where each sweep is, we can now extract the right frames for each plateau (and remove buffer frames)
+```python
+Buffer = 3
+Frames, RGB_Dark = HySE.ComputeHypercube_RGB(DataPath, EdgePos_Data, Buffer=Buffer, BlueShift=1, SaveArray=False)
+```
+
+### Dark Subtraction
+Subtract dark from all frames
+```python
+(Nsweeps, Nwav, Nframes, Y, X, _) = Frames.shape
+
+## BGR 
+Frames_Blue = Frames[:,:,:,:,:,0]
+Frames_Green = Frames[:,:,:,:,:,1]
+Frames_Red = Frames[:,:,:,:,:,2]
+
+# NormaliseMixedHypercube
+Frames_BlueD, MaskB = HySE.NormaliseMixedHypercube(Frames_Blue, Dark=LongDark, SaveFigure=False, Plot=False)
+Frames_GreenD, MaskG = HySE.NormaliseMixedHypercube(Frames_Green, Dark=LongDark, SaveFigure=False, Plot=False)
+Frames_RedD, MaskR = HySE.NormaliseMixedHypercube(Frames_Red, Dark=LongDark, SaveFigure=False, Plot=False)
+```
+
+### Average over all Frames
+For all sweeps, all frames. Or select a single sweep, or only one frame.
+```python
+### JUST GREEN
+FramesCombined_Green = Frames_GreenD_avg
+FramesCombined_Blue = Frames_BlueD_avg
+FramesCombined_Red = Frames_RedD_avg
+
+# ### OR JUST GREEN & Individual Sweeps
+NSweep = 2
+FramesCombined_Green = Frames_GreenD_avg[NSweep,:,:,:]
+FramesCombined_Blue = Frames_BlueD_avg[NSweep,:,:,:]
+FramesCombined_Reference = Frames_RedD_avg[NSweep,:,:,:]
+```
+
+### Mask
+Only really important if doing co-registration
+```python
+_, Mask = HySE.NormaliseMixedHypercube(Frames_GreenD[0,:,0,:,:], Dark=LongDark, Wavelengths_list=Wavelengths_list, 
+                                       SaveFigure=False, SavingPath=SavingPath+Name, vmax=160, Plot=False)
+
+EdgeMask = HySE.GetBestEdgeMask(Mask)
+```
+
+### Mixing Matrices
+First define mixing matrices.
+The hybrid mixing method involves several matrices. Currently not everything is automated, and some submatrices need to be input manually. Further updates should address this issue.
+
+```python
+
+### Blue Matrix full 16x16
+Title = 'Blue Matrix - '+Name
+BlueMatrix = HySE.MakeMixingMatrix_Flexible(Panel2_Wavelengths, BlueMatrix_Indices, 
+                                         Panel4_Wavelengths, BlueMatrix_Indices, 
+                                         SaveFig=False, Title=Title, SavingPath=f'{SavingPath}Blue_MixingMatrix_{Name}.png')
+
+cond_number = np.linalg.cond(BlueMatrix)
+print("Condition number:", cond_number)
+```
+
+```python
+### Green Matrix full 16x16
+Title = 'Green Matrix - '+Name
+GreenMatrix_7x7 = HySE.MakeMixingMatrix_Flexible(Panel2_Wavelengths, MixingMatrix_Indices, 
+                                         Panel4_Wavelengths, MixingMatrix_Indices, 
+                                         SaveFig=False, Title=Title, SavingPath=f'{SavingPath}Green_MixingMatrix_{Name}.png')
+
+cond_number = np.linalg.cond(GreenMatrix_7x7)
+print("Condition number:", cond_number)
+
+
+### Short green Matrix 14x14 (remove frames with weak wavelengths)
+print(f'GREEN SHORT MIXING MATRIX')
+Title = 'Green Matrix 6x6 - '+Name
+
+GreenMatrix_6x6_sub_Indices = generate_local_index_matrix(GreenMatrix_6x6_Indices, indices_6x6)
+
+
+GreenMatrix_6x6 = HySE.MakeMixingMatrix_Flexible(Wavs_6x6_P2, GreenMatrix_6x6_sub_Indices, 
+                                         Wavs_6x6_P4, GreenMatrix_6x6_sub_Indices, 
+                                         SaveFig=False, Title=Title, SavingPath=f'{SavingPath}GreenMatrix_6x6_{Name}.png')
+
+cond_number = np.linalg.cond(GreenMatrix_6x6)
+print("Condition number:", cond_number)
+
+
+### Sub green mixing matrices (7x7)
+MixingMatrix_Sub1 = np.array([[1,1,1,0,0,0,0],
+                              [1,0,1,0,0,1,0], 
+                              [1,1,0,0,0,1,0], 
+                              [0,1,1,0,0,1,0], 
+                              [0,0,0,1,1,0,0], 
+                              [0,0,0,1,0,0,1], 
+                              [0,0,0,0,1,0,1],])
+
+MixingMatrix_Sub2 = MixingMatrix_Sub1
+
+Wavelengths_Sub1 = np.array([486,511,543,560,584,606,625])
+Wavelengths_Sub2 = np.array([503,526,569,576,594,617,646])
+Sub1_indices_frames = [0,1,2,3,5,6,7]
+Sub2_indices_frames = [8,9,10,11,13,14,15]
+
+Title='Green SubMatrices'
+
+HySE.PlotMixingMatrix(MixingMatrix_Sub1, Wavelengths_Sub1, Title, '')
+
+
+### Sub Sub green mixing matrices (3x3 and 4x4)
+
+MixingMatrix_SubSub1A = np.array([[1,1,1,0],
+                                  [1,0,1,1],
+                                  [1,1,0,1],
+                                  [0,1,1,1]])
+
+MixingMatrix_SubSub1B = np.array([[1,1,0],
+                                  [1,0,1],
+                                  [0,1,1]])
+
+MixingMatrix_SubSub2A = MixingMatrix_SubSub1A
+MixingMatrix_SubSub2B = MixingMatrix_SubSub1B
+
+Wavelengths_SubSub1A = np.array([486,511,543,606])
+Wavelengths_SubSub1B = np.array([560,584,625])
+Wavelengths_SubSub2A = np.array([503,526,569,617])
+Wavelengths_SubSub2B = np.array([576,594,646])
+
+SubSub1A_indices_frames = [0,1,2,3]
+SubSub1B_indices_frames = [5,6,7]
+SubSub2A_indices_frames = [8,9,10,11]
+SubSub2B_indices_frames = [13,14,15]
+
+Title='Green SubSubMatrix1A'
+PlotMixingMatrix(MixingMatrix_SubSub1A, MixingMatrix_SubSub1A, Title, '')
+
+Title='Green SubSubMatrix1B'
+PlotMixingMatrix(MixingMatrix_SubSub1B, MixingMatrix_SubSub1B, Title, '')
+
+```
+
+# UPDATED UP TO HERE
 
 ### Normalisation
 
