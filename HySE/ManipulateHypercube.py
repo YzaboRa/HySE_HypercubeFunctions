@@ -328,14 +328,13 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 	Order = kwargs.get('Order', False)
 
 	Wavelengths_list = kwargs.get('Wavelengths_list', None)
-	if Wavelengths_list:
-	   ## Sort Wavelengths
-	   order_list = np.argsort(Wavelengths_list)
-	   Wavelengths_sorted = Wavelengths_list[order_list]
-	   # print(f'Wavelengths_list: \n{Wavelengths_list}\n\n')
-	   # print(f'Wavelengths_sorted: \n{Wavelengths_sorted}\n\n')
+	if Wavelengths_list is not None:
+		## Sort Wavelengths
+		order_list = np.argsort(Wavelengths_list)
+		Wavelengths_sorted = Wavelengths_list[order_list]
 	else:
-	   Order=False # Can't order by wavelengths if there's no wavelength list!
+		print(f'Provide a list of the wavelengths for ordering')
+		Order=False # Can't order by wavelengths if there's no wavelength list!
 
 	if Order:
 		print(f'Order set to True. Hypercube will be sorted according to the wavelengths list')
@@ -469,13 +468,10 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 		else:
 			print(f'Warning: in HySE.ManipulateHypercube.ComputeHypercube(), Order=True but Average=False.')
 			Hypercube_sorted = []
-			NN, WW, YY, XX = Hypercube.shape
-			for n in range(0,NN):
-				hypercube_sorted_sub = []
-				for k in range(0,WW):
-					hypercube_sorted_sub.append(Hypercube[n,order_list[k],:,:,:])
-				Hypercube_sorted.append(hypercube_sorted_sub)
-			Hypercube_sorted = np.array(Hypercube_sorted)
+			print(Hypercube.shape)
+			Nsweeps, WW, Nframes, YY, XX, _ = Hypercube.shape
+			## sort Hypercube
+			# Hypercube_sorted = np.array(Hypercube_sorted)
 
 	else:
 		Hypercube_sorted = Hypercube

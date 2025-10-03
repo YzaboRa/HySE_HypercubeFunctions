@@ -49,7 +49,7 @@ def FindHypercube_RGB(DataPath, **kwargs):
 				
 				- CropImDimensions = [xmin, xmax, ymin, ymax]: coordinates of image crop (default Full HD)')
 				- Ncolours = integer: if different from 8 (for example, if one FSK was off)')
-				- fps = integer (frame per second)
+				- fps = 60. Integer (frame per second)
 				- SaveFig = True: Whether to save figure
 				
 	Output:
@@ -78,7 +78,7 @@ def FindHypercube_RGB(DataPath, **kwargs):
 	SaveFig = kwargs.get('SaveFig', True)
 
 	## Check if user is setting fps
-	fps = kwargs.get('fps', 60*3)
+	fps = kwargs.get('fps', 60)
 		
 	## Check if user has set the max plateau size
 	## Used to handle double plateaux when neighbouring wavelengths

@@ -485,102 +485,102 @@ def PlotHypercube(Hypercube, **kwargs):
 
 
 def ApplyMask(Hypercube, Mask, **kwargs):
-    """
-    Function that applies a mask to all frames in a 3D array
-    
-    Inputs:
-        - Hypercube
-        - Mask
-        - kwargs:
-            - Help
-            - FillValue = np.nan : What to replace masked pixels by
-            
-    Outputs:
-        - MaskedHypercube
-    """
-    Help = kwargs.get('Help', False)
-    if Help:
-        print(inspect.getdoc(ApplyMask))
-        return 0
-    
-    FillValue = kwargs.get('FillValue', np.nan)
-    
-    (N, Y, X) = Hypercube.shape
-    Hypercube_Masked = np.zeros(Hypercube.shape)
-    for c in range(0,N):
-        frame = copy.deepcopy(Hypercube[c,:,:])
-        frame[Mask] = FillValue
-        Hypercube_Masked[c,:,:] = frame
-    return Hypercube_Masked
+	"""
+	Function that applies a mask to all frames in a 3D array
+	
+	Inputs:
+		- Hypercube
+		- Mask
+		- kwargs:
+			- Help
+			- FillValue = np.nan : What to replace masked pixels by
+			
+	Outputs:
+		- MaskedHypercube
+	"""
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(ApplyMask))
+		return 0
+	
+	FillValue = kwargs.get('FillValue', np.nan)
+	
+	(N, Y, X) = Hypercube.shape
+	Hypercube_Masked = np.zeros(Hypercube.shape)
+	for c in range(0,N):
+		frame = copy.deepcopy(Hypercube[c,:,:])
+		frame[Mask] = FillValue
+		Hypercube_Masked[c,:,:] = frame
+	return Hypercube_Masked
 
 
 def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
-    '''
-    Function that saves a mp4 video of the hypercube.
-    Safely handles np.nan values by converting them to black (0).
+	'''
+	Function that saves a mp4 video of the hypercube.
+	Safely handles np.nan values by converting them to black (0).
 
-    Input:
-        - Hypercube: A 3D numpy array (Frames, Y, X) of float dtype, may contain nans.
-        - SavingPathWithName
-        - kwargs:
-            - Help
-            - fps = 10: frame rate for the video
-            - Mask (2D array): If indicated, mask all frames with this mask
-            
+	Input:
+		- Hypercube: A 3D numpy array (Frames, Y, X) of float dtype, may contain nans.
+		- SavingPathWithName
+		- kwargs:
+			- Help
+			- fps = 10: frame rate for the video
+			- Mask (2D array): If indicated, mask all frames with this mask
+			
 
-    Output:
-        Saved:
-            mp4 video
-    '''
-    Help = kwargs.get('Help', False)
-    if Help:
-        print(inspect.getdoc(MakeHypercubeVideo))
-        return
+	Output:
+		Saved:
+			mp4 video
+	'''
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(MakeHypercubeVideo))
+		return
 
-    fps = kwargs.get('fps', 10)
-    
-    Mask = kwargs.get('Mask')
-    (N, Y, X) = Hypercube.shape
-    Hypercube_Masked = np.zeros(Hypercube.shape)
-    if Mask is not None:
-        Hypercube_Masked = ApplyMask(Hypercube, Mask)
-    else:
-        Hypercube_Masked = Hypercube
+	fps = kwargs.get('fps', 10)
+	
+	Mask = kwargs.get('Mask')
+	(N, Y, X) = Hypercube.shape
+	Hypercube_Masked = np.zeros(Hypercube.shape)
+	if Mask is not None:
+		Hypercube_Masked = ApplyMask(Hypercube, Mask)
+	else:
+		Hypercube_Masked = Hypercube
 
-    # --- Step 1: Handle NaNs and Scale the entire Hypercube ---
-    # It ensures that the brightest pixel across all frames becomes 255,
-    # and all other pixels are scaled relative to that.
+	# --- Step 1: Handle NaNs and Scale the entire Hypercube ---
+	# It ensures that the brightest pixel across all frames becomes 255,
+	# and all other pixels are scaled relative to that.
 
-    # Find the maximum value in the cube, ignoring NaNs
-    max_val = np.nanmax(Hypercube_Masked)
+	# Find the maximum value in the cube, ignoring NaNs
+	max_val = np.nanmax(Hypercube_Masked)
 
-    # Avoid division by zero if the hypercube is all zeros or NaNs
-    if max_val == 0:
-        max_val = 1.0 
+	# Avoid division by zero if the hypercube is all zeros or NaNs
+	if max_val == 0:
+		max_val = 1.0 
 
-    # Scale the float data to the 0-255 range
-    scaled_hypercube = (Hypercube_Masked / max_val) * 255.0
+	# Scale the float data to the 0-255 range
+	scaled_hypercube = (Hypercube_Masked / max_val) * 255.0
 
-    # Now, replace any remaining NaN values with 0 (black)
-    scaled_hypercube[np.isnan(scaled_hypercube)] = 0
+	# Now, replace any remaining NaN values with 0 (black)
+	scaled_hypercube[np.isnan(scaled_hypercube)] = 0
 
-    # It is now safe to convert the entire cube to uint8
-    hypercube_to_save = scaled_hypercube.astype('uint8')
+	# It is now safe to convert the entire cube to uint8
+	hypercube_to_save = scaled_hypercube.astype('uint8')
 
-    # --- Step 2: Write the Video ---
-    (NN, YY, XX) = hypercube_to_save.shape
-    if not SavingPathWithName.endswith('.mp4'):
-        SavingPathWithName += '.mp4'
+	# --- Step 2: Write the Video ---
+	(NN, YY, XX) = hypercube_to_save.shape
+	if not SavingPathWithName.endswith('.mp4'):
+		SavingPathWithName += '.mp4'
 
-    # The 'False' argument at the end means we are creating a grayscale video
-    out = cv2.VideoWriter(SavingPathWithName, cv2.VideoWriter_fourcc(*'mp4v'), fps, (XX, YY), False)
+	# The 'False' argument at the end means we are creating a grayscale video
+	out = cv2.VideoWriter(SavingPathWithName, cv2.VideoWriter_fourcc(*'mp4v'), fps, (XX, YY), False)
 
-    for i in range(NN):
-        # Each frame is now a clean uint8 array, ready to be written
-        out.write(hypercube_to_save[i, :, :])
+	for i in range(NN):
+		# Each frame is now a clean uint8 array, ready to be written
+		out.write(hypercube_to_save[i, :, :])
 
-    out.release()
-    print(f"Video saved to {SavingPathWithName}")
+	out.release()
+	print(f"Video saved to {SavingPathWithName}")
 
 
 def PlotDark(Dark):
@@ -951,10 +951,206 @@ def spectral_angle_mapper(spec1, spec2, eps=1e-8, **kwargs):
 	return angle
 
 
-def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData, MacBeth_RGB, Name, **kwargs):
+# def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData, MacBeth_RGB, Name, **kwargs):
+# 	'''
+# 	Function to plot the spectra extracted from the patches of macbeth colour chart
+	
+# 	Inputs:
+# 		- PatchesSpectra_All: an array, or a list of arrays. Each array is expected of the shape
+# 			(Nwavelengths (16), Npatches (30), 3). Uses the output of the GetPatchesSpectrum()
+# 			function.
+# 		- Wavelengths_sorted: list of sorted wavelengths
+# 		- MacBethSpectraData: Ground truth spectra for the macbeth patches
+# 		- MacBeth_RGB: MacBeth RBG values for each patch (for plotting)
+# 		- Name: Name of the dataset (for saving)
+		
+# 	- kwargs:
+# 		- Help: print this info
+# 		- SavingPath: If indicated, saves the figure at the indicated path
+# 		- Metric = 'PSNR' : Indicates which metric to use to asses the quality of the spectrum
+# 			Accepted metrics: 
+# 			'PSNR', 
+# 			'AvgCorrelation' (Pearson correlation coefficient), 
+# 			'SAM' (Spectral Angle Mapper)
+# 		- ChosenMethod (0). If more than one set of spectra provided, determines which
+# 			of those (the 'method') has its metric indicated for each path.
+# 		- PlotLabels: What label to put for each provided set of spectra. If not indicated
+# 			a generic 'option 1', 'option 2' etc will be used
+# 		- WhitePatchNormalise (True). Normalises all spectral by the spectra of the white patch
+# 		- ClipYScale (True): Clip the y range of the plots to [-0.05,1.05]
+# 		- ClipXScale (True)
+# 		- XScale ([450,670])
+
+# 	Outputs:
+# 		- (plots figure)
+	
+# 	Metric Priority: If multiple metrics are set to True, PSNR is used. If PSNR is False
+# 	but AvgCorrelation is True, Correlation is used. If both are False, SAM is used.
+# 	'''
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(PlotPatchesSpectra))
+# 		return
+
+# 	# --- Argument and Kwarg parsing ---
+# 	SavingPath = kwargs.get('SavingPath')
+# 	SaveFig = SavingPath is not None
+	
+# 	ClipYScale = kwargs.get('ClipYScale', True)
+# 	ClipXScale = kwargs.get('ClipXScale', True)
+# 	XScale = kwargs.get('XScale', [450, 670])
+	
+# 	ChosenMethod = kwargs.get('ChosenMethod', 0)
+# 	WhitePatchNormalise = kwargs.get('WhitePatchNormalise', True)
+
+# 	# --- Metric selection logic ---
+# 	Metric = kwargs.get('Metric', 'PSNR')
+# #     UsePSNR = kwargs.get('PSNR', False)
+# #     UseCorrelation = kwargs.get('AvgCorrelation', False)
+# #     UseSAM = kwargs.get('SAM', False)
+	
+# 	metric_name = None
+# 	metric_func = None
+# 	metric_format = None
+# 	# Priority: PSNR > Correlation > SAM
+# 	if Metric=='PSNR':
+# 		print(f'Using PSNR')
+# 		metric_name = 'PSNR'
+# 		metric_func = psnr
+# 		metric_format = '{:.2f} dB'
+# 	elif Metric=='AvgCorrelation':
+# 		print(f'Using Average Correlation')
+# 		metric_name = 'Correlation'
+# 		metric_func = correlation_coefficient
+# 		metric_format = '{:.3f}'
+# 	elif Metric=='SAM':
+# 		print(f'Using Spectral Angle Mapper')
+# 		metric_name = 'SAM'
+# 		metric_func = spectral_angle_mapper
+# 		metric_format = '{:.2f}°'
+# 	else:
+# 		print(f'Metric ({Metric}) not accepted ! Use PSNR, AvgCorrelation or SAM')
+
+# 	CalculateMetric = metric_name is not None
+# 	all_patches_metric_values = [] # For calculating the average for the suptitle
+
+# 	PlotColours = ['limegreen', 'cornflowerblue', 'orange', 'red', 'darkblue', 'cyan', 'magenta']
+		
+# 	# --- Data preparation ---
+# 	if not isinstance(PatchesSpectra_All, list):
+# 		PatchesSpectra_All = [PatchesSpectra_All]
+		
+# 	PlotLabels = kwargs.get('PlotLabels')
+# 	if PlotLabels is None:
+# 		print(f'Indicate PlotLabels for more descriptive plot')
+# 		PlotLabels = [f'Option {i+1}' for i in range(len(PatchesSpectra_All))]
+
+# 	WavelengthRange_start = np.round(int(np.amin(Wavelengths_sorted)) / 10.0) * 10
+# 	WavelengthRange_end = np.round(np.amax(Wavelengths_sorted) / 10.0) * 10
+# 	print(f'Wavelength range: {WavelengthRange_start} : {WavelengthRange_end}')
+
+# 	idx_min_gtruth = find_closest(MacBethSpectraData[:, 0], WavelengthRange_start)
+# 	idx_max_gtruth = find_closest(MacBethSpectraData[:, 0], WavelengthRange_end)
+
+# 	Nwhite = 8 - 1 # Index for the white patch (patch #8)
+# 	White_truth = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth, Nwhite + 1]
+# 	GroundTruthWavelengths = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth, 0]
+
+# 	# --- Plotting ---
+# 	fig, ax = plt.subplots(nrows=5, ncols=6, figsize=(14, 12))
+# 	for i in range(6):
+# 		for j in range(5):
+# 			patchN = i + j * 6
+# 			color = (MacBeth_RGB[patchN, 0] / 255, MacBeth_RGB[patchN, 1] / 255, MacBeth_RGB[patchN, 2] / 255)
+			
+# 			GroundTruthSpectrum = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth, patchN + 1]
+# 			if WhitePatchNormalise:
+# 				GroundTruthSpectrumN = np.divide(GroundTruthSpectrum, White_truth)
+# 			else:
+# 				GroundTruthSpectrumN = GroundTruthSpectrum
+				
+# 			ax[j, i].plot(GroundTruthWavelengths, GroundTruthSpectrumN, color='black', lw=4, label='Truth')
+			
+# 			metric_vals_per_method = []
+			
+# 			for k in range(len(PatchesSpectra_All)):
+# 				PatchesSpectra = PatchesSpectra_All[k]
+# 				if WhitePatchNormalise:
+# 					spectra_WhiteNorm = np.divide(PatchesSpectra[:, patchN, 1], PatchesSpectra[:, Nwhite, 1])
+# 				else:
+# 					spectra_WhiteNorm = PatchesSpectra[:, patchN, 1]
+
+# 				ax[j, i].plot(Wavelengths_sorted, spectra_WhiteNorm, '.-', c=PlotColours[k], label=PlotLabels[k])
+				
+# 				if CalculateMetric:
+# 					# Interpolate ground truth to match our measurement wavelengths for comparison
+# 					GT_comparable = CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrumN)
+# 					metric_val = metric_func(GT_comparable, spectra_WhiteNorm)
+# 					metric_vals_per_method.append(metric_val)
+
+# 			# --- Axis and Title Formatting ---
+# 			if ClipYScale:
+# 				ax[j, i].set_ylim(-0.05, 1.05)
+# 			if ClipXScale:
+# 				ax[j, i].set_xlim(XScale[0], XScale[1])
+			
+# 			# Set title for the white patch specifically
+# 			if patchN == Nwhite:
+# 				ax[j, i].set_title(f'Patch {patchN+1} - white', color='black', fontsize=10)
+# 				ax[j, i].legend(fontsize=8, loc='lower center')
+# 			# Set title for all other patches
+# 			else:
+# 				if CalculateMetric:
+# 					# Determine best method (max for PSNR/Corr, min for SAM)
+# 					if metric_name == 'SAM':
+# 						best_val_pos = np.argmin(metric_vals_per_method)
+# 					else:
+# 						best_val_pos = np.argmax(metric_vals_per_method)
+					
+# 					selected_val_str = metric_format.format(metric_vals_per_method[ChosenMethod])
+# 					best_val_str = metric_format.format(metric_vals_per_method[best_val_pos])
+					
+# 					title_text = (f'Patch {patchN+1}\n'
+# 								  f'Selected {metric_name} = {selected_val_str}\n'
+# 								  f'Best: {best_val_str} ({PlotLabels[best_val_pos]})')
+# 					ax[j, i].set_title(title_text, color=color, fontsize=10)
+# 					all_patches_metric_values.append(metric_vals_per_method[ChosenMethod])
+# 				else:
+# 					ax[j, i].set_title(f'Patch {patchN+1}', color=color, fontsize=10)
+
+# 			# --- Axis Labels ---
+# 			if j == 4:
+# 				ax[j, i].set_xlabel('Wavelength [nm]')
+# 			else:
+# 				ax[j, i].xaxis.set_ticklabels([])
+				
+# 			if i == 0:
+# 				ax[j, i].set_ylabel('Normalized intensity')
+# 			elif ClipYScale: # Only remove labels if y-scale is clipped and not the first column
+# 				ax[j, i].yaxis.set_ticklabels([])
+
+# 	# --- Final Figure Formatting and Saving ---
+# 	suptitle_text = f'Spectra for {Name}'
+# 	if CalculateMetric:
+# #         print(all_patches_metric_values)
+# 		avg_metric = np.mean(np.abs(all_patches_metric_values))
+# 		avg_metric_str = metric_format.format(avg_metric)
+# 		suptitle_text += (f' - Selected Method: {PlotLabels[ChosenMethod]}\n'
+# 						  f'Average {metric_name} for all patches: {avg_metric_str}')
+		
+# 	plt.suptitle(suptitle_text)
+# 	plt.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to make room for suptitle
+	
+# 	if SaveFig:
+# 		plt.savefig(f'{SavingPath}_Patches.png', dpi=300)
+# 	plt.show()
+
+
+
+def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted_All, MacBethSpectraData, MacBeth_RGB, Name, **kwargs):
 	'''
 	Function to plot the spectra extracted from the patches of macbeth colour chart
-	
+
 	Inputs:
 		- PatchesSpectra_All: an array, or a list of arrays. Each array is expected of the shape
 			(Nwavelengths (16), Npatches (30), 3). Uses the output of the GetPatchesSpectrum()
@@ -963,7 +1159,7 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 		- MacBethSpectraData: Ground truth spectra for the macbeth patches
 		- MacBeth_RGB: MacBeth RBG values for each patch (for plotting)
 		- Name: Name of the dataset (for saving)
-		
+
 	- kwargs:
 		- Help: print this info
 		- SavingPath: If indicated, saves the figure at the indicated path
@@ -980,10 +1176,13 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 		- ClipYScale (True): Clip the y range of the plots to [-0.05,1.05]
 		- ClipXScale (True)
 		- XScale ([450,670])
+		- KNORM 
+		- NORMPATCHES
+		- Colours
 
 	Outputs:
 		- (plots figure)
-	
+
 	Metric Priority: If multiple metrics are set to True, PSNR is used. If PSNR is False
 	but AvgCorrelation is True, Correlation is used. If both are False, SAM is used.
 	'''
@@ -995,20 +1194,20 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 	# --- Argument and Kwarg parsing ---
 	SavingPath = kwargs.get('SavingPath')
 	SaveFig = SavingPath is not None
-	
+
 	ClipYScale = kwargs.get('ClipYScale', True)
 	ClipXScale = kwargs.get('ClipXScale', True)
 	XScale = kwargs.get('XScale', [450, 670])
-	
+
 	ChosenMethod = kwargs.get('ChosenMethod', 0)
 	WhitePatchNormalise = kwargs.get('WhitePatchNormalise', True)
-
-	# --- Metric selection logic ---
 	Metric = kwargs.get('Metric', 'PSNR')
-#     UsePSNR = kwargs.get('PSNR', False)
-#     UseCorrelation = kwargs.get('AvgCorrelation', False)
-#     UseSAM = kwargs.get('SAM', False)
+	KNORM = kwargs.get('KNORM', [])
+	NORMPATCHES = kwargs.get('NORMPATCHES')
 	
+	Colours = kwargs.get('Colours')
+	
+
 	metric_name = None
 	metric_func = None
 	metric_format = None
@@ -1016,17 +1215,17 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 	if Metric=='PSNR':
 		print(f'Using PSNR')
 		metric_name = 'PSNR'
-		metric_func = psnr
+		metric_func = HySE.psnr
 		metric_format = '{:.2f} dB'
 	elif Metric=='AvgCorrelation':
 		print(f'Using Average Correlation')
 		metric_name = 'Correlation'
-		metric_func = correlation_coefficient
+		metric_func = HySE.correlation_coefficient
 		metric_format = '{:.3f}'
 	elif Metric=='SAM':
 		print(f'Using Spectral Angle Mapper')
 		metric_name = 'SAM'
-		metric_func = spectral_angle_mapper
+		metric_func = HySE.spectral_angle_mapper
 		metric_format = '{:.2f}°'
 	else:
 		print(f'Metric ({Metric}) not accepted ! Use PSNR, AvgCorrelation or SAM')
@@ -1034,57 +1233,98 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 	CalculateMetric = metric_name is not None
 	all_patches_metric_values = [] # For calculating the average for the suptitle
 
-	PlotColours = ['limegreen', 'cornflowerblue', 'orange', 'red', 'darkblue', 'cyan', 'magenta']
-		
+	if Colours is not None:
+		PlotColours=Colours
+	else:
+		PlotColours = ['limegreen', 'cornflowerblue', 'orange', 'red', 'darkblue', 'cyan', 'magenta']
+
 	# --- Data preparation ---
 	if not isinstance(PatchesSpectra_All, list):
 		PatchesSpectra_All = [PatchesSpectra_All]
-		
+
 	PlotLabels = kwargs.get('PlotLabels')
 	if PlotLabels is None:
 		print(f'Indicate PlotLabels for more descriptive plot')
 		PlotLabels = [f'Option {i+1}' for i in range(len(PatchesSpectra_All))]
-
-	WavelengthRange_start = np.round(int(np.amin(Wavelengths_sorted)) / 10.0) * 10
-	WavelengthRange_end = np.round(np.amax(Wavelengths_sorted) / 10.0) * 10
+		
+	
+#     AllWavs = Wavelengths_sorted_All
+	flattened_list = [wavelength for sublist in Wavelengths_sorted_All for wavelength in sublist]
+	AllWavs = np.array(flattened_list)
+		
+	WavelengthRange_start = np.round(int(np.amin(AllWavs)) / 10.0) * 10
+	WavelengthRange_end = np.round(np.amax(AllWavs) / 10.0) * 10
 	print(f'Wavelength range: {WavelengthRange_start} : {WavelengthRange_end}')
 
-	idx_min_gtruth = find_closest(MacBethSpectraData[:, 0], WavelengthRange_start)
-	idx_max_gtruth = find_closest(MacBethSpectraData[:, 0], WavelengthRange_end)
+	idx_min_gtruth = HySE.find_closest(MacBethSpectraData[:, 0], WavelengthRange_start)
+	idx_max_gtruth = HySE.find_closest(MacBethSpectraData[:, 0], WavelengthRange_end)
 
 	Nwhite = 8 - 1 # Index for the white patch (patch #8)
 	White_truth = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth, Nwhite + 1]
 	GroundTruthWavelengths = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth, 0]
+
 
 	# --- Plotting ---
 	fig, ax = plt.subplots(nrows=5, ncols=6, figsize=(14, 12))
 	for i in range(6):
 		for j in range(5):
 			patchN = i + j * 6
-			color = (MacBeth_RGB[patchN, 0] / 255, MacBeth_RGB[patchN, 1] / 255, MacBeth_RGB[patchN, 2] / 255)
 			
+			color = (MacBeth_RGB[patchN, 0] / 255, MacBeth_RGB[patchN, 1] / 255, MacBeth_RGB[patchN, 2] / 255)
+
 			GroundTruthSpectrum = MacBethSpectraData[idx_min_gtruth:idx_max_gtruth, patchN + 1]
 			if WhitePatchNormalise:
 				GroundTruthSpectrumN = np.divide(GroundTruthSpectrum, White_truth)
 			else:
 				GroundTruthSpectrumN = GroundTruthSpectrum
-				
+
 			ax[j, i].plot(GroundTruthWavelengths, GroundTruthSpectrumN, color='black', lw=4, label='Truth')
-			
+
 			metric_vals_per_method = []
-			
+
 			for k in range(len(PatchesSpectra_All)):
 				PatchesSpectra = PatchesSpectra_All[k]
+				Wavelengths_sorted = Wavelengths_sorted_All[k]
+				
+				WavelengthRange_start_sub = np.round(int(np.amin(Wavelengths_sorted)) / 10.0) * 10
+				WavelengthRange_end_sub = np.round(np.amax(Wavelengths_sorted) / 10.0) * 10
+#                 print(f'Wavelength range: {WavelengthRange_start} : {WavelengthRange_end}')
+
+				idx_min_gtruth_sub = HySE.find_closest(MacBethSpectraData[:, 0], WavelengthRange_start_sub)
+				idx_max_gtruth_sub = HySE.find_closest(MacBethSpectraData[:, 0], WavelengthRange_end_sub)
+
+				Nwhite = 8 - 1 # Index for the white patch (patch #8)
+				White_truth_sub = MacBethSpectraData[idx_min_gtruth_sub:idx_max_gtruth_sub, Nwhite + 1]
+				GroundTruthWavelengths_sub = MacBethSpectraData[idx_min_gtruth_sub:idx_max_gtruth_sub, 0]
+				
+				GroundTruthSpectrum_sub = MacBethSpectraData[idx_min_gtruth_sub:idx_max_gtruth_sub, patchN + 1]
+			
+					
+				if WhitePatchNormalise:
+					GroundTruthSpectrumN_sub = np.divide(GroundTruthSpectrum_sub, White_truth_sub)
+				else:
+					GroundTruthSpectrumN_sub = GroundTruthSpectrum_sub
+			
+				
 				if WhitePatchNormalise:
 					spectra_WhiteNorm = np.divide(PatchesSpectra[:, patchN, 1], PatchesSpectra[:, Nwhite, 1])
 				else:
 					spectra_WhiteNorm = PatchesSpectra[:, patchN, 1]
-
+					
+				if k in KNORM:
+					if NORMPATCHES is None:
+						KL_Norm = np.average(GroundTruthSpectrumN_sub)
+					else:
+						NORMPATCHES
+#                     print(f'For patch {patchN}, {PlotLabels[k]}: divide by 1/{KL_Norm}')
+					spectra_WhiteNorm = spectra_WhiteNorm*KL_Norm
+#                 print(len(Wavelengths_sorted))
+#                 print(len(spectra_WhiteNorm))
 				ax[j, i].plot(Wavelengths_sorted, spectra_WhiteNorm, '.-', c=PlotColours[k], label=PlotLabels[k])
-				
+
 				if CalculateMetric:
 					# Interpolate ground truth to match our measurement wavelengths for comparison
-					GT_comparable = CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths, GroundTruthSpectrumN)
+					GT_comparable = HySE.CompareSpectra(Wavelengths_sorted, GroundTruthWavelengths_sub, GroundTruthSpectrumN_sub)
 					metric_val = metric_func(GT_comparable, spectra_WhiteNorm)
 					metric_vals_per_method.append(metric_val)
 
@@ -1093,11 +1333,11 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 				ax[j, i].set_ylim(-0.05, 1.05)
 			if ClipXScale:
 				ax[j, i].set_xlim(XScale[0], XScale[1])
-			
+
 			# Set title for the white patch specifically
 			if patchN == Nwhite:
 				ax[j, i].set_title(f'Patch {patchN+1} - white', color='black', fontsize=10)
-				ax[j, i].legend(fontsize=8, loc='lower center')
+				ax[j, i].legend(fontsize=7, loc='lower center')
 			# Set title for all other patches
 			else:
 				if CalculateMetric:
@@ -1106,14 +1346,14 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 						best_val_pos = np.argmin(metric_vals_per_method)
 					else:
 						best_val_pos = np.argmax(metric_vals_per_method)
-					
+
 					selected_val_str = metric_format.format(metric_vals_per_method[ChosenMethod])
 					best_val_str = metric_format.format(metric_vals_per_method[best_val_pos])
-					
+
 					title_text = (f'Patch {patchN+1}\n'
 								  f'Selected {metric_name} = {selected_val_str}\n'
 								  f'Best: {best_val_str} ({PlotLabels[best_val_pos]})')
-					ax[j, i].set_title(title_text, color=color, fontsize=10)
+					ax[j, i].set_title(title_text, color=color, fontsize=8)
 					all_patches_metric_values.append(metric_vals_per_method[ChosenMethod])
 				else:
 					ax[j, i].set_title(f'Patch {patchN+1}', color=color, fontsize=10)
@@ -1123,7 +1363,7 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 				ax[j, i].set_xlabel('Wavelength [nm]')
 			else:
 				ax[j, i].xaxis.set_ticklabels([])
-				
+
 			if i == 0:
 				ax[j, i].set_ylabel('Normalized intensity')
 			elif ClipYScale: # Only remove labels if y-scale is clipped and not the first column
@@ -1137,10 +1377,10 @@ def PlotPatchesSpectra(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraDat
 		avg_metric_str = metric_format.format(avg_metric)
 		suptitle_text += (f' - Selected Method: {PlotLabels[ChosenMethod]}\n'
 						  f'Average {metric_name} for all patches: {avg_metric_str}')
-		
-	plt.suptitle(suptitle_text)
+
+	plt.suptitle(suptitle_text, fontsize=12)
 	plt.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to make room for suptitle
-	
+
 	if SaveFig:
 		plt.savefig(f'{SavingPath}_Patches.png', dpi=300)
 	plt.show()
