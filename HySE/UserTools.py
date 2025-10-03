@@ -1497,6 +1497,28 @@ def GetPatchesMetrics(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData
 
 
 
+def PlotMixingMatrix(MixingMatrix, Wavelengths, Title, SavingPath):
+	Nwavs_ = len(Wavelengths)
+	Nims, Nwavs = MixingMatrix.shape
+	if Nwavs!=Nwavs:
+		print(f'Error: There number of wavelengths does not match between Wavelengths list {Nwavs_} and the mixing matrix {MixingMatrix.shape}')
+	xx = [i for i in range(0,Nwavs)]
+	bin_labels = [f'im {i+1}' for i in range(0,Nims)]
+
+	fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(5,5))
+	ax.imshow(MixingMatrix, cmap='magma')
+	ax.set_xticks(xx)
+	ax.set_yticks(xx)
+	ax.set_xticklabels(Wavelengths, rotation=90)
+	ax.set_yticklabels(bin_labels)
+
+	ax.set_xlabel(f'Individual Wavelengths [nm]')
+	ax.set_ylabel(f'Combined Wavelengths [nm]')
+	
+	ax.set_title(f'Mixing Matrix - {Title}')
+	plt.tight_layout()
+#     plt.savefig(SavingPath)
+	plt.show()
 
 
 
