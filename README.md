@@ -555,6 +555,44 @@ FramesTransformed = ApplyTransform(FramesForTransformApply, AllTransforms)
 ```
 The new FramesTransformed array will now be transformed in the same way as the original data.
 
+
+### Manual Registration
+In some cases, SimpleITK is unable to provide decent registration. If the image has some visible features that we are trying to align (particularly lesions), a manual (brute force) registration can be used. For this registration, the user defines fixed points for all images, which are used to compute affine registration. Pop-up windows help to identify those fixed points manually.
+The following example shows how to use manual registration.
+
+```python
+## Load unregistered data:
+HypercubeForRegistration = np.load(HypercubeForRegistration_Path)['arr_0']
+AllReflectionsMasks = np.load(AllReflectionsMasks_Path)['arr_0']
+EdgeMask = np.load(EdgeMask_Path)['arr_0']
+
+## Run the code to manually indentify fixed points and follow instructinos
+Sigma = 2
+DeviationThreshold=150
+CoregisteredHypercube, AllTransforms, RegistrationMask, AllLandmarkPoints = HySE.CoRegisterHypercubeAndMask_Hybrid(HypercubeForRegistration, Wavelengths_list, Static_Index=9, AllReflectionsMasks=AllReflectionsMasks, EdgeMask=EdgeMask, InteractiveMasks=True,Blurring=True, Sigma=Sigma, DeviationThreshold=DeviationThreshold)
+```
+At first a window prompting the user to identify fixed points on the static image will open. There is no limit to the number of fixed points, and the colourbar will expand as points are added. Press "z" to remove the latest point, and "p" to toggle the numbering of the points. 
+<p align="center">
+  <img src="[https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e](https://github.com/user-attachments/assets/1e329078-526d-4049-94a9-9525ee440777)"  alt="ManualRegistration_Moving" width="891" height="443"/>
+</p>
+
+Once all points on the fixed image have been identified, the window can be closed. A new window will then appear, with the static image and already idenfitied fixed points showed on the left frame. The right frame will show the first moving image, where the user must then identify the same fixed points. Like for the static image, pressing "z" will remove the latest point and "p" will toggle the numbering of the points. An automatic warning will apear if the distance between the fixed point in the moving image and the equivalent point in the static image is larger than DeviationThreshold (set to 150 pixels in this example). If this warning appears, it might be that the user has confused points (use "p" to show the points numbers), or that the moving image has enough movement that the same point has moved by more than DeviationThreshold. Once all fixed points have been identified, the window will indicate so and the user may then close the window. A new identical window will then appear, prompting the user to identify fixed points for the second moving image. The same thing will happen untill all moving images (typically 15) have been labelled.
+
+Once all images have been labelled and if the user is confident in their labelling, it is best to save the coordinates for all points for reproducibility:
+```python
+Npoints = len(AllLandmarkPoints['fixed_points'])
+Info = f'ManualRegistration_{Npoints}points'
+PointsSavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_Crop{Cropping}_{Info}__Landmarkpoints.npz'
+np.savez(f'{PointsSavingPath}', AllLandmarkPoints, allow_pickle=True)
+```
+
+These saved coordinates can then be used to run the registration by adding the AllLandmarkPoints input in the CoRegisterHypercubeAndMask_Manual() function. When AllLandmarkPoints is indicated, the function does not prompt the user to label images but instead performs the registration based on those indicated points.
+```python
+AllLandmarkPoints_1 = np.load(PointsPath, allow_pickle=True)['arr_0'].item()
+CoregisteredHypercube, AllTransforms, RegistrationMask, AllLandmarkPoints = HySE.CoRegisterHypercubeAndMask_Manual(HypercubeForRegistration, Wavelengths_list, Static_Index=9, AllReflectionsMasks=AllReflectionsMasks, EdgeMask=EdgeMask, InteractiveMasks=True, RegistrationMethod='landmark', Blurring=True, Sigma=Sigma, DeviationThreshold=150, AllLandmarkPoints=AllLandmarkPoints_1)
+
+```
+
 ## Help 
 
 A general help function allows to print all the modules and associated functions:
