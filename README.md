@@ -569,14 +569,15 @@ EdgeMask = np.load(EdgeMask_Path)['arr_0']
 ## Run the code to manually indentify fixed points and follow instructinos
 Sigma = 2
 DeviationThreshold=150
-CoregisteredHypercube, AllTransforms, RegistrationMask, AllLandmarkPoints = HySE.CoRegisterHypercubeAndMask_Hybrid(HypercubeForRegistration,
-Wavelengths_list,
-Static_Index=9,
-AllReflectionsMasks=AllReflectionsMasks,
-EdgeMask=EdgeMask,
-InteractiveMasks=True,Blurring=True,
-Sigma=Sigma,
-DeviationThreshold=DeviationThreshold)
+RegHypercube, AllTransforms, RegMask, AllPoints = HySE.CoRegisterHypercubeAndMask_Hybrid(HypercubeForRegistration, 
+                                                                                         Wavelengths_list, 
+                                                                                         Static_Index=9, 
+                                                                                         AllReflectionsMasks=AllReflectionsMasks, 
+                                                                                         EdgeMask=EdgeMask, 
+                                                                                         InteractiveMasks=True,
+                                                                                         Blurring=True, 
+                                                                                         Sigma=Sigma, 
+                                                                                         DeviationThreshold=DeviationThreshold)
 ```
 At first a window prompting the user to identify fixed points on the static image will open. There is no limit to the number of fixed points, and the colourbar will expand as points are added. Press "z" to remove the latest point, and "p" to toggle the numbering of the points. 
 
@@ -593,16 +594,25 @@ Once all points on the fixed image have been identified, the window can be close
 
 Once all images have been labelled and if the user is confident in their labelling, it is best to save the coordinates for all points for reproducibility:
 ```python
-Npoints = len(AllLandmarkPoints['fixed_points'])
+Npoints = len(AllPoints['fixed_points'])
 Info = f'ManualRegistration_{Npoints}points'
 PointsSavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_Crop{Cropping}_{Info}__Landmarkpoints.npz'
-np.savez(f'{PointsSavingPath}', AllLandmarkPoints, allow_pickle=True)
+np.savez(f'{PointsSavingPath}', AllPoints, allow_pickle=True)
 ```
 
 These saved coordinates can then be used to run the registration by adding the AllLandmarkPoints input in the CoRegisterHypercubeAndMask_Manual() function. When AllLandmarkPoints is indicated, the function does not prompt the user to label images but instead performs the registration based on those indicated points.
 ```python
 AllLandmarkPoints_1 = np.load(PointsPath, allow_pickle=True)['arr_0'].item()
-CoregisteredHypercube, AllTransforms, RegistrationMask, AllLandmarkPoints = HySE.CoRegisterHypercubeAndMask_Manual(HypercubeForRegistration, Wavelengths_list, Static_Index=9, AllReflectionsMasks=AllReflectionsMasks, EdgeMask=EdgeMask, InteractiveMasks=True, RegistrationMethod='landmark', Blurring=True, Sigma=Sigma, DeviationThreshold=150, AllLandmarkPoints=AllLandmarkPoints_1)
+RegHypercube, AllTransforms, RegMask, AllPoints = HySE.CoRegisterHypercubeAndMask_Manual(HypercubeForRegistration, 
+                                                                                         Wavelengths_list,
+                                                                                         Static_Index=9, 
+                                                                                         AllReflectionsMasks=AllReflectionsMasks, 
+                                                                                         EdgeMask=EdgeMask, 
+                                                                                         InteractiveMasks=True, 
+                                                                                         Blurring=True, 
+                                                                                         Sigma=Sigma, 
+                                                                                         DeviationThreshold=DeviationThreshold,
+                                                                                         AllLandmarkPoints=AllLandmarkPoints_1)
 
 ```
 
