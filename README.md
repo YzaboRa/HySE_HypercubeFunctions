@@ -150,6 +150,8 @@ FramesCombined_Reference = Frames_RedD_avg[NSweep,:,:,:]
 ```
 
 ### Normalisation
+<details>
+<summary>⚠️ Outdated section (click to expand)</summary>
 
 N.B.: This section needs updating to incorporate using the reference channel for spatial normalisation. The names used in this section might not reflect those earlier/later in this file. Normalisation can be skipped.
 
@@ -187,7 +189,8 @@ Hypercube_MacbethHySE_1_ND, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHy
                                                            SaveFigure=True, SavingPath=SavingPath+Name)
 
 ```
-
+<details>
+  
 ### Mask
 Only really important if doing co-registration
 ```python
