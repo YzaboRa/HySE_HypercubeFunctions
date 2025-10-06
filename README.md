@@ -432,58 +432,21 @@ np.savez(SavingPath+'HybridWav3_GreenCombined_SubSubAll_wavelengths.npz', Wavs_S
 
 ```
 
-
-# UPDATED UP TO HERE
-
-
-### Unmixing
-
-Once this is done, we can then move on to the actual unmixing:
-
+We can plot this hypercube for visualisation:
 ```python
-############################
-####### 5. Mixing Matrix
-############################
-
-## Compute the mixing matrix
-MixingMatrix = HySE.MakeMixingMatrix(Wavelengths_list, Arduino_MixingMatrix, Help=False)
+HySE.PlotHypercube(Unmixed_Blue, Wavelengths=Wavelengths_list_sorted, SameScale=False, SavePlot=False, SavingPathWithName='')
 ```
+
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/e71b8693-c12b-4a80-8303-4bda44a04c0e" width="400"/>
-</p>
-
-```python
-
-############################
-####### 6. Unmix the data
-############################
-
-Unmixed_Hypercube_MacbethHySE_avg_ND = HySE.UnmixData(Hypercube_MacbethHySE_avg_ND, MixingMatrix)
-Unmixed_Hypercube_MacbethHySE_avg_N = HySE.UnmixData(Hypercube_MacbethHySE_avg_N, MixingMatrix)
-Unmixed_Hypercube_MacbethHySE_avg_D = HySE.UnmixData(Hypercube_MacbethHySE_avg_D, MixingMatrix)
-
-Unmixed_Hypercube_MacbethHySE_all_ND = HySE.UnmixData(Hypercube_MacbethHySE_all_ND, MixingMatrix)
-Unmixed_Hypercube_MacbethHySE_1_ND = HySE.UnmixData(Hypercube_MacbethHySE_1_ND, MixingMatrix)
-
-## We can plot this hypercube for visualisation:
-SP = f'{SavingPath}{Name}_UnmixedND_avg.png'
-HySE.PlotHypercube(Unmixed_Hypercube_MacbethHySE_avg, Wavelengths=Wavelengths_list_sorted, SameScale=False, Masks=Mask_avg, SavePlot=False, SavingPathWithName=SP) #vmax=0.5,
-```
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/904991ed-4660-4f37-a5de-291f8ef8407a" width="500"/>
+  <img src="https://github.com/user-attachments/assets/5a08ee78-a088-4881-aba4-c79da1dfaa03" width="400"/>
 </p>
 
 ### Saving
-Don't forget to save the unmixed hypercubes! The functions may save figures, but you need to save the array itself:
+Don't forget to save the unmixed hypercubes! The functions may save figures, but you need to save the array itself.
+For example:
 
 ```python
-
-np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_avg_ND.npz', Unmixed_Hypercube_MacbethHySE_avg_ND)
-np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_avg_N.npz', Unmixed_Hypercube_MacbethHySE_avg_N)
-np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_avg_D.npz', Unmixed_Hypercube_MacbethHySE_avg_D)
-
-np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_all_ND.npz', Unmixed_Hypercube_MacbethHySE_all_ND)
-np.savez(f'{SavingPath}{Name}_UnmixedHypercube_MacbethHySE_1_ND.npz', Unmixed_Hypercube_MacbethHySE_1_ND)
+np.savez(f'{SavingPath}{Name}_UnmixedHypercube_Blue.npz', Unmixed_Blue)
 
 ## The Hypercube Visualiser GUI will also require a list of the wavelengths:
 np.savez(f'{SavingPath}{Name}_SortedWavelengths.npz', Wavelengths_list_sorted)
