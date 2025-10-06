@@ -438,7 +438,7 @@ HySE.PlotHypercube(Unmixed_Blue, Wavelengths=Wavelengths_list_sorted, SameScale=
 ```
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/5a08ee78-a088-4881-aba4-c79da1dfaa03" width="400"/>
+  <img src="https://github.com/user-attachments/assets/5a08ee78-a088-4881-aba4-c79da1dfaa03" width="550"/>
 </p>
 
 ### Saving
@@ -462,9 +462,7 @@ Certain functions are designed to make this task easier.
 
 ```python
 
-############################
-####### A.1 Location of ground truth files
-############################
+## Location of ground truth files
 
 MacbethPath = 'MacBeth/Micro_Nano_CheckerTargetData.xls'
 
@@ -479,9 +477,7 @@ MacBeth_RGB = np.array(pd.read_excel(Macbeth_AdobePath))
 MacBethSpectraRGB = np.array([MacBethSpectraColour[:,0], MacBethSpectraColour[:,7], MacBethSpectraColour[:,8], MacBethSpectraColour[:,9]])
 
 
-############################
-####### A.2 Crop around macbeth chart
-############################
+## Crop around macbeth chart
 
 xs, xe = 170,927
 ys, ye = 310,944
@@ -495,9 +491,7 @@ plt.tight_layout()
 plt.show()
 
 
-############################
-####### A.3 Identify where each patch is located
-############################
+## Identify where each patch is located
 
 ## This step requires referncing the plot previously generated, and usually requires a few iterations for each new dataset
 ## Make sure that the ROI squares cover the right patches and only those, by looking at the generated plot.
@@ -518,35 +512,57 @@ HySE.PlotPatchesDetection(macbeth, Positions, Sample_size)
 </p>
 
 ```python
-############################
-####### A.4 Compute the spectra for each patch
-############################
+
+## Compute the spectra for each patch
 
 CropCoordinates = [xs, xe, ys, ye]
 
-PatchesSpectra_MacbethHySE_avg_ND = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_avg_ND, Sample_size, Positions, CropCoordinates)
-PatchesSpectra_MacbethHySE_avg_N = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_avg_N, Sample_size, Positions, CropCoordinates)
-PatchesSpectra_MacbethHySE_avg_D = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_avg_D, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_Green7x7 = HySE.GetPatchesSpectrum(Unmixed_Green_7x7, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_Green6x6 = HySE.GetPatchesSpectrum(Unmixed_Green_6x6, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_Green4x4 = HySE.GetPatchesSpectrum(Unmixed_Green_4x4, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_Green3x3 = HySE.GetPatchesSpectrum(Unmixed_Green_3x3, Sample_size, Positions, CropCoordinates)
 
-PatchesSpectra_MacbethHySE_all_ND = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_all_ND, Sample_size, Positions, CropCoordinates)
-PatchesSpectra_MacbethHySE_1_ND = HySE.GetPatchesSpectrum(Unmixed_Hypercube_MacbethHySE_1_ND, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_Blue = HySE.GetPatchesSpectrum(Unmixed_Blue, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_GreenSub_Combined = HySE.GetPatchesSpectrum(Unmixed_GreenSub12_Combined, Sample_size, Positions, CropCoordinates)
+PatchesSpectra_GreenSubSub_Combined = HySE.GetPatchesSpectrum(Unmixed_GreenSubSub_Combined, Sample_size, Positions, CropCoordinates)
 
-############################
-####### A.5 Plot
-############################
+## Plot
 
-## Indicate which spectra to plot
-##     If plotting more than one, create a list with all the spectra
-PatchesToPlot = [PatchesSpectra_MacbethHySE_avg_ND, PatchesSpectra_MacbethHySE_all_ND, PatchesSpectra_MacbethHySE_1_ND]
-## For a more descriptive plot, define short labels for each spectra in the list
-Labels = ['avg then unmix', 'unmix then avg', 'one sweep']
-## If saving the figure, define a saving path
-Name_ToSave = f'{SavingPath}{Name}_UnmixingComparison_ND'
+PatchesToPlot = [PatchesSpectra_Blue,
+                 PatchesSpectra_Green7x7, 
+                 PatchesSpectra_Green6x6,
+                 PatchesSpectra_GreenSub_Combined, 
+                 PatchesSpectra_GreenSubSub_Combined]
 
-HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraData, MacBeth_RGB, Name, PlotLabels=Labels)#, SavingPath=Name_ToSave)
+WavelengthsAll = [Wavelengths_list_sorted, 
+                  Wavelengths_list_sorted,
+                  Wavs_6x6,  
+                  Wavs_6x6, 
+                  Wavs_6x6]
+
+Labels = ['Blue', 
+          'Green full',
+          'Green 6x6',  
+          'Green sub combined', 
+          'Green sub sub combined']
+
+Colours = ['royalblue', 
+           'forestgreen', 
+           'limegreen', 
+           'deeppink', 
+           'cyan']
+
+
+metric = 'SAM'
+
+Name_ToSave = f'{SavingPath}{Name}'
+HySE.PlotPatchesSpectra(PatchesToPlot, WavelengthsAll, MacBethSpectraData, MacBeth_RGB, Name, PlotLabels=Labels, SavingPath=Name_ToSave, XScale=[400,670],
+                      Metric=metric, ChosenMethod=2, SaveFig=False, Colours=Colours)
+
 ```
+
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e" width="800"/>
+  <img src="https://github.com/user-attachments/assets/5fa369a3-d25c-49de-9eb7-1788d9319b4f" width="800"/>
 </p>
 
 
