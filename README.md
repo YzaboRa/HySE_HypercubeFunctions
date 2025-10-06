@@ -572,8 +572,9 @@ DeviationThreshold=150
 CoregisteredHypercube, AllTransforms, RegistrationMask, AllLandmarkPoints = HySE.CoRegisterHypercubeAndMask_Hybrid(HypercubeForRegistration, Wavelengths_list, Static_Index=9, AllReflectionsMasks=AllReflectionsMasks, EdgeMask=EdgeMask, InteractiveMasks=True,Blurring=True, Sigma=Sigma, DeviationThreshold=DeviationThreshold)
 ```
 At first a window prompting the user to identify fixed points on the static image will open. There is no limit to the number of fixed points, and the colourbar will expand as points are added. Press "z" to remove the latest point, and "p" to toggle the numbering of the points. 
+
 <p align="center">
-  <img src="[https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e](https://github.com/user-attachments/assets/1e329078-526d-4049-94a9-9525ee440777)"  alt="ManualRegistration_Moving" width="891" height="443"/>
+  <img src="https://github.com/user-attachments/assets/1e329078-526d-4049-94a9-9525ee440777" width="891"/>
 </p>
 
 Once all points on the fixed image have been identified, the window can be closed. A new window will then appear, with the static image and already idenfitied fixed points showed on the left frame. The right frame will show the first moving image, where the user must then identify the same fixed points. Like for the static image, pressing "z" will remove the latest point and "p" will toggle the numbering of the points. An automatic warning will apear if the distance between the fixed point in the moving image and the equivalent point in the static image is larger than DeviationThreshold (set to 150 pixels in this example). If this warning appears, it might be that the user has confused points (use "p" to show the points numbers), or that the moving image has enough movement that the same point has moved by more than DeviationThreshold. Once all fixed points have been identified, the window will indicate so and the user may then close the window. A new identical window will then appear, prompting the user to identify fixed points for the second moving image. The same thing will happen untill all moving images (typically 15) have been labelled.
