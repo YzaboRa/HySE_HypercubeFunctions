@@ -108,7 +108,9 @@ StartFrames = [160, 334, 508, 683]
 
 EdgePos_Data = HySE.FindHypercube_RGB(DataPath, PlateauSize=9, StartFrames=StartFrames, SaveFig=False, MaxPlateauSize=20, fps=60)
 ```
-
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/7fd87cd3-ab97-457a-9f21-80580b51f00e" width="800"/>
+</p>
 ### Extract Frames
 Knowing where each sweep is, we can now extract the right frames for each plateau (and remove buffer frames)
 ```python
@@ -442,7 +444,7 @@ Name_ToSave = f'{SavingPath}{Name}_UnmixingComparison_ND'
 HySE.PlotPatchesSpectra(PatchesToPlot, Wavelengths_list_sorted, MacBethSpectraData, MacBeth_RGB, Name, PlotLabels=Labels)#, SavingPath=Name_ToSave)
 ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e" width="750"/>
+  <img src="https://github.com/user-attachments/assets/5b5fabae-9fd9-4fbb-93a9-d354557b8b1e" width="800"/>
 </p>
 
 
@@ -580,13 +582,13 @@ RegHypercube, AllTransforms, RegMask, AllPoints = HySE.CoRegisterHypercubeAndMas
 At first a window prompting the user to identify fixed points on the static image will open. There is no limit to the number of fixed points, and the colourbar will expand as points are added. Press "z" to remove the latest point, and "p" to toggle the numbering of the points. 
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/f4863536-f631-4cc1-bbd7-cbaa2edfde81" width="796"/>
+  <img src="https://github.com/user-attachments/assets/f4863536-f631-4cc1-bbd7-cbaa2edfde81" width="800"/>
 </p>
 
 Once all points on the fixed image have been identified, the window can be closed. A new window will then appear, with the static image and already idenfitied fixed points showed on the left frame. The right frame will show the first moving image, where the user must then identify the same fixed points. Like for the static image, pressing "z" will remove the latest point and "p" will toggle the numbering of the points. An automatic warning will apear if the distance between the fixed point in the moving image and the equivalent point in the static image is larger than DeviationThreshold (set to 150 pixels in this example). If this warning appears, it might be that the user has confused points (use "p" to show the points numbers), or that the moving image has enough movement that the same point has moved by more than DeviationThreshold. Once all fixed points have been identified, the window will indicate so and the user may then close the window. A new identical window will then appear, prompting the user to identify fixed points for the second moving image. The same thing will happen untill all moving images (typically 15) have been labelled.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/1e329078-526d-4049-94a9-9525ee440777" width="891"/>
+  <img src="https://github.com/user-attachments/assets/1e329078-526d-4049-94a9-9525ee440777" width="800"/>
 </p>
 
 
