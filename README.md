@@ -174,6 +174,10 @@ cond_number = np.linalg.cond(BlueMatrix)
 print("Condition number:", cond_number)
 ```
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/49fd5867-b39b-40b0-8cfc-38f39294e873" width="650"/>
+</p>
+
 ```python
 ### Green Matrix full 16x16
 Title = 'Green Matrix - '+Name
@@ -184,7 +188,13 @@ GreenMatrix_7x7 = HySE.MakeMixingMatrix_Flexible(Panel2_Wavelengths, MixingMatri
 cond_number = np.linalg.cond(GreenMatrix_7x7)
 print("Condition number:", cond_number)
 
+```
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/6b4f70ad-33ce-4103-be13-c6dd77184728" width="650"/>
+</p>
+
+```python
 ### Short green Matrix 14x14 (remove frames with weak wavelengths)
 print(f'GREEN SHORT MIXING MATRIX')
 Title = 'Green Matrix 6x6 - '+Name
@@ -252,6 +262,11 @@ Title='Green SubSubMatrix1B'
 PlotMixingMatrix(MixingMatrix_SubSub1B, MixingMatrix_SubSub1B, Title, '')
 
 ```
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/650e1403-c03a-44b0-9424-341d801b709a" width="850"/>
+</p>
+
 
 # UPDATED UP TO HERE
 
