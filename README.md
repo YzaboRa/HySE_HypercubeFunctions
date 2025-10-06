@@ -551,7 +551,7 @@ The transforms optimised during the registration are stored in the AllTransforms
 To apply the transforms to new frames, use the ApplyTransforms() function:
 
 ```python
-FramesTransformed = ApplyTransform(FramesForTransformApply, AllTransforms)
+FramesTransformed = HySE.ApplyTransform(FramesForTransformApply, AllTransforms)
 ```
 The new FramesTransformed array will now be transformed in the same way as the original data.
 
