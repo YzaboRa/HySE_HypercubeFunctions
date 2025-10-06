@@ -569,7 +569,14 @@ EdgeMask = np.load(EdgeMask_Path)['arr_0']
 ## Run the code to manually indentify fixed points and follow instructinos
 Sigma = 2
 DeviationThreshold=150
-CoregisteredHypercube, AllTransforms, RegistrationMask, AllLandmarkPoints = HySE.CoRegisterHypercubeAndMask_Hybrid(HypercubeForRegistration, Wavelengths_list, Static_Index=9, AllReflectionsMasks=AllReflectionsMasks, EdgeMask=EdgeMask, InteractiveMasks=True,Blurring=True, Sigma=Sigma, DeviationThreshold=DeviationThreshold)
+CoregisteredHypercube, AllTransforms, RegistrationMask, AllLandmarkPoints = HySE.CoRegisterHypercubeAndMask_Hybrid(HypercubeForRegistration,
+Wavelengths_list,
+Static_Index=9,
+AllReflectionsMasks=AllReflectionsMasks,
+EdgeMask=EdgeMask,
+InteractiveMasks=True,Blurring=True,
+Sigma=Sigma,
+DeviationThreshold=DeviationThreshold)
 ```
 At first a window prompting the user to identify fixed points on the static image will open. There is no limit to the number of fixed points, and the colourbar will expand as points are added. Press "z" to remove the latest point, and "p" to toggle the numbering of the points. 
 
