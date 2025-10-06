@@ -544,10 +544,8 @@ HySE.MakeHypercubeVideo(HypercubeForRegistration, OrigVideoSavingPath)
 ```
 
 
-
-
 <video width="320" controls>
-  <source src="https://github.com/user-attachments/assets/609da372-4e61-4ecf-9e88-4abaff1a7e01" type="video/mp4">
+  <src="https://github.com/user-attachments/assets/609da372-4e61-4ecf-9e88-4abaff1a7e01">
 </video>
 
 
