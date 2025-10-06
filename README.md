@@ -543,12 +543,6 @@ OrigVideoSavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_NoR
 HySE.MakeHypercubeVideo(HypercubeForRegistration, OrigVideoSavingPath)
 ```
 
-
-<video width="320" controls>
-  <src="https://github.com/user-attachments/assets/609da372-4e61-4ecf-9e88-4abaff1a7e01">
-</video>
-
-
 ### Apply transforms to other data
 The transforms optimised during the registration are stored in the AllTransforms list output by HySE.CoRegisterHypercube() function. Each element in the list is a specific transform applied to the associated frame. Each of those transforms can also be saved as .txt files.
 
