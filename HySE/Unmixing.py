@@ -855,4 +855,34 @@ def omit_frames(arr, indices):
 	print(f'Original indices: {indices}')
 	print(f'Keeping indices: {keep_indices}')
 	return arr[keep_indices]
+
+
+def combine_hypercubes(hypercube1, chypercube2, wavelengths1, wavelengths2):
+	"""
+	Combine two hyperspectral sub-cubes into one cube sorted by wavelength.
+
+	Inputs:
+		- hypercube1: first sub hypercube to combine (size N, Y, X)
+		- hypercube2: second sub hypercube to combine (size M, Y, X)
+		- wavelengths1: wavelengths used for hypercube1 (size/length N)
+		- wavelengths2: wavelengths used for hypercube2 (size/length M)
+
+	Outputs:
+		- ccombined_hypercube: size (N+M, Y, X)
+		- combined_wavelengths: size/length N+M
+	"""
+
+	# Stack cubes and wavelengths
+	all_hypercubes = np.concatenate([hypercube1, hypercube2], axis=0)
+	print(all_hypercubes.shape)
+	all_wavelengths = np.array(list(wavelengths1) + list(wavelengths2))
+
+	# Sort indices by wavelength
+	sort_idx = np.argsort(all_wavelengths)
+
+	# Reorder
+	combined_hypercube = all_hypercubes[sort_idx]
+	combined_wavelengths = all_wavelengths[sort_idx]
+
+	return combined_hypercube, combined_wavelengths
 		
