@@ -189,7 +189,7 @@ Hypercube_MacbethHySE_1_ND, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHy
                                                            SaveFigure=True, SavingPath=SavingPath+Name)
 
 ```
-<details>
+</details>
   
 ### Mask
 Only really important if doing co-registration
