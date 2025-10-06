@@ -543,9 +543,9 @@ OrigVideoSavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_NoR
 HySE.MakeHypercubeVideo(HypercubeForRegistration, OrigVideoSavingPath)
 ```
 
-
-https://github.com/user-attachments/assets/2f8d4626-8326-407f-890d-68c89c45309e
-
+<video src=https://github.com/user-attachments/assets/2f8d4626-8326-407f-890d-68c89c45309e 
+  controls="controls" style="max-width">
+</video>
 
 
 ### Apply transforms to other data
