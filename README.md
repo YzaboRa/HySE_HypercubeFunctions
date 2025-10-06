@@ -149,6 +149,45 @@ FramesCombined_Blue = Frames_BlueD_avg[NSweep,:,:,:]
 FramesCombined_Reference = Frames_RedD_avg[NSweep,:,:,:]
 ```
 
+### Normalisation
+
+N.B.: This section needs updating to incorporate using the reference channel for spatial normalisation. The names used in this section might not reflect those earlier/later in this file. Normalisation can be skipped.
+
+The data now needs to be normalised. Several options are possible, all through the same function 'HySE.NormaliseMixedHypercube'. 
+Optional arguments allow to control what normalisation is done:
+* When 'Dark' is specified, the function with subtract the dark frame input
+* When WhiteCalibration is specified, the function with normalise (divide) each frame by the equivalent white calibration frame.
+
+The function also estimates a mask, from the white calibration when possible and from the data otherwise, that masks the dark corners from the endoscopic data.
+
+Depending on the selected normalisation, sometimes the automatic plotting range is inadequate. The 'vmax' option allows to manually adjust the upper scale.
+
+
+```python
+##The General function for normalising the data is the following:
+Hypercube_MacbethHySE_avg_ND, Mask_avg = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=False, SavingPath=SavingPath+Name,)
+Hypercube_MacbethHySE_avg_N, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=True, SavingPath=SavingPath+Name)
+Hypercube_MacbethHySE_avg_D, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=False, SavingPath=SavingPath+Name, vmax=80)
+```
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/eb7f9bdb-0ee8-4985-a2ab-d9e3f19d4f36" width="500"/>
+</p>
+
+
+```python
+## Using the non averaged dataset:
+Hypercube_MacbethHySE_all_ND, Mask_all = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=False, SavingPath=SavingPath+Name)
+## Or a single individual sweep:
+Hypercube_MacbethHySE_1_ND, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all[0,:,:,:], Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
+                                                           SaveFigure=True, SavingPath=SavingPath+Name)
+
+```
+
 ### Mask
 Only really important if doing co-registration
 ```python
@@ -175,7 +214,7 @@ print("Condition number:", cond_number)
 ```
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/49fd5867-b39b-40b0-8cfc-38f39294e873" width="650"/>
+  <img src="https://github.com/user-attachments/assets/49fd5867-b39b-40b0-8cfc-38f39294e873" width="500"/>
 </p>
 
 ```python
@@ -191,7 +230,7 @@ print("Condition number:", cond_number)
 ```
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6b4f70ad-33ce-4103-be13-c6dd77184728" width="650"/>
+  <img src="https://github.com/user-attachments/assets/6b4f70ad-33ce-4103-be13-c6dd77184728" width="500"/>
 </p>
 
 ```python
@@ -267,51 +306,133 @@ PlotMixingMatrix(MixingMatrix_SubSub1B, MixingMatrix_SubSub1B, Title, '')
   <img src="https://github.com/user-attachments/assets/650e1403-c03a-44b0-9424-341d801b709a" width="850"/>
 </p>
 
+### Unmixing
+First select the appropriate frames to unmix each subset of the dataset:
+```python
+## If we only have indices only for 8x8 logic (instead of the full 16x16
+## Use the omit_frames() function with propagates to the rest of the dataset
+Frames_6x6 = HySE.omit_frames(FramesCombined_Green_N, indices_6x6)
+
+## If indices are input manually for the whole dateset, use them directly
+## Working with only the larger submatrices (empirically: better results)
+Frames_Sub1 = FramesCombined_Green_N[Sub1_indices_frames]
+Frames_Sub2 = FramesCombined_Green_N[Sub2_indices_frames]
+
+## Or working with the smallest submatrices (empirically: worse results)
+Frames_SubSub1A = FramesCombined_Green_N[SubSub1A_indices_frames]
+Frames_SubSub1B = FramesCombined_Green_N[SubSub1B_indices_frames]
+Frames_SubSub2A = FramesCombined_Green_N[SubSub2A_indices_frames]
+Frames_SubSub2B = FramesCombined_Green_N[SubSub2B_indices_frames]
+```
+
+Then unmixing can be done. 
+There are 3 functions in this package that can be used for umxing:
+- UnmixData(): Basic matrix inversion using least squares
+- UnmixDataNNLS(): Matrix inversition using non-negative least squares (NNLS), with noise filtering and rejection of pixels with negative or invalid intensity
+- UnmixDataSmoothNNLS(): Matrix inversion using NNLS with with noise filtering and pixel rejection, imposing smoothness (regulation set weighted by lambda)
+- UnmixDataSmoothNNLSPrior(): Matrix inversino using NNLS with two regulators, smoothnes (weighted by lambda_smooth) and a known spectral prior (weighted by lambda_prior)
+
+The UnmixDataSmoothNNLS() function generally leads to the best results, with low lambda (~0.1)
+```python
+
+## Blue Matrix
+t0 = time.time()
+Unmixed_Blue = HySE.UnmixDataSmoothNNLS(FramesCombined_Blue_N, BlueMatrix, lambda_smooth=0.1)
+t1 = time.time()
+print(f'\nFull Blue - Smooth NNLS unmixing took {t1-t0:.0f}s')
+
+## Green Matrix
+
+## Green Matrix, all frames:
+t0 = time.time()
+Unmixed_Green_7x7 = HySE.UnmixDataSmoothNNLS(FramesCombined_Green_N, GreenMatrix_7x7, lambda_smooth=0.1)
+t1 = time.time()
+print(f'Full Green - Smooth NNLS unmixing took {t1-t0:.0f}s')
+
+## Green Matrix, 6x6:
+t0 = time.time()
+Unmixed_Green_6x6 = HySE.UnmixDataSmoothNNLS(Frames_6x6, GreenMatrix_6x6, lambda_smooth=0.1)
+t1 = time.time()
+print(f'Green 6x6 - Smooth NNLS unmixing took {t1-t0:.0f}s')
+
+
+## Green Matrix, Sub1:
+t0 = time.time()
+Unmixed_Green_Sub1 = HySE.UnmixDataSmoothNNLS(Frames_Sub1, MixingMatrix_Sub1, lambda_smooth=0.1)
+t1 = time.time()
+print(f'Green Sub1 - Smooth NNLS unmixing took {t1-t0:.0f}s')
+
+## Green Matrix, Sub2:
+t0 = time.time()
+Unmixed_Green_Sub2 = HySE.UnmixDataSmoothNNLS(Frames_Sub2, MixingMatrix_Sub2, lambda_smooth=0.1)
+t1 = time.time()
+print(f'Green Sub2 - Smooth NNLS unmixing took {t1-t0:.0f}s')
+
+## Green Matrix, SubSub1A:
+t0 = time.time()
+Unmixed_Green_SubSub1A = HySE.UnmixDataSmoothNNLS(Frames_SubSub1A, MixingMatrix_SubSub1A, lambda_smooth=0.1)
+t1 = time.time()
+print(f'Green SubSub1A - Smooth NNLS unmixing took {t1-t0:.0f}s')
+
+## Green Matrix, SubSub1B:
+t0 = time.time()
+Unmixed_Green_SubSub1B = HySE.UnmixDataSmoothNNLS(Frames_SubSub1B, MixingMatrix_SubSub1B, lambda_smooth=0.1)
+t1 = time.time()
+print(f'Green SubSub1B - Smooth NNLS unmixing took {t1-t0:.0f}s')
+
+## Green Matrix, SubSub2A:
+t0 = time.time()
+Unmixed_Green_SubSub2A = HySE.UnmixDataSmoothNNLS(Frames_SubSub2A, MixingMatrix_SubSub2A, lambda_smooth=0.1)
+t1 = time.time()
+print(f'Green SubSub2A - Smooth NNLS unmixing took {t1-t0:.0f}s')
+
+## Green Matrix, SubSub2B:
+t0 = time.time()
+Unmixed_Green_SubSub2B = HySE.UnmixDataSmoothNNLS(Frames_SubSub2B, MixingMatrix_SubSub2B, lambda_smooth=0.1)
+t1 = time.time()
+print(f'Green SubSub2B - Smooth NNLS unmixing took {t1-t0:.0f}s')
+
+```
+
+The results obtained from the submatrices need to be recombined so that a full spectra is obtained:
+
+```python
+# Larger submatrices:
+Unmixed_GreenSub12_Combined, Wavs_Sub12_Combined = HySE.combine_hypercubes(Unmixed_Green_Sub1, Unmixed_Green_Sub2, 
+                                                                           Wavelengths_Sub1, Wavelengths_Sub2)
+
+## Smaller submatrices:
+Unmixed_GreenSubSub1_Combined, Wavs_SubSub1_Combined = HySE.combine_hypercubes(Unmixed_Green_SubSub1A, Unmixed_Green_SubSub1B, 
+                                                                               Wavelengths_SubSub1A, Wavelengths_SubSub1B)
+Unmixed_GreenSubSub2_Combined, Wavs_SubSub2_Combined = HySE.combine_hypercubes(Unmixed_Green_SubSub2A, Unmixed_Green_SubSub2B, 
+                                                                               Wavelengths_SubSub2A, Wavelengths_SubSub2B)
+
+Unmixed_GreenSubSubAll_Combined, Wavs_SubSubAll_Combined = HySE.combine_hypercubes(Unmixed_GreenSubSub1_Combined, Unmixed_GreenSubSub2_Combined, 
+                                                                                   Wavs_SubSub1_Combined, Wavs_SubSub2_Combined)
+
+```
+
+And save for future references/easier registration.
+
+```python
+print(f'Combined Wavelengths - Larger submatrices:')
+## Sanity check to make sure the combined wavelengths correspond to the right ones, ordered
+print(Wavs_Sub12_Combined) 
+np.savez(SavingPath+'HybridWav3_GreenCombined_Sub12.npz', Unmixed_GreenSub12_Combined)
+np.savez(SavingPath+'HybridWav3_GreenCombined_Sub12_wavelengths.npz', Wavs_Sub12_Combined)
+
+print(f'Combined Wavelengths - Smaller submatrices:')
+print(Wavs_SubSubAll_Combined)
+np.savez(SavingPath+'HybridWav3_GreenCombined_SubSubAll.npz', Unmixed_GreenSubSubAll_Combined)
+np.savez(SavingPath+'HybridWav3_GreenCombined_SubSubAll_wavelengths.npz', Wavs_SubSubAll_Combined)
+
+
+```
+
 
 # UPDATED UP TO HERE
 
-### Normalisation
 
-The data now needs to be normalised. Several options are possible, all through the same function 'HySE.NormaliseMixedHypercube'. 
-Optional arguments allow to control what normalisation is done:
-* When 'Dark' is specified, the function with subtract the dark frame input
-* When WhiteCalibration is specified, the function with normalise (divide) each frame by the equivalent white calibration frame.
-
-The function also estimates a mask, from the white calibration when possible and from the data otherwise, that masks the dark corners from the endoscopic data.
-
-Depending on the selected normalisation, sometimes the automatic plotting range is inadequate. The 'vmax' option allows to manually adjust the upper scale.
-
-
-```python
-
-
-############################
-####### 6. Normalise Data
-############################
-
-##The General function for normalising the data is the following:
-Hypercube_MacbethHySE_avg_ND, Mask_avg = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=False, SavingPath=SavingPath+Name,)
-Hypercube_MacbethHySE_avg_N, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=True, SavingPath=SavingPath+Name)
-Hypercube_MacbethHySE_avg_D, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=False, SavingPath=SavingPath+Name, vmax=80)
-```
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/eb7f9bdb-0ee8-4985-a2ab-d9e3f19d4f36" width="500"/>
-</p>
-
-
-```python
-## Using the non averaged dataset:
-Hypercube_MacbethHySE_all_ND, Mask_all = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=False, SavingPath=SavingPath+Name)
-## Or a single individual sweep:
-Hypercube_MacbethHySE_1_ND, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all[0,:,:,:], Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=True, SavingPath=SavingPath+Name)
-
-```
 ### Unmixing
 
 Once this is done, we can then move on to the actual unmixing:
