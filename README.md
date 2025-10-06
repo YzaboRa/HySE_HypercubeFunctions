@@ -543,7 +543,11 @@ OrigVideoSavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_NoR
 HySE.MakeHypercubeVideo(HypercubeForRegistration, OrigVideoSavingPath)
 ```
 
-<video src="https://github.com/user-attachments/assets/2f8d4626-8326-407f-890d-68c89c45309e" controls="controls">
+
+
+
+<video width="320" controls>
+  <source src="https://github.com/user-attachments/assets/609da372-4e61-4ecf-9e88-4abaff1a7e01" type="video/mp4">
 </video>
 
 
