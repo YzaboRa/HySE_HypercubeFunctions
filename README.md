@@ -599,6 +599,7 @@ HypercubeForRegistration = HypercubeForRegistration_Avg[Nsweep,:,:,:]
 ```
 
 ### Get Mask
+#### Edges
 Co-registration performs better when the sharp black edges from the endoscopy monitor display are masked
 
 ```python
@@ -606,9 +607,70 @@ Co-registration performs better when the sharp black edges from the endoscopy mo
 _, Mask = HySE.NormaliseMixedHypercube(Hypercube_Lesion1_all[2,:,:,:], Dark=LongDark, Wavelengths_list=Wavelengths_list, 
                                        SaveFigure=False, SavingPath=SavingPath+Name, vmax=160, Plot=False)
 
-## SimpleITK expects a mask with the inverse logic
-Mask_Invert = np.invert(Mask)
+## Get the best mask to remove the edges of the image
+EdgeMask = HySE.GetBestEdgeMask(Mask)
 ```
+
+#### Specular Reflections
+For some lesions, wet mucosa will lead to specular reflections, which can corrupt the registration. Those reflections have to be identified and masked for each frame.
+
+```python
+## Work on a single sweep that has been confirmed to have clear frames for the whole sweep, with minimal movement. Select a frame to work with (do not average images). If possible, use the (red) reference channel frames (which use all the same wavelengths and should be bright enough)
+Nsweep = 13
+Nframe = 1
+## If necessary, clip the data to ensure no negative values (which might happen after dark subtraction)
+HypercubeForRegistration = np.clip(Frames_GreenD[Nsweep, :, Nframe, :,:], 0, None)
+```
+
+Use the RemoveSpecularReflections() function to find masks to remove the specular reflections. If required (it probably will), you can upload a list of k values (lenght = # of frames) for to fine-tune the cutoff for each frame. The function accepts two methods: threshold (determined by k or cutoff, if specified. Lower k=most masking) and neighbourhood value (if NeighborhoodSize is specified). Use HySE.help('Masking.RemoveSpecularReflections') for details.
+
+```python
+## Find the right parameters to mask all specular reflections
+## N
+## Sweep 13:
+##.        0.   1.   2.   3.   4.   5   6.   7.     8.   9.   10.  11.  12.  13.  14.  15. 
+k_list = [3.1, 4.0, 3.1, 3.8, 3.8, 3.5, 4.0, 3.8,   3.7, 3.7, 3.6, 3.7, 3.7, 3.7, 4.0, 3.8]
+
+HypercubeForRegistration_Masked, AllReflectionsMasks = HySE.RemoveSpecularReflections(HypercubeForRegistration, k=k_list, FillValue=0, Buffer=5) #FillValue=0, NeighborhoodSize=20, , Cutoff=200
+print(AllReflectionsMasks.shape)
+```
+The fine-tuning of parameters will require some trial and error. Use the following code to visualise results:
+```python
+fs=11
+## Make sure reflections are masked appropriately
+Indices = [i for i in range(0,len(Wavelengths_list))]
+
+fig, ax = plt.subplots(nrows=len(Indices), ncols=3, figsize=(10,2.5*len(Indices)))
+# plt.close()
+for i in range(0,len(Indices)):
+    u = Indices[i]
+    m, M = np.nanmin(HypercubeForRegistration[u,:,:]), np.nanmax(HypercubeForRegistration[u,:,:])
+    ax[i,0].imshow(HypercubeForRegistration[u,:,:], vmin=m, vmax=M, cmap='gray')
+    ax[i,0].set_title(f'Hypercube u={u}', fontsize=fs)
+    ax[i,1].imshow(HypercubeForRegistration_Masked[u,:,:], vmin=m, vmax=M, cmap='gray')
+    ax[i,1].set_title(f'Masked hypercube u={u} - k={k_list[u]}', fontsize=fs)
+    ax[i,2].imshow(AllReflectionsMasks[u,:,:])
+    ax[i,2].set_title(f'Mask u={u} - Sum = {np.sum(AllReflectionsMasks[u,:,:])}', fontsize=fs)
+    for j in range(0,3):
+        ax[i,j].set_axis_off()
+plt.tight_layout()
+plt.show()
+```
+An example of a subset of the figure generated can be seen here:
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/03f16e61-9c8e-4af1-9c39-feaffbbb158d" width="800"/>
+</p>
+
+It's best to save those masks for furture registration. Registration codes will accept the EdgeMask and the AllReflectionsMasks.
+```python
+ArraySavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_HypercubeForRegistration.npz'
+np.savez(f'{ArraySavingPath}', HypercubeForRegistration)
+ArraySavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_AllReflectionsMasks.npz'
+np.savez(f'{ArraySavingPath}', AllReflectionsMasks)
+ArraySavingPath = f'{SavingPath}{Name}_{NameSub}_RawFrames/Sweep{Nsweep}_EdgeMask.npz'
+np.savez(f'{ArraySavingPath}', EdgeMask)
+```
+
 
 ### Perform Co-Registration
 
