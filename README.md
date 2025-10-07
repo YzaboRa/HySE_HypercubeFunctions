@@ -759,18 +759,7 @@ HySE.MakeMixingMatrix(_,_,Help=True)
 ```
 
 ## To do
-- [ ] Update masking of images
-   - [ ] Specular reflections
-   - [ ] Low intensity areas
-- [x] Spectra only normalisation
-- [ ] Try different unmixing algorithms
-   - [ ] Non-Negative Least Squares (NNLS)
-   - [ ] Weighted Least Squares (WLS)
-   - [ ] Tikhonov Regularization (Ridge Regression)
-   - [ ] Sparse Unmixing (Lasso)
-- [ ] Co-registration
-   - [ ] Try SimpleElastix with better data
-   - [ ] Other algorithm
+- [ ] Reference chanel normalisation
 
 ## Comments
 - If the functions cannote be loaded, try adding an empty \__init__.py file in the same folder
