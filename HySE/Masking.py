@@ -194,7 +194,7 @@ def GetStandardMask(WhiteCalibration, **kwargs):
 		return 0
 	threshold = kwargs.get('threshold', 1)
 	Calibration_avg = np.average(np.average(WhiteCalibration, axis=1), axis=1)
-	max_idx = np.where(Calibration_avg==np.amax(Calibration_avg))[0][0]
+	max_idx = np.where(Calibration_avg==np.nanmax(Calibration_avg))[0][0]
 	Mask = WhiteCalibration[max_idx, :,:] < threshold
 	return Mask
 

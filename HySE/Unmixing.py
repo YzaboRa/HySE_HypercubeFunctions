@@ -380,8 +380,24 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	Sigma = kwargs.get('Sigma', 20)
 	Dark = kwargs.get('Dark')
 	if Dark is not None:
-		Dark_g = gaussian_filter(Dark, sigma=Sigma)
-		print(f'Dark subtraction. Avg val = {np.average(Dark):.2f}, after blurring: {np.average(Dark_g):.2f}')
+		(Nw, Y, X) = MixedHypercube.shape
+		(Yd, Xd) = Dark.shape
+		if ((Y!=Yd) or (X!=Xd)):
+			print(f'Data ({MixedHypercube.shape}) is cropped. Cropping Dark ({Dark.shape})')
+			ToCropX = Xd-X
+			ToCropY = Yd-Y
+			if ToCropX!=ToCropY:
+				print(f'Cropping doesn\'t seem to be the same along both axes. X: {ToCropX}, Y: {ToCropY}')
+
+			c = int(ToCropX/2)
+			Dark_ = Dark[c:-c, (c+1):(-c)]
+			print(f'Dark new size: {Dark_.shape}')
+
+
+		Dark_g = gaussian_filter(Dark_, sigma=Sigma)
+		print(f'Dark subtraction. Avg val = {np.average(Dark_):.2f}, after blurring: {np.average(Dark_g):.2f}')
+		## Check if sizes match (if data is cropped)
+		
 
 	SpectralNormalisation = kwargs.get('SpectralNormalisation', False)
 	IndivFrames = kwargs.get('IndivFrames', False)
@@ -512,10 +528,14 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		Mavg = np.average(HypercubeToPlot)
 		Mstd = np.std(HypercubeToPlot)
 		fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
+		print(f'Plotting shapes: HypercubeToPlot -> {HypercubeToPlot.shape}, Mask -> {Mask.shape} ')
 		for j in range(0,4):
 			for i in range(0,4):
 				if nn<17:
-					ToPlot_sub = np.ma.array(HypercubeToPlot[nn,:,:], mask=Mask)
+					print(HypercubeToPlot[nn,:,:].shape)
+					print(Mask.shape)
+					# ToPlot_sub = np.ma.array(HypercubeToPlot[nn,:,:], mask=Mask[nn,:,:])à
+					ToPlot_sub = HypercubeToPlot[nn,:,:]
 					ax[j,i].imshow(ToPlot_sub, cmap='magma',vmin=vmin, vmax=vmax)
 					ax[j,i].set_title(f'im {nn}')
 					ax[j,i].set_xticks([])
