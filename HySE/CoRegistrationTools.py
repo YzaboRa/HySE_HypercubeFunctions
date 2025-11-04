@@ -44,6 +44,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import tempfile
 
+from astropy.convolution import convolve, Gaussian2DKernel
 
 
 ####  -------   HELPER FUNCTIONS   -------
@@ -654,6 +655,55 @@ def CoRegisterImages(im_static, im_shifted, **kwargs):
 
 #### ----------------------------------------------------------------------
 
+def gaussian_blur_nan(image, sigma, **kwargs):
+	"""
+	Applies a 2D Gaussian blur to an image while correctly handling np.nan values.
+
+	This function uses astropy.convolution.convolve to interpolate the blur
+	over NaN pixels, preventing them from spreading.
+
+	Args:
+		image (np.ndarray): The 2D input image, which may contain np.nan values.
+		sigma (float): The standard deviation of the Gaussian kernel.
+		**kwargs: Additional keyword arguments to pass to astropy.convolution.convolve.
+				  Common ones include:
+				  - boundary (str): How to handle boundaries. Defaults to 'extend'.
+									Options: 'extend', 'fill', 'wrap'.
+				  - preserve_nan (bool): If True, pixels that were NaN in the input
+										 will be set to NaN in the output. 
+										 Defaults to True.
+
+	Returns:
+		np.ndarray: The blurred 2D image.
+	"""
+	
+	# Set default behaviors
+	boundary = kwargs.get('boundary', 'extend')
+	preserve_nan = kwargs.get('preserve_nan', True)
+	
+	# 1. Create the 2D blur kernel from the sigma
+	kernel = Gaussian2DKernel(x_stddev=sigma, y_stddev=sigma)
+	
+	# 2. Store original NaN locations if we need to preserve them
+	original_nan_mask = None
+	if preserve_nan:
+		original_nan_mask = np.isnan(image)
+
+	# 3. Convolve, interpolating over NaN values
+	blurred_image = convolve(
+		image, 
+		kernel, 
+		nan_treatment='interpolate', 
+		boundary=boundary,
+		**kwargs # Pass any other user-defined kwargs
+	)
+	
+	# 4. (Optional) Re-apply the original NaNs
+	if preserve_nan and original_nan_mask is not None:
+		blurred_image[original_nan_mask] = np.nan
+		
+	return blurred_image
+
 ## Original basic function:
 def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 	"""
@@ -757,13 +807,21 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 			print(f'  Static image')
 			# # print(f'c={c}: static_im.shape = {im.shape}')
 
-			if HideReflections and ReflectionsMask_Shifted is not None:
-				if Blurring:
-					im0 = gaussian_filter(im0, sigma=Sigma)
+			if (HideReflections is not None) and (AllReflectionsMasks is not None):
+				# if Blurring:
+				# 	im0 = gaussian_filter(im0, sigma=Sigma)
 				im0[ReflectionsMask_Static>0.5] = np.nan
 
-			Hypercube.append(im0)
+			if Blurring:
+				print(f' - Blurring -')
+				# im0_blurred = gaussian_filter(im0, sigma=Sigma)
+				im0_blurred = gaussian_blur_nan(im0, sigma=Sigma)
+			else:
+				im0_blurred = im0
+
+			Hypercube.append(im0_blurred)
 			AllTransforms.append(0)
+			ReflectionsMask_Shifted = None
 		else:
 			print(f'Working on: {c+1} /{NN}')
 			im_shifted = RawHypercube[c, :,:]
@@ -819,7 +877,13 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 					im_coregistered_final[registered_mask] = np.nan
 
 
-			Hypercube.append(im_coregistered_final)
+			if Blurring:
+				# im_coregistered_final_blurred = gaussian_filter(im_coregistered_final, sigma=Sigma)
+				im_coregistered_final_blurred = gaussian_blur_nan(im_coregistered_final, sigma=Sigma)
+			else:
+				im_coregistered_final_blurred = im_coregistered_final
+
+			Hypercube.append(im_coregistered_final_blurred)
 			AllTransforms.append(transform_map)
 
 			if PlotDiff:
@@ -903,6 +967,7 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 				moving image to guide the registration.
 			- AllROICoordinates : If indicated, the code will use the provided coordinates instead of
 				prompting the user.
+			- MinVal = 0 (float) : minimum value (every pixel < MinVal will be masked)
 
 
 	Outputs:
@@ -954,6 +1019,8 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 	t0 = time.time()
 	(NN, YY, XX) = RawHypercube.shape
 
+	MinVal = kwargs.get('MinVal', 0)
+
 	Cropping = kwargs.get('Cropping', 0)
 	if Cropping != 0 and not InteractiveMasks:
 		RawHypercube = RawHypercube[:, Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
@@ -976,6 +1043,7 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 		PromptUser = False
 
 	StaticMask_interactive = None
+	static_roi = None
 	if InteractiveMasks:
 		print("--- Interactive Mask Selection ---")
 
@@ -998,21 +1066,25 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 
 	for c in range(0, NN):
 		if c == Static_Index:
-			im0 = copy.deepcopy(im_static)
+			im0 = copy.deepcopy(im_static).astype(np.float32)
 			AllTransforms.append(0)
 			print(f'Static Image')
 			if PromptUser:
 				AllROICoordinates.append(static_roi)
-				
-			if Blurring:
-				im0 = gaussian_filter(im0, sigma=Sigma)
-			
+
 			if StaticMask_interactive is not None:
 				im0[StaticMask_interactive] = np.nan
 				
 			if HideReflections is not None:
-				im0[StaticMask > 0.5] = np.nan
+				if StaticMask is not None:
+					im0[StaticMask > 0.5] = np.nan
 
+			if Blurring:
+				im0 = gaussian_blur_nan(im0, sigma=Sigma)
+				
+			# if Blurring:
+			# 	im0 = gaussian_filter(im0, sigma=Sigma)
+		
 			Hypercube.append(im0)
 			AllTransforms.append(0)
 
@@ -1063,11 +1135,32 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 			im_coregistered_final = im_coregistered_smeared.astype(np.float32)
 
 			if HideReflections and ShiftedMask_for_reg is not None:
-				## a. Create "Hole-Punch Mask". 
-				##    This mask is True for every pixel to remove
-				##    Start with a mask that is True everywhere outside the ROI.
-				hole_punch_mask_moving = np.ones_like(im_shifted, dtype=np.uint8)
-				hole_punch_mask_moving[y_start:y_end, x_start:x_end] = 0 # Set the ROI interior to False (we want to keep it)
+				# ## a. Create "Hole-Punch Mask". 
+				# ##    This mask is True for every pixel to remove
+				# ##    Start with a mask that is True everywhere outside the ROI.
+				# print(f'im_shifted.shape: {im_shifted.shape}')
+				# hole_punch_mask_moving = np.ones_like(im_shifted, dtype=np.uint8)
+				# print(f'hole_punch_mask_moving.shape (pre): {hole_punch_mask_moving.shape}')
+				# if InteractiveMasks:
+				# 	hole_punch_mask_moving[y_start:y_end, x_start:x_end] = 0 # Set the ROI interior to False (we want to keep it)
+				# else:
+				# 	hole_punch_mask_moving = 0 # Set the ROI interior to False (we want to keep it)
+				# # print(f'hole_punch_mask_moving.shape (post): {hole_punch_mask_moving.shape}')
+
+				## a. Create "Hole-Punch Mask".
+				## This mask is True (1) for every pixel to remove
+				##    and False (0) for every pixel to keep.
+				
+				if InteractiveMasks:
+					# Start with a mask that is True everywhere (remove all)
+					hole_punch_mask_moving = np.ones_like(im_shifted, dtype=np.uint8)
+					# Then set the ROI interior to False (keep ROI)
+					hole_punch_mask_moving[y_start:y_end, x_start:x_end] = 0 
+				else:
+					# Start with a mask that is False everywhere (keep all)
+					hole_punch_mask_moving = np.zeros_like(im_shifted, dtype=np.uint8)
+				
+				# print(f'hole_punch_mask_moving.shape (post): {hole_punch_mask_moving.shape}')
 
 				## b. Now, add the reflections to the mask. 
 				##    Set reflection pixels to True (we want to remove them).
@@ -1088,6 +1181,7 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 
 				transformixImageFilter.SetTransformParameterMap(transform_map)
 
+
 				moving_mask_sitk = _sitk.GetImageFromArray(hole_punch_mask_moving)
 
 				transformixImageFilter.SetMovingImage(moving_mask_sitk)
@@ -1098,13 +1192,18 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 				## e. Punch holes in the final registered image
 				im_coregistered_final[registered_mask] = np.nan
 
+			# if Blurring:
+			# 	im_coregistered_final = gaussian_filter(im_coregistered_final, sigma=Sigma)
+			if Blurring:
+				im_coregistered_final = gaussian_blur_nan(im_coregistered_final, sigma=Sigma)
 			Hypercube.append(im_coregistered_final)
 			AllTransforms.append(transform_map)
 
 		# After each frame (static or moving) is processed, update the combined mask.
 		current_frame = Hypercube[-1]
 		# An invalid pixel is one that is NaN (from reflections) or 0 (from registration edges)
-		invalid_pixels_mask = np.isnan(current_frame) | (current_frame == 0)
+		# invalid_pixels_mask = np.isnan(current_frame) | (current_frame == 0)
+		invalid_pixels_mask = np.isnan(current_frame) | (current_frame < MinVal)
 		CombinedMask = CombinedMask | invalid_pixels_mask
 
 		# Optional Plotting

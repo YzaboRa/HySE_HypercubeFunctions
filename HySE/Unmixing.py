@@ -14,14 +14,9 @@ from scipy.ndimage import gaussian_filter
 from scipy.optimize import lsq_linear
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
-
-
+from joblib import Parallel, delayed
 import HySE.Masking
 
-
-# import numpy as np
-# import matplotlib.pyplot as plt
-# import inspect
 
 def MakeMixingMatrix_Flexible(Panel1_Wavelengths, Arduino_MixingMatrix_P1,
 							  Panel2_Wavelengths, Arduino_MixingMatrix_P2, **kwargs):
@@ -392,6 +387,7 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			c = int(ToCropX/2)
 			Dark_ = Dark[c:-c, (c+1):(-c)]
 			print(f'Dark new size: {Dark_.shape}')
+		else: Dark_ = Dark
 
 
 		Dark_g = gaussian_filter(Dark_, sigma=Sigma)
@@ -679,7 +675,7 @@ def UnmixDataNNLS(MixedHypercube, MixingMatrix, intensity_thresh=1e-2, std_thres
 			return res.x if res.success else np.zeros(num_waves)
 
 		if parallel:
-			from joblib import Parallel, delayed
+			# from joblib import Parallel, delayed
 			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
 			SolvedMatrix_flat = np.array(results).T
 		else:
@@ -754,7 +750,7 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
 			return res.x if res.success else np.zeros(num_waves)
 
 		if parallel:
-			from joblib import Parallel, delayed
+			# from joblib import Parallel, delayed
 			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
 			SolvedMatrix_flat = np.array(results).T
 		else:
@@ -770,10 +766,7 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
 	return UnmixedHypercube
 
 
-import numpy as np
-import inspect
-from scipy.optimize import lsq_linear
-# Assuming HySE and joblib are available
+
 
 def UnmixDataSmoothNNLSPrior(MixedHypercube, MixingMatrix, prior_spectrum,
 							lambda_smooth=0.1, lambda_prior=0.1,
@@ -852,7 +845,7 @@ def UnmixDataSmoothNNLSPrior(MixedHypercube, MixingMatrix, prior_spectrum,
 			return res.x if res.success else np.zeros(num_waves)
 
 		if parallel:
-			from joblib import Parallel, delayed
+			# from joblib import Parallel, delayed
 			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
 			SolvedMatrix_flat = np.array(results).T
 		else:
