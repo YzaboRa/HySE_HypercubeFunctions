@@ -354,9 +354,45 @@ def ApplyTransform(Frames, Transforms, **kwargs):
 	return TransformedFrames
 
 
+# def SaveTransforms(AllTransforms, TransformsSavingPath, **kwargs):
+# 	'''
+# 	Function that saves all the transforms output from the coregistration pipeline (AllTransforms) as txt files.
+	
+# 	Inputs:
+# 		- AllTransforms (Output from CoRegisterHypercube())
+# 		- TransformsSavingPath : Where to save files (do not add extension)
+# 		- kwargs
+# 			- Help
+# 	Ouput:
+	
+# 	'''
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(SaveTransforms))
+# 		return 
+	
+# 	N = len(AllTransforms)
+# 	for n in range(0,N):
+# 		transform = AllTransforms[n]
+# 		if transform==0:
+# #             print('Static image')
+# 			pass
+# 		else:
+# 			# print(f'type(transform): {type(transform)}')
+# 			if type(transform)==list:
+# 				for i in range(0,len(transform)):
+# 					_sitk.WriteParameterFile(transform[i], f'{TransformsSavingPath}_Frame{n}_{i}.txt')
+# 			else:
+# 				_sitk.WriteParameterFile(transform, f'{TransformsSavingPath}_Frame{n}.txt')
+
+
 def SaveTransforms(AllTransforms, TransformsSavingPath, **kwargs):
 	'''
-	Function that saves all the transforms output from the coregistration pipeline (AllTransforms) as txt files.
+	Function that saves all the transforms output from the coregistration 
+	pipeline (AllTransforms) as txt files.
+	
+	This version is robust and can save both Elastix-style ParameterMaps 
+	(from B-spline) and SimpleITK Transform Objects (from LandmarkOnly).
 	
 	Inputs:
 		- AllTransforms (Output from CoRegisterHypercube())
@@ -375,11 +411,31 @@ def SaveTransforms(AllTransforms, TransformsSavingPath, **kwargs):
 	for n in range(0,N):
 		transform = AllTransforms[n]
 		if transform==0:
-#             print('Static image')
+			# Static image, do nothing
 			pass
-		else:
+		
+		# --- FIX IS HERE ---
+		
+		# CASE 1: This is a SimpleITK Transform Object (e.g., Affine, BSpline)
+		# (This is what your new LandmarkOnly function returns)
+		elif isinstance(transform, _sitk.Transform):
+			# Use WriteTransform for transform objects
+			_sitk.WriteTransform(transform, f'{TransformsSavingPath}_Frame{n}.txt')
+
+		# CASE 2: This is an Elastix ParameterMap (a list of dicts)
+		# (This is what your old B-spline function returned)
+		elif isinstance(transform, list):
+			# Use WriteParameterFile for each parameter map (dict) in the list
 			for i in range(0,len(transform)):
 				_sitk.WriteParameterFile(transform[i], f'{TransformsSavingPath}_Frame{n}_{i}.txt')
+		
+		# CASE 3: Fallback for a single ParameterMap that isn't in a list
+		elif isinstance(transform, dict):
+			_sitk.WriteParameterFile(transform, f'{TransformsSavingPath}_Frame{n}.txt')
+
+		else:
+			print(f"Frame {n}: Unknown transform type ({type(transform)}). Skipping.")
+				
 			
 	
 def LoadTransforms(TransformsPath, **kwargs):
