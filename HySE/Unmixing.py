@@ -726,6 +726,20 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, CombinedMask=None, lambda_
 				raise ValueError(f"CombinedMask shape {CombinedMask.shape} does not match hypercube spatial dimensions ({YY}, {XX})")
 			mask_flat = CombinedMask.flatten()
 
+		# def solve_single(i):
+		# 	# Check the provided mask first. If True, the pixel is invalid.
+		# 	if mask_flat is not None and mask_flat[i]: 
+		# 		return np.zeros(num_waves)
+
+		# 	# Original checks for intensity and standard deviation
+		# 	pixel = ObservedMatrix[i, :]
+		# 	if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
+		# 		return np.zeros(num_waves)
+
+		# 	b_reg = np.concatenate([pixel, zeros_rhs])
+		# 	res = lsq_linear(A_reg_base, b_reg, bounds=(0, np.inf), max_iter=max_iter, method='trf')
+		# 	return res.x if res.success else np.zeros(num_waves)
+
 		def solve_single(i):
 			# Check the provided mask first. If True, the pixel is invalid.
 			if mask_flat is not None and mask_flat[i]: 
@@ -733,6 +747,11 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, CombinedMask=None, lambda_
 
 			# Original checks for intensity and standard deviation
 			pixel = ObservedMatrix[i, :]
+			
+			# If any value in the pixel's spectrum is NaN, skip it.
+			if np.isnan(pixel).any(): # <-- NEW NAN CHECK
+				return np.zeros(num_waves)
+
 			if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
 				return np.zeros(num_waves)
 
