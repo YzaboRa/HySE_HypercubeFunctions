@@ -413,17 +413,14 @@ def SaveTransforms(AllTransforms, TransformsSavingPath, **kwargs):
 		if transform==0:
 			# Static image, do nothing
 			pass
-		
-		# --- FIX IS HERE ---
+	
 		
 		# CASE 1: This is a SimpleITK Transform Object (e.g., Affine, BSpline)
-		# (This is what your new LandmarkOnly function returns)
 		elif isinstance(transform, _sitk.Transform):
 			# Use WriteTransform for transform objects
 			_sitk.WriteTransform(transform, f'{TransformsSavingPath}_Frame{n}.txt')
 
 		# CASE 2: This is an Elastix ParameterMap (a list of dicts)
-		# (This is what your old B-spline function returned)
 		elif isinstance(transform, list):
 			# Use WriteParameterFile for each parameter map (dict) in the list
 			for i in range(0,len(transform)):
@@ -433,6 +430,44 @@ def SaveTransforms(AllTransforms, TransformsSavingPath, **kwargs):
 		elif isinstance(transform, dict):
 			_sitk.WriteParameterFile(transform, f'{TransformsSavingPath}_Frame{n}.txt')
 
+		# # CASE 4: Tuple (Likely a composite transform)
+		# elif isinstance(transform, tuple):
+		# 	# Iterate over elements of the tuple and save each one
+		# 	for i, sub_transform in enumerate(transform):
+		# 		if isinstance(sub_transform, _sitk.Transform):
+		# 			_sitk.WriteTransform(sub_transform, f'{TransformsSavingPath}_Frame{n}_Tuple{i}.txt')
+		# 		elif isinstance(sub_transform, dict):
+		# 			_sitk.WriteParameterFile(sub_transform, f'{TransformsSavingPath}_Frame{n}_Tuple{i}.txt')
+		# 		elif sub_transform == 0:
+		# 			pass
+		# 		else:
+		# 			print(f"Frame {n}, Sub-transform {i}: Unknown type in tuple ({type(sub_transform)}). Skipping.")
+
+		# CASE 4: Tuple
+		elif isinstance(transform, tuple):
+			# print(f"Frame {n}: Handling Composite Transform (tuple).")
+			for i, sub_transform in enumerate(transform):
+				
+				# Check if the sub-transform is a SimpleITK Transform Object
+				if isinstance(sub_transform, _sitk.Transform):
+					_sitk.WriteTransform(sub_transform, f'{TransformsSavingPath}_Frame{n}_Comp{i}.txt')
+					
+				# Check if the sub-transform is a ParameterMap (dict or SimpleITK ParameterMap object)
+				# We assume any dictionary-like object that isn't a simple transform is a ParameterMap
+				elif sub_transform == 0:
+					pass # Skip
+					
+				else:
+					# Try to write it as a ParameterFile. This is often the safest bet
+					# for SimpleITK's ParameterMap objects, as they may not inherit from dict.
+					try:
+						_sitk.WriteParameterFile(sub_transform, f'{TransformsSavingPath}_Frame{n}_Comp{i}.txt')
+					except AttributeError:
+						print(f"Frame {n}, Sub-transform {i}: Unknown type in tuple ({type(sub_transform)}). Skipping.")
+					except Exception as e:
+						 print(f"Frame {n}, Sub-transform {i}: Failed to write transform ({e}). Skipping.")
+
+		# CASE 5: Fallback for unknown type
 		else:
 			print(f"Frame {n}: Unknown transform type ({type(transform)}). Skipping.")
 				
