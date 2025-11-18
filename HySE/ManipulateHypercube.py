@@ -898,7 +898,7 @@ def GetDark_WholeVideo(vidPath, **kwargs):
 	dark = np.average(np.array(Darks), axis=0)
 	std_est = np.average(STDs)
 	print(f'Dark from video ({len(DataAll)} frames -> {chunk_size*N}). Average value: {np.average(dark):.2f}, std: {std_est:.2f}')
-	dark = np.average(frames,axis=0)
+	# dark = np.average(frames,axis=0)
 	return dark
 
 
