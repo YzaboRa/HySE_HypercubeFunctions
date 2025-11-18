@@ -4,7 +4,8 @@ Functions used to calculate and manipulate the hypercube data (compute hypercube
 
 
 """
-
+# Test Comment!!
+# KL checking her GitHub synchronisation!!
 
 import numpy as np
 import cv2
@@ -598,12 +599,12 @@ def GetDark_WholeVideo(vidPath, **kwargs):
 		# print(info)
 		print(inspect.getdoc(GetLongDark))
 		return 0
-
+	RGB = kwargs.get('RGB',False)
 	CropImDimensions = kwargs.get('CropImDimensions')
 	if CropImDimensions is None:
-		DataAll = HySE.Import.ImportData(vidPath)
+		DataAll = HySE.Import.ImportData(vidPath,RGB=RGB)
 	else:
-		DataAll = HySE.Import.ImportData(vidPath, CropImDimensions=CropImDimensions)
+		DataAll = HySE.Import.ImportData(vidPath, CropImDimensions=CropImDimensions,RGB=RGB)
 	 # DataAll = Import.ImportData(vidPath, **kwargs)
 
 	L = len(DataAll)
@@ -630,7 +631,6 @@ def GetDark_WholeVideo(vidPath, **kwargs):
 	dark = np.average(np.array(Darks), axis=0)
 	std_est = np.average(STDs)
 	print(f'Dark from video ({len(DataAll)} frames -> {chunk_size*N}). Average value: {np.average(dark):.2f}, std: {std_est:.2f}')
-	dark = np.average(frames,axis=0)
 	return dark
 
 
