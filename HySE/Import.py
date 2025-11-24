@@ -128,6 +128,11 @@ def ImportData(Path, *Coords, **kwargs):
 	Trace = kwargs.get('Trace', False)
 	if Trace:
 		print(f'Only importing the trace of the data')
+
+	TrimSat = kwargs.get('TrimSat', False)
+	if TrimSat:
+		SatVal = kwargs.get('SatVal', 250)
+		print(f'Saturated image values above {SatVal} to be set to NaN')
 	
 	CropIm = kwargs.get('CropIm', True)
 	# if CropIm:
@@ -199,27 +204,33 @@ def ImportData(Path, *Coords, **kwargs):
 	ret = True
 	ii = 0
 	while (fc < NNvid and ret): 
-		ret, frame = cap.read()
+		ret, frame = cap.read() # Read frame from video
 		if frame is not None:
-			if CropIm:
-				# print(f'fc = {fc}, frame.shape = {frame.shape}')
-				x_start = CropImDimensions[0]
-				x_end = CropImDimensions[1]
-				y_start = CropImDimensions[2]
-				y_end = CropImDimensions[3]
-				frame = frame[y_start:y_end, x_start:x_end]
-			if (fc>=Nstart) and (fc<Nend):
+			if (fc>=Nstart) and (fc<Nend): # First decide if this frame is included before doing any operations on it
+				if CropIm: # Crop frame spatial dimensions
+					# print(f'fc = {fc}, frame.shape = {frame.shape}')
+					x_start = CropImDimensions[0]
+					x_end = CropImDimensions[1]
+					y_start = CropImDimensions[2]
+					y_end = CropImDimensions[3]
+					frame = frame[y_start:y_end, x_start:x_end]
 				if RGB:
+					if TrimSat:  # Set values to NaNs if saturated
+						frame = frame.astype(np.float32)
+						frame[frame >= SatVal] = np.nan
 					if Trace:
 						# data.append(np.average(frame))
-						data.append([np.average(frame[:,:,0]), np.average(frame[:,:,1]), np.average(frame[:,:,2])])
+						data.append([np.nanmean(frame[:,:,0]), np.nanmean(frame[:,:,1]), np.nanmean(frame[:,:,2])])
 					else:
 						data[ii] = frame
 				else: ## bgr format
+					if TrimSat:  # Set values to NaNs if saturated in any colour channel
+						frame = frame.astype(np.float32)
+						frame[np.nanmax(frame,axis=2) >= SatVal] = np.nan
 					if Trace:
-						data.append(np.average(frame[:,:,2]))
-						data.append(np.average(frame[:,:,1]))
-						data.append(np.average(frame[:,:,0]))
+						data.append(np.nanmean(frame[:,:,2]))
+						data.append(np.nanmean(frame[:,:,1]))
+						data.append(np.nanmean(frame[:,:,0]))
 					else:
 						data[3*ii,:,:] = frame[:,:,2]
 						data[3*ii+1,:,:] = frame[:,:,1]
