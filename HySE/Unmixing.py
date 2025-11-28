@@ -340,8 +340,8 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 
 		- kwargs:
 			- Help
-			- Dark = array shape (YY, XX)
-			- WhiteCalibration = array shape (Nwavelengths, YY, XX)
+			- Dark = array, shape (YY, XX)
+			- WhiteCalibration = array, shape (Nwavelengths, YY, XX)
 			- Sigma = 20. Integer, indicates how much blurring to apply 
 				for the dark and White calibration arrays
 			- SpectralNormalisation = False. If True, the white reference will be used to normalise the spectrum
@@ -352,6 +352,8 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			- SavingFigure = '' string.
 			- Plot = True
 			- IndivFrames = False : Whether or not individual frames have been kept for each instead of being averaged
+			- SaturatedPixel: Value considered to be the saturation point. Pixels with that value (or above) in the 
+				white calibration will be set to nan
 
 
 	Outputs:
@@ -367,6 +369,8 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	if Help:
 		print(inspect.getdoc(NormaliseMixedHypercube))
 		return 0,0
+
+	SaturatedPixel = kwargs.get('SaturatedPixel', 254)
 
 	Sigma = kwargs.get('Sigma', 20)
 	Dark = kwargs.get('Dark')
@@ -400,6 +404,15 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	WhiteCalibration = kwargs.get('WhiteCalibration')
 	if WhiteCalibration is not None:
 		print(f'White Normalising')
+		if np.amax(WhiteCalibration)>=SaturatedPixel:
+			print(f' Saturated pixels (value >= {SaturatedPixel}) in the white calibration. Getting rid of them')
+			print(f'  Note that this functionality hasn\'t been used yet, and so might trigger errors')
+			WhiteCalibration.astype(float) 
+			WhiteCalibration[WhiteCalibration >= SaturatedPixel] = np.nan
+			count_nan = np.isnan(A).sum()
+			if count_nan>0:
+				print(f' Removed {count_nan} saturated pixels')
+
 		if SpectralNormalisation:
 			print(f'Only spectral normalisation')
 		# Wavelengths_list = kwargs.get('Wavelengths_list')
@@ -958,7 +971,7 @@ def omit_frames(arr, indices):
 	return arr[keep_indices]
 
 
-def combine_hypercubes(hypercube1, chypercube2, wavelengths1, wavelengths2):
+def combine_hypercubes(hypercube1, NormaliseMixedHypercubehypercube2, wavelengths1, wavelengths2):
 	"""
 	Combine two hyperspectral sub-cubes into one cube sorted by wavelength.
 

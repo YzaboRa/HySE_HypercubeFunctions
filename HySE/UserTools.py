@@ -72,7 +72,7 @@ def find_closest(arr, val):
 	Function that finds the index in a given array whose value is the closest to a provided value
 
 	Input:
-		- arr: Array from which the index will be pulled from
+		- arr: Array from which the index will be pulled fromGetDark_WholeVideo
 		- val: Value to match as closely as possible
 
 	Outout:
@@ -682,48 +682,63 @@ def GetPatchPos_WithDistortion(Patch1_pos, Patch_size_x, Patch_size_y, Image_ang
 	k1 = kwargs.get('k1', 0.0)
 	k2 = kwargs.get('k2', 0.0)
 	ImageShape = kwargs.get('ImageShape', None)
-
 	if ImageShape is None:
 		raise ValueError("You must supply ImageShape=(height, width) for radial correction")
 
+	if k1==0.0 and k2==0.0:
+		Positions = []
+		[y0, x0] = Patch1_pos
+		Image_angle_rad = Image_angle*np.pi/180
+		index = 0
+		for j in range(0,5):
+			y0s = y0 -  j*Patch_size_y*np.cos(Image_angle_rad) #j*Patch_size -
+			x0s = x0 + j*Patch_size_x*np.sin(Image_angle_rad)
+			for i in range(0,6):
+				x = x0s - Patch_size_x*np.cos(Image_angle_rad)*i
+				y = y0s - Patch_size_x*np.sin(Image_angle_rad)*i
+				# if (j==0 and i==5):
+				# 	y = y-15
+				# 	x = x+10
+				Positions.append([index, x, y])
+				index +=1
+	else:
+		h_px, w_px = ImageShape
+		x_c = w_px / 2
+		y_c = h_px / 2
 
-	h_px, w_px = ImageShape
-	x_c = w_px / 2
-	y_c = h_px / 2
+		Positions = []
+		[y0, x0] = Patch1_pos
+		angle_rad = Image_angle * np.pi / 180
+		index = 0
+		
+		diag2 = w_px**2 + h_px**2
 
-	Positions = []
-	[y0, x0] = Patch1_pos
-	angle_rad = Image_angle * np.pi / 180
-	index = 0
-	
-	diag2 = w_px**2 + h_px**2
+		for j in range(5):  # rows
+			for i in range(6):  # cols
+				# Estimate raw offset from patch 1
+				dx = -i * Patch_size_x * np.cos(angle_rad) + j * Patch_size_x * np.sin(angle_rad)
+				dy = -i * Patch_size_x * np.sin(angle_rad) - j * Patch_size_y * np.cos(angle_rad)
+				x_guess = x0 + dx
+				y_guess = y0 + dy
 
-	for j in range(5):  # rows
-		for i in range(6):  # cols
-			# Estimate raw offset from patch 1
-			dx = -i * Patch_size_x * np.cos(angle_rad) + j * Patch_size_x * np.sin(angle_rad)
-			dy = -i * Patch_size_x * np.sin(angle_rad) - j * Patch_size_y * np.cos(angle_rad)
-			x_guess = x0 + dx
-			y_guess = y0 + dy
+				# Apply local scale adjustment for barrel distortion
+	#             scale = rough_radial_scaling(x_guess, y_guess, x_c, y_c, k1, k2)
+				scale = rough_radial_scaling(x_guess, y_guess, x_c, y_c, k1, k2, diag2)
+				dx_adj = dx * scale
+				dy_adj = dy * scale
 
-			# Apply local scale adjustment for barrel distortion
-#             scale = rough_radial_scaling(x_guess, y_guess, x_c, y_c, k1, k2)
-			scale = rough_radial_scaling(x_guess, y_guess, x_c, y_c, k1, k2, diag2)
-			dx_adj = dx * scale
-			dy_adj = dy * scale
+				x = x0 + dx_adj
+				y = y0 + dy_adj
+				# if j == 0 and i == 5:
+				# 	y -= 15
+				# 	x += 10
 
-			x = x0 + dx_adj
-			y = y0 + dy_adj
-			# if j == 0 and i == 5:
-			# 	y -= 15
-			# 	x += 10
+				# Ensure coordinates remain positive
+				x = max(0, min(x, w_px - 1))
+				y = max(0, min(y, h_px - 1))
 
-			# Ensure coordinates remain positive
-			x = max(0, min(x, w_px - 1))
-			y = max(0, min(y, h_px - 1))
-
-			Positions.append([index, x, y])
-			index += 1
+				Positions.append([index, x, y])
+				index += 1
 
 	return np.array(Positions)
 
