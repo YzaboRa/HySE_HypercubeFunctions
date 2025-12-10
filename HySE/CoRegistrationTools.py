@@ -1032,11 +1032,331 @@ def CoRegisterHypercube(RawHypercube, Wavelengths_list, **kwargs):
 
 
 ## Fancier version
+# def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
+# 	"""
+
+# 	Apply Simple Elastix co-registration to all sweep
+
+# 	Uses CoRegisterImages
+
+# 	Input:
+# 		- RawHypercube : To co-registrate. Shape [N, Y, X]
+# 		- Wavelengths_list
+# 		- kwargs:
+# 			- Help
+# 			- Cropping = 0
+# 			- Order = False: Whether to order the coregistered image (based on Wavelenghts_list)
+# 			- StaticIndex = 0: Which image is set as the static one (others are registered to it)
+# 			- SaveHypercube
+# 			- PlotDiff = False. If True, plots differences between static, moving and registered images
+# 			- SavingPath. If PlotDiff or SaveHypercbybe is True, where to save the data/figure
+# 			- EdgeMask -> Static mask
+# 			- AllReflectionsMasks -> Moving mask
+# 			- HideReflections = True
+# 			- InteractiveMasks (False): If True, opens a window for the user to select
+# 				a mask on the static image, and then a corresponding mask on each
+# 				moving image to guide the registration.
+# 			- AllROICoordinates : If indicated, the code will use the provided coordinates instead of
+# 				prompting the user.
+# 			- MinVal = 0 (float) : minimum value (every pixel < MinVal will be masked)
+
+
+# 	Outputs:
+# 		- Hypercube_Coregistered: The final co-registered hypercube.
+# 		- Coregistration_Transforms: The list of transformation maps.
+# 		- CombinedMask: A single 2D boolean mask where True indicates a pixel that
+# 			is invalid in at least one of the co-registered frames.
+# 		- AllROICoordinates: List of all the coordinates (y_start, y_end, x_start, x_end)
+# 			(to be used for other coregistrations with CoRegisterHypercubeAndMas(AllROICoordinates=AllROICoordinates))
+
+# 	"""
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(CoRegisterHypercubeAndMask))
+# 		return 0, 0, 0
+
+# 	InteractiveMasks = kwargs.get('InteractiveMasks', False)
+
+# 	# Other parameters
+# 	PlotDiff = kwargs.get('PlotDiff', False)
+
+# 	SavingPath = kwargs.get('SavingPath')
+# 	if SavingPath is None:
+# 		SavingPath = ''
+# 		if PlotDiff:
+# 			print(f'PlotDiff has been set to True. Indicate a SavingPath.')
+
+# 	Static_Index = kwargs.get('StaticIndex')
+# 	if Static_Index is None:
+# 		Static_Index = 0
+# 		print(f'Static index set to default {Static_Index}')
+
+# 	## Handle cropping
+# 	Cropping = kwargs.get('Cropping', 0)
+
+# 	EdgeMask = kwargs.get('EdgeMask')
+# 	AllReflectionsMasks = kwargs.get('AllReflectionsMasks')
+
+# 	HideReflections = kwargs.get('HideReflections', True)
+
+# 	SaveHypercube = kwargs.get('SaveHypercube', False)
+# 	if SaveHypercube:
+# 		print(f'Saving Hypercube')
+
+# 	Order = kwargs.get('Order', False)
+# 	Blurring = kwargs.get('Blurring', False)
+# 	Sigma = kwargs.get('Sigma', 2)
+
+# 	t0 = time.time()
+# 	(NN, YY, XX) = RawHypercube.shape
+
+# 	MinVal = kwargs.get('MinVal', 0)
+
+# 	Cropping = kwargs.get('Cropping', 0)
+# 	if Cropping != 0 and not InteractiveMasks:
+# 		RawHypercube = RawHypercube[:, Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+# 		if EdgeMask is not None:
+# 			EdgeMask = EdgeMask[Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+# 		if AllReflectionsMasks is not None:
+# 			AllReflectionsMasks = AllReflectionsMasks[:, Cropping:(-1*Cropping), Cropping:(-1*Cropping)]
+
+# 	(NN_crop, YY_crop, XX_crop) = RawHypercube.shape
+# 	CombinedMask = np.zeros((YY_crop, XX_crop), dtype=bool)
+# 	im_static = RawHypercube[Static_Index, :, :]
+
+# 	Hypercube = []
+# 	AllTransforms = []
+# 	AllROICoordinates = kwargs.get('AllROICoordinates')
+# 	if AllROICoordinates is None:
+# 		PromptUser = True
+# 		AllROICoordinates = []
+# 	else:
+# 		PromptUser = False
+
+# 	StaticMask_interactive = None
+# 	static_roi = None
+# 	if InteractiveMasks:
+# 		print("--- Interactive Mask Selection ---")
+
+# 		# 1. Get the mask for the static image (the target)
+# 		if PromptUser:
+# 			static_roi = get_interactive_roi(im_static, title='Select ROI on STATIC image (this is the target)')
+# 		else:
+# 			static_roi = AllROICoordinates[Static_Index]
+# 			# print(static_roi)
+# 		if static_roi is not None:
+# 			y_start, y_end, x_start, x_end = static_roi
+# 			StaticMask_interactive = np.zeros_like(im_static, dtype=np.uint8)
+# 			StaticMask_interactive[y_start:y_end, x_start:x_end] = 1 # 1 means "focus here"
+
+# 	if AllReflectionsMasks is not None:
+# 		ReflectionsMask_Static = AllReflectionsMasks[Static_Index, :, :]
+# 	else:
+# 		ReflectionsMask_Static = None
+# 	StaticMask = GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Static)
+
+# 	for c in range(0, NN):
+# 		if c == Static_Index:
+# 			im0 = copy.deepcopy(im_static).astype(np.float32)
+# 			AllTransforms.append(0)
+# 			print(f'Static Image')
+# 			if PromptUser:
+# 				AllROICoordinates.append(static_roi)
+
+# 			if StaticMask_interactive is not None:
+# 				im0[StaticMask_interactive] = np.nan
+				
+# 			if HideReflections is not None:
+# 				if StaticMask is not None:
+# 					im0[StaticMask > 0.5] = np.nan
+
+# 			if Blurring:
+# 				im0 = gaussian_blur_nan(im0, sigma=Sigma)
+				
+# 			# if Blurring:
+# 			# 	im0 = gaussian_filter(im0, sigma=Sigma)
+		
+# 			Hypercube.append(im0)
+# 			AllTransforms.append(0)
+
+# 		else:
+# 			print(f'Working on: {c+1} /{NN}')
+# 			im_shifted = RawHypercube[c, :, :]
+
+# 			StaticMask_for_reg = None
+# 			ShiftedMask_for_reg = None
+
+# 			if InteractiveMasks and StaticMask_interactive is not None:
+# 				# 2. For each moving image, get its corresponding mask
+# 				if PromptUser:
+# 					shifted_roi = get_interactive_roi(im_shifted, title=f'Select ROI on MOVING image {c+1}/{NN}')
+# 					AllROICoordinates.append(shifted_roi)
+# 				else:
+# 					shifted_roi = AllROICoordinates[c]
+# 				if shifted_roi is not None:
+# 					y_start, y_end, x_start, x_end = shifted_roi
+			
+# 					if AllReflectionsMasks is not None:
+# 						ReflectionsMask_Shifted = AllReflectionsMasks[c, :, :]
+# 					else:
+# 						ReflectionsMask_Shifted = None
+# 					ShiftedMask_for_reg_orig = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted, PrintInfo=False)
+
+# 					ShiftedMask_interactive = np.zeros_like(im_shifted, dtype=np.uint8)
+# 					ShiftedMask_interactive[y_start:y_end, x_start:x_end] = 1
+
+# 					# Use these interactive masks for the registration
+# 					# NOTE: SimpleITK masks are inverted (0=ignore), so we pass them as is,
+# 					# and CoRegisterImages should handle the inversion (1-mask).
+# 					StaticMask_for_reg = (1 - StaticMask_interactive)
+# 					ShiftedMask_for_reg = (1 - ShiftedMask_interactive)
+
+# 			else:
+
+# 				if AllReflectionsMasks is not None:
+# 					ReflectionsMask_Shifted = AllReflectionsMasks[c, :, :]
+# 				else:
+# 					ReflectionsMask_Shifted = None
+# 				ShiftedMask_for_reg = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted, PrintInfo=False)
+
+# 			# 3. Perform the masked registration
+# 			im_coregistered_smeared, transform_map = HySE.CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask_for_reg,
+# 																		   ShiftedMask=ShiftedMask_for_reg,**kwargs)
+
+# 			im_coregistered_final = im_coregistered_smeared.astype(np.float32)
+
+# 			if HideReflections and ShiftedMask_for_reg is not None:
+# 				# ## a. Create "Hole-Punch Mask". 
+# 				# ##    This mask is True for every pixel to remove
+# 				# ##    Start with a mask that is True everywhere outside the ROI.
+# 				# print(f'im_shifted.shape: {im_shifted.shape}')
+# 				# hole_punch_mask_moving = np.ones_like(im_shifted, dtype=np.uint8)
+# 				# print(f'hole_punch_mask_moving.shape (pre): {hole_punch_mask_moving.shape}')
+# 				# if InteractiveMasks:
+# 				# 	hole_punch_mask_moving[y_start:y_end, x_start:x_end] = 0 # Set the ROI interior to False (we want to keep it)
+# 				# else:
+# 				# 	hole_punch_mask_moving = 0 # Set the ROI interior to False (we want to keep it)
+# 				# # print(f'hole_punch_mask_moving.shape (post): {hole_punch_mask_moving.shape}')
+
+# 				## a. Create "Hole-Punch Mask".
+# 				## This mask is True (1) for every pixel to remove
+# 				##    and False (0) for every pixel to keep.
+				
+# 				if InteractiveMasks:
+# 					# Start with a mask that is True everywhere (remove all)
+# 					hole_punch_mask_moving = np.ones_like(im_shifted, dtype=np.uint8)
+# 					# Then set the ROI interior to False (keep ROI)
+# 					hole_punch_mask_moving[y_start:y_end, x_start:x_end] = 0 
+# 				else:
+# 					# Start with a mask that is False everywhere (keep all)
+# 					hole_punch_mask_moving = np.zeros_like(im_shifted, dtype=np.uint8)
+				
+# 				# print(f'hole_punch_mask_moving.shape (post): {hole_punch_mask_moving.shape}')
+
+# 				## b. Now, add the reflections to the mask. 
+# 				##    Set reflection pixels to True (we want to remove them).
+# 				if ReflectionsMask_Shifted is not None:
+# 					hole_punch_mask_moving[ReflectionsMask_Shifted > 0.5] = 1
+
+# 				## c. Now warp this combined hole-punch mask.
+# 				transformixImageFilter = _sitk.TransformixImageFilter()
+# 				transformixImageFilter.LogToConsoleOff()
+
+# 				## Set the transform map from the image registration
+# 				transformixImageFilter.SetTransformParameterMap(transform_map)
+
+# 				## Modify the parameter map to use nearest neighbor interpolation
+# 				transform_map[0]['FinalBSplineInterpolationOrder'] = ['0']
+# 				if len(transform_map) > 1: # Handle TwoStage registration
+# 					transform_map[1]['FinalBSplineInterpolationOrder'] = ['0']
+
+# 				transformixImageFilter.SetTransformParameterMap(transform_map)
+
+
+# 				moving_mask_sitk = _sitk.GetImageFromArray(hole_punch_mask_moving)
+
+# 				transformixImageFilter.SetMovingImage(moving_mask_sitk)
+
+# 				registered_mask_sitk = transformixImageFilter.Execute()
+# 				registered_mask = _sitk.GetArrayFromImage(registered_mask_sitk).astype(bool)
+
+# 				## e. Punch holes in the final registered image
+# 				im_coregistered_final[registered_mask] = np.nan
+
+# 			# if Blurring:
+# 			# 	im_coregistered_final = gaussian_filter(im_coregistered_final, sigma=Sigma)
+# 			if Blurring:
+# 				im_coregistered_final = gaussian_blur_nan(im_coregistered_final, sigma=Sigma)
+# 			Hypercube.append(im_coregistered_final)
+# 			AllTransforms.append(transform_map)
+
+# 		# After each frame (static or moving) is processed, update the combined mask.
+# 		current_frame = Hypercube[-1]
+# 		# An invalid pixel is one that is NaN (from reflections) or 0 (from registration edges)
+# 		# invalid_pixels_mask = np.isnan(current_frame) | (current_frame == 0)
+# 		invalid_pixels_mask = np.isnan(current_frame) | (current_frame < MinVal)
+# 		CombinedMask = CombinedMask | invalid_pixels_mask
+
+# 		# Optional Plotting
+# 		if PlotDiff and c != Static_Index:
+# 			if '.png' in SavingPath:
+# 				NameTot = SavingPath.split('/')[-1]
+# 				Name = NameTot.replace('.png', '')+f'_{c}.png'
+# 				SavingPathWithName = SavingPath.replace(NameTot, Name)
+# 			else:
+# 				Name = f'_{c}_CoRegistration.png'
+# 				SavingPathWithName = SavingPath+Name
+# 			HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
+
+
+# 	tf = time.time()
+# 	Hypercube = np.array(Hypercube)
+# 	time_total = tf - t0
+# 	minutes = int(time_total / 60)
+# 	seconds = time_total - minutes * 60
+# 	print(f'\n\n Co-registration took {minutes} min and {seconds:.0f} s in total\n')
+
+# 	# Sort hypercube, transforms, and the combined mask according to the order_list
+# 	if Order:
+# 		Hypercube_sorted = Hypercube[order_list]
+# 		# Reorder transforms list
+# 		AllTransforms_sorted = [AllTransforms[i] for i in order_list]
+# 	else:
+# 		Hypercube_sorted = Hypercube
+# 		AllTransforms_sorted = AllTransforms
+
+# 	if SaveHypercube:
+# 		if '.png' in SavingPath:
+# 			NameTot = SavingPath.split('/')[-1]
+# 			Name = NameTot.replace('.png', '')+f'_CoregisteredHypercube.npz'
+# 			Name_wav = NameTot.replace('.png', '')+f'_CoregisteredHypercube_wavelengths.npz'
+# 			SavingPathHypercube = SavingPath.replace(NameTot, Name)
+# 			SavingPathWavelengths = SavingPath.replace(NameTot, Name_wav)
+# 		else:
+# 			Name = f'_CoregisteredHypercube.npz'
+# 			Name_wav = f'_CoregisteredHypercube_wavelengths.npz'
+# 			SavingPathHypercube = SavingPath+Name
+# 			SavingPathWavelengths = SavingPath+Name_wav
+
+# 		np.savez(f'{SavingPathHypercube}', Hypercube)
+# 		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
+
+# 	return Hypercube, AllTransforms, CombinedMask, AllROICoordinates
+
+
+
+import numpy as np
+import SimpleITK as _sitk
+import copy
+import time
+import inspect
+# Assuming HySE and gaussian_blur_nan are available in your scope
+# import HySE 
+# from your_module import gaussian_blur_nan
+
 def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 	"""
-
 	Apply Simple Elastix co-registration to all sweep
-
 	Uses CoRegisterImages
 
 	Input:
@@ -1058,8 +1378,7 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 				moving image to guide the registration.
 			- AllROICoordinates : If indicated, the code will use the provided coordinates instead of
 				prompting the user.
-			- MinVal = 0 (float) : minimum value (every pixel < MinVal will be masked)
-
+			- MinVal = 0 (float) : minimum value (every pixel < MinVal will be masked/set to NaN)
 
 	Outputs:
 		- Hypercube_Coregistered: The final co-registered hypercube.
@@ -1067,13 +1386,11 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 		- CombinedMask: A single 2D boolean mask where True indicates a pixel that
 			is invalid in at least one of the co-registered frames.
 		- AllROICoordinates: List of all the coordinates (y_start, y_end, x_start, x_end)
-			(to be used for other coregistrations with CoRegisterHypercubeAndMas(AllROICoordinates=AllROICoordinates))
-
 	"""
 	Help = kwargs.get('Help', False)
 	if Help:
 		print(inspect.getdoc(CoRegisterHypercubeAndMask))
-		return 0, 0, 0
+		return 0, 0, 0, 0
 
 	InteractiveMasks = kwargs.get('InteractiveMasks', False)
 
@@ -1140,10 +1457,11 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 
 		# 1. Get the mask for the static image (the target)
 		if PromptUser:
+			# Assuming get_interactive_roi is defined externally
 			static_roi = get_interactive_roi(im_static, title='Select ROI on STATIC image (this is the target)')
 		else:
 			static_roi = AllROICoordinates[Static_Index]
-			# print(static_roi)
+			
 		if static_roi is not None:
 			y_start, y_end, x_start, x_end = static_roi
 			StaticMask_interactive = np.zeros_like(im_static, dtype=np.uint8)
@@ -1153,12 +1471,13 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 		ReflectionsMask_Static = AllReflectionsMasks[Static_Index, :, :]
 	else:
 		ReflectionsMask_Static = None
-	StaticMask = GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Static)
+	
+	# Assuming GetGlobalMask is available or defined
+	StaticMask = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Static, PrintInfo=False)
 
 	for c in range(0, NN):
 		if c == Static_Index:
 			im0 = copy.deepcopy(im_static).astype(np.float32)
-			AllTransforms.append(0)
 			print(f'Static Image')
 			if PromptUser:
 				AllROICoordinates.append(static_roi)
@@ -1166,15 +1485,17 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 			if StaticMask_interactive is not None:
 				im0[StaticMask_interactive] = np.nan
 				
-			if HideReflections is not None:
-				if StaticMask is not None:
-					im0[StaticMask > 0.5] = np.nan
+			# if HideReflections is not None:
+			# 	if StaticMask is not None:
+			# 		# print(masking)
+			# 		im0[StaticMask > 0.5] = np.nan
+
+			# --- FIX: Apply MinVal to Static Image ---
+			im0[im0 < MinVal] = np.nan
+			# -----------------------------------------
 
 			if Blurring:
 				im0 = gaussian_blur_nan(im0, sigma=Sigma)
-				
-			# if Blurring:
-			# 	im0 = gaussian_filter(im0, sigma=Sigma)
 		
 			Hypercube.append(im0)
 			AllTransforms.append(0)
@@ -1200,19 +1521,17 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 						ReflectionsMask_Shifted = AllReflectionsMasks[c, :, :]
 					else:
 						ReflectionsMask_Shifted = None
+					
 					ShiftedMask_for_reg_orig = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted, PrintInfo=False)
 
 					ShiftedMask_interactive = np.zeros_like(im_shifted, dtype=np.uint8)
 					ShiftedMask_interactive[y_start:y_end, x_start:x_end] = 1
 
 					# Use these interactive masks for the registration
-					# NOTE: SimpleITK masks are inverted (0=ignore), so we pass them as is,
-					# and CoRegisterImages should handle the inversion (1-mask).
 					StaticMask_for_reg = (1 - StaticMask_interactive)
 					ShiftedMask_for_reg = (1 - ShiftedMask_interactive)
 
 			else:
-
 				if AllReflectionsMasks is not None:
 					ReflectionsMask_Shifted = AllReflectionsMasks[c, :, :]
 				else:
@@ -1221,27 +1540,12 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 
 			# 3. Perform the masked registration
 			im_coregistered_smeared, transform_map = HySE.CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask_for_reg,
-																		   ShiftedMask=ShiftedMask_for_reg,**kwargs)
+																		 ShiftedMask=ShiftedMask_for_reg, **kwargs)
 
 			im_coregistered_final = im_coregistered_smeared.astype(np.float32)
 
 			if HideReflections and ShiftedMask_for_reg is not None:
-				# ## a. Create "Hole-Punch Mask". 
-				# ##    This mask is True for every pixel to remove
-				# ##    Start with a mask that is True everywhere outside the ROI.
-				# print(f'im_shifted.shape: {im_shifted.shape}')
-				# hole_punch_mask_moving = np.ones_like(im_shifted, dtype=np.uint8)
-				# print(f'hole_punch_mask_moving.shape (pre): {hole_punch_mask_moving.shape}')
-				# if InteractiveMasks:
-				# 	hole_punch_mask_moving[y_start:y_end, x_start:x_end] = 0 # Set the ROI interior to False (we want to keep it)
-				# else:
-				# 	hole_punch_mask_moving = 0 # Set the ROI interior to False (we want to keep it)
-				# # print(f'hole_punch_mask_moving.shape (post): {hole_punch_mask_moving.shape}')
-
 				## a. Create "Hole-Punch Mask".
-				## This mask is True (1) for every pixel to remove
-				##    and False (0) for every pixel to keep.
-				
 				if InteractiveMasks:
 					# Start with a mask that is True everywhere (remove all)
 					hole_punch_mask_moving = np.ones_like(im_shifted, dtype=np.uint8)
@@ -1250,11 +1554,8 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 				else:
 					# Start with a mask that is False everywhere (keep all)
 					hole_punch_mask_moving = np.zeros_like(im_shifted, dtype=np.uint8)
-				
-				# print(f'hole_punch_mask_moving.shape (post): {hole_punch_mask_moving.shape}')
 
-				## b. Now, add the reflections to the mask. 
-				##    Set reflection pixels to True (we want to remove them).
+				## b. Add reflections to the mask.
 				if ReflectionsMask_Shifted is not None:
 					hole_punch_mask_moving[ReflectionsMask_Shifted > 0.5] = 1
 
@@ -1272,9 +1573,7 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 
 				transformixImageFilter.SetTransformParameterMap(transform_map)
 
-
 				moving_mask_sitk = _sitk.GetImageFromArray(hole_punch_mask_moving)
-
 				transformixImageFilter.SetMovingImage(moving_mask_sitk)
 
 				registered_mask_sitk = transformixImageFilter.Execute()
@@ -1283,18 +1582,22 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 				## e. Punch holes in the final registered image
 				im_coregistered_final[registered_mask] = np.nan
 
-			# if Blurring:
-			# 	im_coregistered_final = gaussian_filter(im_coregistered_final, sigma=Sigma)
+			# --- FIX: Apply MinVal to Registered Image ---
+			im_coregistered_final[im_coregistered_final < MinVal] = np.nan
+			# ---------------------------------------------
+
 			if Blurring:
 				im_coregistered_final = gaussian_blur_nan(im_coregistered_final, sigma=Sigma)
+
 			Hypercube.append(im_coregistered_final)
 			AllTransforms.append(transform_map)
 
 		# After each frame (static or moving) is processed, update the combined mask.
 		current_frame = Hypercube[-1]
-		# An invalid pixel is one that is NaN (from reflections) or 0 (from registration edges)
-		# invalid_pixels_mask = np.isnan(current_frame) | (current_frame == 0)
-		invalid_pixels_mask = np.isnan(current_frame) | (current_frame < MinVal)
+		
+		# An invalid pixel is one that is NaN (from reflections OR MinVal)
+		# Note: Since we set < MinVal to NaN above, np.isnan catches both cases now.
+		invalid_pixels_mask = np.isnan(current_frame)
 		CombinedMask = CombinedMask | invalid_pixels_mask
 
 		# Optional Plotting
@@ -1306,8 +1609,9 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 			else:
 				Name = f'_{c}_CoRegistration.png'
 				SavingPathWithName = SavingPath+Name
-			HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered, SavePlot=True, SavingPathWithName=SavingPathWithName)
-
+			
+			# Assuming im_coregistered was intended to be im_coregistered_final or im_coregistered_smeared
+			HySE.UserTools.PlotCoRegistered(im_static, im_shifted, im_coregistered_final, SavePlot=True, SavingPathWithName=SavingPathWithName)
 
 	tf = time.time()
 	Hypercube = np.array(Hypercube)
@@ -1318,12 +1622,15 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 
 	# Sort hypercube, transforms, and the combined mask according to the order_list
 	if Order:
+		order_list = np.argsort(Wavelengths_list) # Defined here to ensure variable exists
 		Hypercube_sorted = Hypercube[order_list]
 		# Reorder transforms list
 		AllTransforms_sorted = [AllTransforms[i] for i in order_list]
+		Wavelengths_sorted = np.array(Wavelengths_list)[order_list]
 	else:
 		Hypercube_sorted = Hypercube
 		AllTransforms_sorted = AllTransforms
+		Wavelengths_sorted = Wavelengths_list
 
 	if SaveHypercube:
 		if '.png' in SavingPath:
@@ -1338,13 +1645,10 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 			SavingPathHypercube = SavingPath+Name
 			SavingPathWavelengths = SavingPath+Name_wav
 
-		np.savez(f'{SavingPathHypercube}', Hypercube)
+		np.savez(f'{SavingPathHypercube}', Hypercube_sorted)
 		np.savez(f'{SavingPathWavelengths}', Wavelengths_sorted)
 
-	return Hypercube, AllTransforms, CombinedMask, AllROICoordinates
-
-
-
+	return Hypercube_sorted, AllTransforms_sorted, CombinedMask, AllROICoordinates
 
 #### ----------------------------------------------------------------------
 
@@ -1364,7 +1668,11 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 		- Wavelengths_list
 		- kwargs:
 			- Help
-			- Buffer = 9 : How many frames to skip at the start and end of a sweep
+			- Buffer = 3 : How many frames to skip at the start and end of a sweep
+			- RGB = True : To make function backwards compatible with previous methods
+				before distinct RGB channels were treated differently
+			- Channel = 'G' : If RGB is True, indicates which of the RGB channels to take the data from
+
 
 	Outputs:
 		- Hypercube for registration
@@ -1377,24 +1685,65 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 
 	Buffer = kwargs.get('Buffer')
 	if Buffer is None:
-		Buffer = 9
+		Buffer = 3
 		print(f'Setting Buffer to default {Buffer}')
-	Hypercube_all, Dark_all = HySE.ComputeHypercube(Path, EdgePos, Buffer=Buffer, Average=False, 
-													Order=False, Help=False, SaveFig=False, SaveArray=False, Plot=False, ForCoRegistration=True)
-	if isinstance(Nframe, int):
-		HypercubeForRegistration = Hypercube_all[Nsweep,:,Nframe,:,:]
-	elif isinstance(Nframe, list):
-		HypercubeForRegistration = []
-		for i in range(0,len(Nframe)):
-			HypercubeForRegistration_sub = Hypercube_all[Nsweep,:,Nframe[i],:,:]
-			if i==0:
-				HypercubeForRegistration = HypercubeForRegistration_sub
-			else:
-				HypercubeForRegistration = np.concatenate((HypercubeForRegistration, HypercubeForRegistration_sub), axis=0)
+	RGB = kwargs.get('RGB', True)
+	Channel = kwargs.get('Channel')
+	if RGB:
+#         Frames, RGB_Dark = HySE.ComputeHypercube_RGB(DataPath, EdgePos_Data, Buffer=Buffer, BlueShift=1, SaveArray=False)
+
+		Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB(Path, EdgePos, Buffer=Buffer, BlueShift=1, SaveArray=False)
+		print(f' -> Hypercube_all.shape: {Hypercube_all.shape}')
+		
+		if Channel=='G' or Channel==1:
+			Channel=1
+		elif Channel=='B' or Channel==0:
+			Channel=0
+		elif Channel=='R' or Channel==2:
+			Channel=2
+		else:
+			print('When using the RGB option, you need to define a channel (\'R\', \'G\', \'B\' or 2, 1, 0)')
+			print('  Setting to defaul green channel')
+			Channel=1
+		
+		if isinstance(Nframe, int):
+			print(Hypercube_all.shape)
+			HypercubeForRegistration = Hypercube_all[Nsweep,:,Nframe,:,:,Channel]
+		elif isinstance(Nframe, list):
+			HypercubeForRegistration = []
+			for i in range(0,len(Nframe)):
+				HypercubeForRegistration_sub = Hypercube_all[Nsweep,:,Nframe[i],:,:,Channel]
+				if i==0:
+					HypercubeForRegistration = HypercubeForRegistration_sub
+				else:
+					HypercubeForRegistration = np.concatenate((HypercubeForRegistration, HypercubeForRegistration_sub), axis=0)
+		else:
+			print(f'Nframe format not accepted.')
+			HypercubeForRegistration=0
+		
+		
 	else:
-		print(f'Nframe format not accepted.')
-		HypercubeForRegistration=0
+		print('RGB mode is set to False')
+		print(f'  Note that you might need to adjust the buffer size to account for this. It is currently set to {Buffer}')
+		Hypercube_all, Dark_all = HySE.ComputeHypercube(Path, EdgePos, Buffer=Buffer, Average=False, Order=False, Help=False, SaveFig=False, SaveArray=False, Plot=False, ForCoRegistration=True)
+		
+		if isinstance(Nframe, int):
+			HypercubeForRegistration = Hypercube_all[Nsweep,:,Nframe,:,:]
+		elif isinstance(Nframe, list):
+			HypercubeForRegistration = []
+			for i in range(0,len(Nframe)):
+				HypercubeForRegistration_sub = Hypercube_all[Nsweep,:,Nframe[i],:,:]
+				if i==0:
+					HypercubeForRegistration = HypercubeForRegistration_sub
+				else:
+					HypercubeForRegistration = np.concatenate((HypercubeForRegistration, HypercubeForRegistration_sub), axis=0)
+		else:
+			print(f'Nframe format not accepted.')
+			HypercubeForRegistration=0
+	
+	
 	return HypercubeForRegistration
+
 
 
 
