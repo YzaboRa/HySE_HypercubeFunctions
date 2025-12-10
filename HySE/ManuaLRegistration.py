@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 from scipy.signal import savgol_filter, find_peaks
 import matplotlib
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 import imageio
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.widgets import RectangleSelector
@@ -42,6 +42,11 @@ import copy
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import tempfile
+
+import SimpleITK as _sitk
+import matplotlib.pyplot as plt
+# import matplotlib.colors as mcolors
+# import matplotlib.cm as cm
 
 
 from matplotlib.widgets import Slider, RadioButtons
@@ -438,27 +443,6 @@ def CoRegisterImages_Manual(im_static, im_shifted, **kwargs):
 	
 	return _sitk.GetArrayFromImage(result_orig_se), transformParameterMap
 
-
-
-
-import numpy as np
-import copy
-import time
-import inspect
-import os
-import tempfile
-import SimpleITK as _sitk
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import matplotlib.cm as cm
-
-# --- ASSUMPTIONS ---
-# I am assuming you have these functions defined elsewhere, based on your code:
-# - LandmarkPicker( ... )
-# - _compute_landmark_transform( ... )
-# - gaussian_blur_nan( ... )  (the nan-aware blur function)
-# - CoRegisterImages_Manual( ... ) (This is NOT used, but was in the original)
-# --------------------
 
 
 def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
