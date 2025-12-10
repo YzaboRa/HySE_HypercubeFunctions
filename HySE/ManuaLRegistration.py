@@ -44,11 +44,171 @@ import matplotlib.colors as mcolors
 import tempfile
 
 
+from matplotlib.widgets import Slider, RadioButtons
+
+class LandmarkPicker:
+	"""
+	An advanced interactive class to select corresponding points in two images
+	with undo, color-coding, enforced point selection, and image controls.
+	"""
+	def __init__(self, fixed_image, moving_image=None, fixed_points_to_display=None,
+				 frame_info=None, warning_message=None, deviation_threshold=150):
+		self.fixed_image = fixed_image
+		self.moving_image = moving_image
+		self.fixed_points = []
+		self.moving_points = []
+		self.plotted_artists = []
+		self.show_text_labels = False 
+		self.deviation_threshold = deviation_threshold
+		self.warning_messages = []
+
+		self.fig = plt.figure(figsize=(16, 9))
+
+		# --- ALLOW ZOOM/PAN ---
+		# We ensure the toolbar is active. The 'on_click' function checks its state.
+		
+		# Adjust layout to make room for widgets at the bottom
+		gs = self.fig.add_gridspec(1, 2, width_ratios=[1, 1], wspace=0.1)
+		self.fig.subplots_adjust(bottom=0.25, right=0.88)
+		
+		self.ax_fixed = self.fig.add_subplot(gs[0, 0])
+		self.ax_moving = self.fig.add_subplot(gs[0, 1])
+		self.axes = [self.ax_fixed, self.ax_moving]
+		self.cbar_ax = self.fig.add_axes([0.9, 0.25, 0.02, 0.6])
+
+		self.phase = 'moving' if moving_image is not None else 'fixed'
+
+		# --- DISPLAY IMAGES & STORE REFERENCES ---
+		# We store the image objects (im_obj) to update clims/cmap later without clearing axes
+		if self.phase == 'fixed':
+			self.num_total_points = None
+			self.fig.suptitle("PHASE 1: Select landmarks. Use toolbar to Zoom/Pan.\n'z': undo, 'p': labels. CLOSE to finish.", fontsize=14)
+			self.fixed_img_norm = self._normalize(self.fixed_image)
+			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='gray', vmin=0, vmax=1)
+			self.ax_fixed.set_title('Click to select FIXED points')
+			self.ax_moving.axis('off')
+			self.im_moving_obj = None
+		else: # moving phase
+			self.fixed_points_to_display = fixed_points_to_display
+			self.num_total_points = len(self.fixed_points_to_display)
+			frame_str = f"Frame {frame_info[0]} / {frame_info[1]}"
+			self.fig.suptitle(f"PHASE 2: {frame_str}\nUse toolbar to Zoom/Pan. 'z': undo, 'p': labels. MUST select {self.num_total_points} points.", fontsize=14)
+			
+			self.fixed_img_norm = self._normalize(self.fixed_image)
+			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='gray', vmin=0, vmax=1)
+			self.ax_fixed.set_title('FIXED points (reference)')
+			
+			self.moving_img_norm = self._normalize(self.moving_image)
+			self.im_moving_obj = self.ax_moving.imshow(self.moving_img_norm, cmap='gray', vmin=0, vmax=1)
+		
+		if warning_message:
+			self.fig.text(0.5, 0.95, warning_message, color='red', ha='center', fontsize=12, weight='bold',
+						  bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
+
+		# --- WIDGETS ---
+		# Define positions [left, bottom, width, height]
+		ax_color = 'lightgoldenrodyellow'
+		
+		# 1. Sliders for Fixed Image (Left side)
+		ax_fix_min = self.fig.add_axes([0.15, 0.1, 0.25, 0.03], facecolor=ax_color)
+		ax_fix_max = self.fig.add_axes([0.15, 0.06, 0.25, 0.03], facecolor=ax_color)
+		self.slider_fix_min = Slider(ax_fix_min, 'Fixed Min', 0.0, 1.0, valinit=0.0)
+		self.slider_fix_max = Slider(ax_fix_max, 'Fixed Max', 0.0, 1.0, valinit=1.0)
+		
+		self.slider_fix_min.on_changed(self.update_fixed_clim)
+		self.slider_fix_max.on_changed(self.update_fixed_clim)
+
+		# 2. Sliders for Moving Image (Right side) - Only if in moving phase
+		if self.phase == 'moving':
+			ax_mov_min = self.fig.add_axes([0.55, 0.1, 0.25, 0.03], facecolor=ax_color)
+			ax_mov_max = self.fig.add_axes([0.55, 0.06, 0.25, 0.03], facecolor=ax_color)
+			self.slider_mov_min = Slider(ax_mov_min, 'Moving Min', 0.0, 1.0, valinit=0.0)
+			self.slider_mov_max = Slider(ax_mov_max, 'Moving Max', 0.0, 1.0, valinit=1.0)
+			
+			self.slider_mov_min.on_changed(self.update_moving_clim)
+			self.slider_mov_max.on_changed(self.update_moving_clim)
+
+		# 3. Radio Buttons for Colormap
+		ax_radio = self.fig.add_axes([0.92, 0.05, 0.07, 0.15], facecolor=ax_color)
+		self.radio = RadioButtons(ax_radio, ('gray', 'magma', 'viridis'))
+		self.radio.on_clicked(self.update_cmap)
+
+		self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
+		self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
+		self.cid_close = self.fig.canvas.mpl_connect('close_event', self.on_close)
+		self._redraw()
+
+	def update_fixed_clim(self, val):
+		"""Callback to update contrast for the fixed image."""
+		if self.im_fixed_obj:
+			vmin = self.slider_fix_min.val
+			vmax = self.slider_fix_max.val
+			# Ensure vmin < vmax to avoid errors
+			if vmin >= vmax: 
+				vmax = vmin + 0.01
+			self.im_fixed_obj.set_clim(vmin, vmax)
+			self.fig.canvas.draw_idle()
+
+	def update_moving_clim(self, val):
+		"""Callback to update contrast for the moving image."""
+		if self.im_moving_obj:
+			vmin = self.slider_mov_min.val
+			vmax = self.slider_mov_max.val
+			if vmin >= vmax: 
+				vmax = vmin + 0.01
+			self.im_moving_obj.set_clim(vmin, vmax)
+			self.fig.canvas.draw_idle()
+
+	def update_cmap(self, label):
+		"""Callback to update the colormap for both images."""
+		if self.im_fixed_obj:
+			self.im_fixed_obj.set_cmap(label)
+		if self.im_moving_obj:
+			self.im_moving_obj.set_cmap(label)
+		self.fig.canvas.draw_idle()
+
+	def on_click(self, event):
+		if event.inaxes is None or event.button != 1: return
+		
+		# --- CHECK TOOLBAR & WIDGET STATE ---
+		# 1. If zoom/pan is active, ignore click
+		toolbar = self.fig.canvas.manager.toolbar
+		if toolbar is not None and toolbar.mode != '':
+			return
+			
+		# 2. If click is inside the main axes (not on sliders), proceed
+		# This prevents clicks on sliders from adding points
+		if event.inaxes not in [self.ax_fixed, self.ax_moving]:
+			return
+
+		x, y = event.xdata, event.ydata
+		
+		if self.phase == 'fixed' and event.inaxes == self.ax_fixed:
+			self.fixed_points.append((x, y))
+
+		elif self.phase == 'moving' and event.inaxes == self.ax_moving:
+			if len(self.moving_points) < self.num_total_points:
+				self.moving_points.append((x, y))
+				## Perform deviation test
+				idx = len(self.moving_points) - 1
+				p_fixed = self.fixed_points_to_display[idx]
+				p_moving = self.moving_points[idx]
+				dist = np.linalg.norm(np.array(p_fixed) - np.array(p_moving))
+
+				if dist > self.deviation_threshold:
+					warning = f"Point #{idx + 1} deviation: {dist:.1f} px (>{self.deviation_threshold} px)"
+					self.warning_messages.append(warning)
+					print(f"    /!\\ WARNING: {warning}")
+			else:
+				print("All fixed points have a corresponding moving point. Cannot add more.")
+
+		self._redraw()
+
 # class LandmarkPicker:
 # 	"""
 # 	An advanced interactive class to select corresponding points in two images
 # 	with undo, color-coding, and enforced point selection.
-# 	(CORRECTED to prevent WeakRef cleanup errors and toolbar conflicts)
+# 	Updated to support native Matplotlib zoom/pan tools.
 # 	"""
 # 	def __init__(self, fixed_image, moving_image=None, fixed_points_to_display=None,
 # 				 frame_info=None, warning_message=None, deviation_threshold=150):
@@ -63,34 +223,10 @@ import tempfile
 
 # 		self.fig = plt.figure(figsize=(16, 8))
 
-# 		# --- FIX: Disable conflicting toolbar tools ---
-# 		# This prevents the 'zoom' and 'pan' tools from hijacking
-# 		# mouse clicks, which would crash the 'on_click' handler.
-# 		try:
-# 			# Get the Matplotlib ToolManager
-# 			tm = self.fig.canvas.manager.toolmanager
-			
-# 			# Remove the conflicting tools by their string IDs
-# 			tm.remove_tool('zoom')
-# 			tm.remove_tool('pan')
-			
-# 			# Optional: Remove other nav tools to prevent user confusion
-# 			tm.remove_tool('home')
-# 			tm.remove_tool('back')
-# 			tm.remove_tool('forward')
-			
-# 			# This also prevents the 'p' key from conflicting
-# 			# with Matplotlib's default 'pan' hotkey.
-
-# 		except AttributeError:
-# 			# This can happen if using a very old Matplotlib version
-# 			# or a backend that doesn't use ToolManager.
-# 			print("LandmarkPicker Warning: Could not access ToolManager to disable toolbar tools.")
-# 		except Exception as e:
-# 			# Catch other potential errors
-# 			print(f"LandmarkPicker Warning: Error disabling toolbar: {e}")
-# 		# --- END FIX ---
-
+# 		# --- ALLOW ZOOM/PAN ---
+# 		# We no longer disable the toolbar tools. 
+# 		# The 'on_click' function will check if they are active.
+		
 # 		gs = self.fig.add_gridspec(1, 2, width_ratios=[1, 1], wspace=0.1)
 # 		self.ax_fixed = self.fig.add_subplot(gs[0, 0])
 # 		self.ax_moving = self.fig.add_subplot(gs[0, 1])
@@ -102,7 +238,7 @@ import tempfile
 
 # 		if self.phase == 'fixed':
 # 			self.num_total_points = None
-# 			self.fig.suptitle("PHASE 1: Select landmarks on the image.\nPress 'z' to undo, 'p' to toggle labels. MUST CLOSE window to finish.", fontsize=14)
+# 			self.fig.suptitle("PHASE 1: Select landmarks. Use toolbar to Zoom/Pan.\n'z': undo, 'p': labels. CLOSE to finish.", fontsize=14)
 # 			self.ax_fixed.imshow(self._normalize(self.fixed_image), cmap='gray')
 # 			self.ax_fixed.set_title('Click to select FIXED points')
 # 			self.ax_moving.axis('off')
@@ -110,7 +246,7 @@ import tempfile
 # 			self.fixed_points_to_display = fixed_points_to_display
 # 			self.num_total_points = len(self.fixed_points_to_display)
 # 			frame_str = f"Frame {frame_info[0]} / {frame_info[1]}"
-# 			self.fig.suptitle(f"PHASE 2: {frame_str}\nPress 'z' to undo, 'p' to toggle labels. MUST select all {self.num_total_points} points.", fontsize=14)
+# 			self.fig.suptitle(f"PHASE 2: {frame_str}\nUse toolbar to Zoom/Pan. 'z': undo, 'p': labels. MUST select {self.num_total_points} points.", fontsize=14)
 # 			self.ax_fixed.imshow(self._normalize(self.fixed_image), cmap='gray')
 # 			self.ax_fixed.set_title('FIXED points (reference)')
 # 			self.ax_moving.imshow(self._normalize(self.moving_image), cmap='gray')
@@ -119,67 +255,10 @@ import tempfile
 # 			self.fig.text(0.5, 0.95, warning_message, color='red', ha='center', fontsize=12, weight='bold',
 # 						  bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
 
-# 		# Connect events and store their connection IDs (cids)
 # 		self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
 # 		self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
 # 		self.cid_close = self.fig.canvas.mpl_connect('close_event', self.on_close)
 # 		self._redraw()
-
-class LandmarkPicker:
-	"""
-	An advanced interactive class to select corresponding points in two images
-	with undo, color-coding, and enforced point selection.
-	Updated to support native Matplotlib zoom/pan tools.
-	"""
-	def __init__(self, fixed_image, moving_image=None, fixed_points_to_display=None,
-				 frame_info=None, warning_message=None, deviation_threshold=150):
-		self.fixed_image = fixed_image
-		self.moving_image = moving_image
-		self.fixed_points = []
-		self.moving_points = []
-		self.plotted_artists = []
-		self.show_text_labels = False 
-		self.deviation_threshold = deviation_threshold
-		self.warning_messages = []
-
-		self.fig = plt.figure(figsize=(16, 8))
-
-		# --- ALLOW ZOOM/PAN ---
-		# We no longer disable the toolbar tools. 
-		# The 'on_click' function will check if they are active.
-		
-		gs = self.fig.add_gridspec(1, 2, width_ratios=[1, 1], wspace=0.1)
-		self.ax_fixed = self.fig.add_subplot(gs[0, 0])
-		self.ax_moving = self.fig.add_subplot(gs[0, 1])
-		self.axes = [self.ax_fixed, self.ax_moving]
-		self.fig.subplots_adjust(right=0.88)
-		self.cbar_ax = self.fig.add_axes([0.9, 0.15, 0.02, 0.7])
-
-		self.phase = 'moving' if moving_image is not None else 'fixed'
-
-		if self.phase == 'fixed':
-			self.num_total_points = None
-			self.fig.suptitle("PHASE 1: Select landmarks. Use toolbar to Zoom/Pan.\n'z': undo, 'p': labels. CLOSE to finish.", fontsize=14)
-			self.ax_fixed.imshow(self._normalize(self.fixed_image), cmap='gray')
-			self.ax_fixed.set_title('Click to select FIXED points')
-			self.ax_moving.axis('off')
-		else: # moving phase
-			self.fixed_points_to_display = fixed_points_to_display
-			self.num_total_points = len(self.fixed_points_to_display)
-			frame_str = f"Frame {frame_info[0]} / {frame_info[1]}"
-			self.fig.suptitle(f"PHASE 2: {frame_str}\nUse toolbar to Zoom/Pan. 'z': undo, 'p': labels. MUST select {self.num_total_points} points.", fontsize=14)
-			self.ax_fixed.imshow(self._normalize(self.fixed_image), cmap='gray')
-			self.ax_fixed.set_title('FIXED points (reference)')
-			self.ax_moving.imshow(self._normalize(self.moving_image), cmap='gray')
-		
-		if warning_message:
-			self.fig.text(0.5, 0.95, warning_message, color='red', ha='center', fontsize=12, weight='bold',
-						  bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
-
-		self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
-		self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
-		self.cid_close = self.fig.canvas.mpl_connect('close_event', self.on_close)
-		self._redraw()
 		
 	def disconnect(self):
 		"""Disconnects all the matplotlib event connections."""
@@ -197,33 +276,6 @@ class LandmarkPicker:
 	def _normalize(self, img):
 		p2, p98 = np.percentile(img, (2, 98)); return np.clip((img - p2) / (p98 - p2), 0, 1)
 		
-	# def on_click(self, event):
-	# 	if event.inaxes is None or event.button != 1: return
-	# 	x, y = event.xdata, event.ydata
-		
-	# 	# With the toolbar fix, we can be confident x and y are not None
-	# 	# from a conflicting tool.
-
-	# 	if self.phase == 'fixed' and event.inaxes == self.ax_fixed:
-	# 		self.fixed_points.append((x, y))
-
-	# 	elif self.phase == 'moving' and event.inaxes == self.ax_moving:
-	# 		if len(self.moving_points) < self.num_total_points:
-	# 			self.moving_points.append((x, y))
-	# 			## Perform deviation test
-	# 			idx = len(self.moving_points) - 1
-	# 			p_fixed = self.fixed_points_to_display[idx]
-	# 			p_moving = self.moving_points[idx]
-	# 			dist = np.linalg.norm(np.array(p_fixed) - np.array(p_moving))
-
-	# 			if dist > self.deviation_threshold:
-	# 				warning = f"Point #{idx + 1} deviation: {dist:.1f} px (>{self.deviation_threshold} px)"
-	# 				self.warning_messages.append(warning)
-	# 				print(f"   /!\\ WARNING: {warning}")
-	# 		else:
-	# 			print("All fixed points have a corresponding moving point. Cannot add more.")
-
-	# 	self._redraw()
 
 	def on_click(self, event):
 		if event.inaxes is None or event.button != 1: return
