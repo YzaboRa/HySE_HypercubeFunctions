@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 from scipy.signal import savgol_filter, find_peaks
 import matplotlib
-# from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt
 import imageio
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.widgets import RectangleSelector
@@ -44,7 +44,6 @@ import matplotlib.colors as mcolors
 import tempfile
 
 import SimpleITK as _sitk
-import matplotlib.pyplot as plt
 # import matplotlib.colors as mcolors
 # import matplotlib.cm as cm
 
@@ -209,62 +208,7 @@ class LandmarkPicker:
 
 		self._redraw()
 
-# class LandmarkPicker:
-# 	"""
-# 	An advanced interactive class to select corresponding points in two images
-# 	with undo, color-coding, and enforced point selection.
-# 	Updated to support native Matplotlib zoom/pan tools.
-# 	"""
-# 	def __init__(self, fixed_image, moving_image=None, fixed_points_to_display=None,
-# 				 frame_info=None, warning_message=None, deviation_threshold=150):
-# 		self.fixed_image = fixed_image
-# 		self.moving_image = moving_image
-# 		self.fixed_points = []
-# 		self.moving_points = []
-# 		self.plotted_artists = []
-# 		self.show_text_labels = False 
-# 		self.deviation_threshold = deviation_threshold
-# 		self.warning_messages = []
 
-# 		self.fig = plt.figure(figsize=(16, 8))
-
-# 		# --- ALLOW ZOOM/PAN ---
-# 		# We no longer disable the toolbar tools. 
-# 		# The 'on_click' function will check if they are active.
-		
-# 		gs = self.fig.add_gridspec(1, 2, width_ratios=[1, 1], wspace=0.1)
-# 		self.ax_fixed = self.fig.add_subplot(gs[0, 0])
-# 		self.ax_moving = self.fig.add_subplot(gs[0, 1])
-# 		self.axes = [self.ax_fixed, self.ax_moving]
-# 		self.fig.subplots_adjust(right=0.88)
-# 		self.cbar_ax = self.fig.add_axes([0.9, 0.15, 0.02, 0.7])
-
-# 		self.phase = 'moving' if moving_image is not None else 'fixed'
-
-# 		if self.phase == 'fixed':
-# 			self.num_total_points = None
-# 			self.fig.suptitle("PHASE 1: Select landmarks. Use toolbar to Zoom/Pan.\n'z': undo, 'p': labels. CLOSE to finish.", fontsize=14)
-# 			self.ax_fixed.imshow(self._normalize(self.fixed_image), cmap='gray')
-# 			self.ax_fixed.set_title('Click to select FIXED points')
-# 			self.ax_moving.axis('off')
-# 		else: # moving phase
-# 			self.fixed_points_to_display = fixed_points_to_display
-# 			self.num_total_points = len(self.fixed_points_to_display)
-# 			frame_str = f"Frame {frame_info[0]} / {frame_info[1]}"
-# 			self.fig.suptitle(f"PHASE 2: {frame_str}\nUse toolbar to Zoom/Pan. 'z': undo, 'p': labels. MUST select {self.num_total_points} points.", fontsize=14)
-# 			self.ax_fixed.imshow(self._normalize(self.fixed_image), cmap='gray')
-# 			self.ax_fixed.set_title('FIXED points (reference)')
-# 			self.ax_moving.imshow(self._normalize(self.moving_image), cmap='gray')
-		
-# 		if warning_message:
-# 			self.fig.text(0.5, 0.95, warning_message, color='red', ha='center', fontsize=12, weight='bold',
-# 						  bbox=dict(facecolor='white', alpha=0.8, edgecolor='none'))
-
-# 		self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
-# 		self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
-# 		self.cid_close = self.fig.canvas.mpl_connect('close_event', self.on_close)
-# 		self._redraw()
-		
 	def disconnect(self):
 		"""Disconnects all the matplotlib event connections."""
 		self.fig.canvas.mpl_disconnect(self.cid_click)
@@ -387,7 +331,7 @@ class LandmarkPicker:
 
 
 
-
+import matplotlib.pyplot as plt
 
 	
 def _compute_landmark_transform(fixed_points, moving_points, transform_type='affine'):
