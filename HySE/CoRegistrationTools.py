@@ -212,7 +212,6 @@ def get_interactive_roi(image, title='Select Registration ROI'):
 
 
 
-
 def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
 	"""
 	Function that takes all hypercubes (where hypercube computed from specific sweepw were kept individually 
@@ -221,9 +220,12 @@ def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
 	saved in the folder Sweep{s}.
 
 	Modified to allow expanded hypercubes that include individual (non-averaged) frames within plateaus.
+	
+	*Update*: Includes robust contrast adjustment to handle specular reflections (clips top 0.1% intensity).
 
 	Input:
 		- Hypercube_all : All the hypercubes computed from all sweeps. Shape (Nsweeps, Nwav, Y, X) or (Nsweeps, Nwav, Nframes, Y, X)
+		- RescalePercentile = 95 : Rescale image to this percentile of the image's values. To remove impact of specular reflection.
 		- SavingPath : Where to save all results (generic) (expected to end with '/')
 		- Name : General name of the data (i.e. patient)
 		- NameSub : Specific name for the hypercubes (i.e. lesion)
@@ -256,17 +258,20 @@ def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
 	else:
 		print(f'Only saving sweeps {Sweeps}')
 
+	# Frames logic handled dynamically below based on dimensions
 	Frames = kwargs.get('Frames')
-	if Frames is None:
-		Frames = [i for i in range(0, Frames)]
-	else:
+	if Frames is not None:
 		print(f'Only saving frames {Frames}')
+		
+	RescalePercentile = kwargs.get('RescalePercentile', 95)
+	print(f'Rescaling images to {RescalePercentile} percentile')
 	
 	GeneralDirectory = f'{Name}_{NameSub}_RawFrames'
 	try:
 		os.mkdir(f'{SavingPath}{GeneralDirectory}')
 	except FileExistsError:
 		pass
+
 	for s in range(0,Nsweeps):
 		if s in Sweeps:
 			DirectoryName = f'{SavingPath}{GeneralDirectory}/Sweep{s}'
@@ -278,19 +283,128 @@ def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
 			if len(hypercube_shape)==4:
 				hypercube = Hypercube_all[s,:,:,:]
 				for w in range(0,Nwav):
-					frame = hypercube[w,:,:]/(np.amax(hypercube[w,:,:]))*255
-					im = Image.fromarray(frame)
+					raw_frame = hypercube[w,:,:]
+					
+					# Robust Normalization handling specular reflections
+					# Calculate 99.9th percentile to exclude specular highlights
+					v_max = np.percentile(raw_frame, 99.9)
+					if v_max == 0: v_max = 1 # Prevent div by zero
+					
+					# Clip and scale
+					frame = np.clip(raw_frame, 0, v_max)
+					frame = (frame / v_max) * 255
+					
+					im = Image.fromarray(frame.astype(np.uint8))
 					im = im.convert("L")
 					im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}.png')
 			else:
+				# 5D case
 				hypercube = Hypercube_all[s,:,:,:,:]
+				
+				# Handle default Frames if not provided
+				CurrentFrames = Frames if Frames is not None else range(0, Nframes)
+
+#                 # Rescale image ignoring values from specular reflection
+#                 v_max = np.percentile(hypercube, RescalePercentile)
+#                 if v_max == 0: v_max = 1
+#                 print(f' rescling to vmax = {v_max}')
+						
 				for w in range(0,Nwav):
 					for f in range(0,Nframes):
-						if f in Frames:
-							frame = hypercube[w,f,:,:]/(np.amax(hypercube[w,f,:,:]))*255
-							im = Image.fromarray(frame)
+						if f in CurrentFrames:
+							raw_frame = hypercube[w,f,:,:]
+							
+							# Rescale image ignoring values from specular reflection
+							v_max = np.percentile(raw_frame, RescalePercentile)
+							if v_max == 0: v_max = 1
+#                             print(f' rescling to vmax = {v_max}')
+							
+							frame = np.clip(raw_frame, 0, v_max)
+							frame = (frame / v_max) * 255
+
+							im = Image.fromarray(frame.astype(np.uint8))
 							im = im.convert("L")
 							im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}_frame{f}.png')
+
+							
+# def SaveFramesSweeps(Hypercube_all, SavingPath, Name, NameSub, **kwargs):
+# 	"""
+# 	Function that takes all hypercubes (where hypercube computed from specific sweepw were kept individually 
+# 	instead of averaged) and saves frames as individual images. 
+# 	All images are saved in folder called {Name}_{NameSub}_RawFrames inside SavingPath, and images from sweep i are
+# 	saved in the folder Sweep{s}.
+
+# 	Modified to allow expanded hypercubes that include individual (non-averaged) frames within plateaus.
+
+# 	Input:
+# 		- Hypercube_all : All the hypercubes computed from all sweeps. Shape (Nsweeps, Nwav, Y, X) or (Nsweeps, Nwav, Nframes, Y, X)
+# 		- SavingPath : Where to save all results (generic) (expected to end with '/')
+# 		- Name : General name of the data (i.e. patient)
+# 		- NameSub : Specific name for the hypercubes (i.e. lesion)
+# 		- kwargs:
+# 			- Sweeps [int, int, ...] : If indicated, which sweeps to save
+# 			- Frames [int] : If indicated, which frames inside a given sweep to save
+# 			- Help
+
+
+# 	Outputs:
+# 		- All frames saved as png images in individual folders
+
+# 	"""
+
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(SaveFramesSweeps))
+# 		return 
+
+# 	hypercube_shape = Hypercube_all.shape
+# 	if len(hypercube_shape)==4:
+# 		Nsweeps, Nwav, YY, XX = Hypercube_all.shape
+# 	else:
+# 		Nsweeps, Nwav, Nframes, YY, XX = Hypercube_all.shape
+# 		# 19, 16, 3, 1004, 1155
+
+# 	Sweeps = kwargs.get('Sweeps')
+# 	if Sweeps is None:
+# 		Sweeps = [i for i in range(0, Nsweeps)]
+# 	else:
+# 		print(f'Only saving sweeps {Sweeps}')
+
+# 	Frames = kwargs.get('Frames')
+# 	if Frames is None:
+# 		Frames = [i for i in range(0, Frames)]
+# 	else:
+# 		print(f'Only saving frames {Frames}')
+	
+# 	GeneralDirectory = f'{Name}_{NameSub}_RawFrames'
+# 	try:
+# 		os.mkdir(f'{SavingPath}{GeneralDirectory}')
+# 	except FileExistsError:
+# 		pass
+# 	for s in range(0,Nsweeps):
+# 		if s in Sweeps:
+# 			DirectoryName = f'{SavingPath}{GeneralDirectory}/Sweep{s}'
+# 			try:
+# 				os.mkdir(DirectoryName)
+# 			except FileExistsError:
+# 				pass
+
+# 			if len(hypercube_shape)==4:
+# 				hypercube = Hypercube_all[s,:,:,:]
+# 				for w in range(0,Nwav):
+# 					frame = hypercube[w,:,:]/(np.amax(hypercube[w,:,:]))*255
+# 					im = Image.fromarray(frame)
+# 					im = im.convert("L")
+# 					im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}.png')
+# 			else:
+# 				hypercube = Hypercube_all[s,:,:,:,:]
+# 				for w in range(0,Nwav):
+# 					for f in range(0,Nframes):
+# 						if f in Frames:
+# 							frame = hypercube[w,f,:,:]/(np.amax(hypercube[w,f,:,:]))*255
+# 							im = Image.fromarray(frame)
+# 							im = im.convert("L")
+# 							im.save(f'{SavingPath}{GeneralDirectory}/Sweep{s}/Im{w}_frame{f}.png')
 
 
 
