@@ -353,7 +353,7 @@ def _compute_landmark_transform(fixed_points, moving_points, transform_type='aff
 
 
 
-from scipy.interpolate import Rbf
+from scipy.interpolate import Rbf #RBFInterpolator #
 
 def _compute_tps_transform(fixed_points, moving_points, reference_image_array):
 	"""
@@ -393,6 +393,8 @@ def _compute_tps_transform(fixed_points, moving_points, reference_image_array):
 	# This creates a function that interpolates the displacements exactly
 	rbf_x = Rbf(fx, fy, dx, function='thin_plate')
 	rbf_y = Rbf(fx, fy, dy, function='thin_plate')
+	# rbf_x = RBFInterpolator(fx, fy, dx, kernel='thin_plate_spline')
+	# rbf_y = RBFInterpolator(fx, fy, dy, kernel='thin_plate_spline')
 
 	# 4. Generate a grid of physical coordinates from the reference image
 	size = reference_image.GetSize()
@@ -507,6 +509,7 @@ def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
 
 	
 	Static_Index = kwargs.get('StaticIndex', 0)
+	print(f'Setting frame  {Static_Index} as static frame')
 	Cropping = kwargs.get('Cropping', 0)
 	Exact = kwargs.get('Exact', True)
 	Blurring = kwargs.get('Blurring', True)
