@@ -27,6 +27,7 @@ plt.rcParams["font.family"] = "arial"
 import HySE.UserTools
 import HySE.Import
 import HySE.ManipulateHypercube
+import HySE.CoRegistrationTools
 
 
 PythonEnvironment = get_ipython().__class__.__name__
@@ -334,6 +335,7 @@ class LandmarkPicker:
 import matplotlib.pyplot as plt
 
 	
+
 def _compute_landmark_transform(fixed_points, moving_points, transform_type='affine'):
 	"""Takes lists of points and computes the SimpleITK transform."""
 	min_points = {'rigid': 2, 'similarity': 2, 'affine': 3}.get(transform_type, 3)
@@ -348,6 +350,85 @@ def _compute_landmark_transform(fixed_points, moving_points, transform_type='aff
 	else: raise ValueError("Unsupported TransformType.")
 	final_transform = _sitk.LandmarkBasedTransformInitializer(transform, fixed_flat, moving_flat)
 	return final_transform
+
+
+
+from scipy.interpolate import Rbf
+
+def _compute_tps_transform(fixed_points, moving_points, reference_image_array):
+	"""
+	Computes a Thin Plate Spline (TPS) displacement field transform that 
+	perfectly aligns the fixed points to the moving points.
+	
+	Args:
+		fixed_points: List of tuples (x, y) in physical coordinates.
+		moving_points: List of tuples (x, y) in physical coordinates.
+		reference_image: The sitk.Image defining the domain (size, spacing, origin).
+		
+	Returns:
+		sitk.DisplacementFieldTransform: A non-rigid transform aligning landmarks exactly.
+	"""
+	if len(fixed_points) < 3 or len(moving_points) < 3:
+		raise ValueError("TPS requires at least 3 points.")
+
+	# Convert imput image to sikt image:
+	reference_image = _sitk.GetImageFromArray(reference_image_array)
+
+	# 1. Separate points into arrays
+	# Fixed points (Target for the RBF query)
+	fx = np.array([p[0] for p in fixed_points])
+	fy = np.array([p[1] for p in fixed_points])
+	
+	# Moving points (Values at the target)
+	mx = np.array([p[0] for p in moving_points])
+	my = np.array([p[1] for p in moving_points])
+
+	# 2. Calculate displacements (Moving - Fixed)
+	# The transform needs to know: "For a point at Fixed(x,y), where is it in Moving?"
+	# The displacement vector is D = Moving - Fixed
+	dx = mx - fx
+	dy = my - fy
+
+	# 3. Fit Radial Basis Functions (Thin Plate Spline)
+	# This creates a function that interpolates the displacements exactly
+	rbf_x = Rbf(fx, fy, dx, function='thin_plate')
+	rbf_y = Rbf(fx, fy, dy, function='thin_plate')
+
+	# 4. Generate a grid of physical coordinates from the reference image
+	size = reference_image.GetSize()
+	spacing = reference_image.GetSpacing()
+	origin = reference_image.GetOrigin()
+	direction = np.array(reference_image.GetDirection()).reshape(2, 2)
+
+	# Create index grid
+	x_idx = np.arange(0, size[0])
+	y_idx = np.arange(0, size[1])
+	xv_idx, yv_idx = np.meshgrid(x_idx, y_idx, indexing='xy')
+
+	# Convert index grid to physical coordinates (handling rotation/direction)
+	# Physical = Origin + Direction * (Index * Spacing)
+	# Note: This matrix mult is manual to support rotated images
+	phys_x = origin[0] + direction[0, 0] * xv_idx * spacing[0] + direction[0, 1] * yv_idx * spacing[1]
+	phys_y = origin[1] + direction[1, 0] * xv_idx * spacing[0] + direction[1, 1] * yv_idx * spacing[1]
+
+	# 5. Evaluate RBF on the grid to get the displacement field
+	disp_x = rbf_x(phys_x, phys_y)
+	disp_y = rbf_y(phys_x, phys_y)
+
+	# 6. Create SimpleITK Displacement Field
+	# Stack x and y displacements into a vector image
+	# Note: SimpleITK expects the vector image to be (SizeX, SizeY) with vector pixels
+	# We must transpose numpy arrays because SimpleITK is (x, y) but numpy is (row, col) aka (y, x)
+	disp_np = np.stack((disp_x, disp_y), axis=-1)
+	
+	# Create the image from the array
+	displacement_img = _sitk.GetImageFromArray(disp_np, isVector=True)
+	displacement_img.CopyInformation(reference_image)
+
+	# 7. Create the Transform
+	transform = _sitk.DisplacementFieldTransform(displacement_img)
+	
+	return transform
 
 
 	
@@ -406,6 +487,9 @@ def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
 			- Help, Cropping, Order, SaveHypercube, PlotDiff, SavingPath, EdgeMask, 
 			  AllReflectionsMasks, HideReflections
 			- Static_Index (0): Which image is set as the static one.
+			- Exact = True: If set to False, the code will use the input points to approximate the 
+					best affine transform. If set to True, it will compute a Thin Plate Spline (TPS)
+					transform to interpolate the best transform that goes exactly through the points.
 			- AllLandmarkPoints (None): A dictionary {'fixed_points': [], 'moving_points': [[]]} 
 									  to bypass the interactive GUI.
 			- TransformType ('Affine'): Global transform for the landmark stage.
@@ -424,6 +508,7 @@ def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
 	
 	Static_Index = kwargs.get('StaticIndex', 0)
 	Cropping = kwargs.get('Cropping', 0)
+	Exact = kwargs.get('Exact', True)
 	Blurring = kwargs.get('Blurring', True)
 	Sigma = kwargs.get('Sigma', 2)
 	Order = kwargs.get('Order', False)
@@ -431,6 +516,10 @@ def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
 	AllReflectionsMasks = kwargs.get('AllReflectionsMasks')
 	HideReflections = kwargs.get('HideReflections', True)
 	deviation_threshold = kwargs.get('DeviationThreshold', 200)
+	if Exact:
+		print('Computing a Thin Plate Spline transform that exactly goes through the identified points')
+	else:
+		print('Computing an Affine transform that best approximates going through all the identified points')
 	
 	t0 = time.time()
 	(NN, YY, XX) = RawHypercube.shape
@@ -480,7 +569,7 @@ def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
 			if Blurring:
 				# Apply NaN-aware blur
 				try:
-					im_static_processed = gaussian_blur_nan(im_static_processed, sigma=Sigma)
+					im_static_processed = HySE.CoRegistrationTools.gaussian_blur_nan(im_static_processed, sigma=Sigma)
 				except NameError:
 					print("Static Frame Warning: 'gaussian_blur_nan' not found. Blurring may be incorrect.")
 					im_static_processed = _sitk.GetArrayFromImage(_sitk.DiscreteGaussian(_sitk.GetImageFromArray(im_static_processed), Sigma))
@@ -520,7 +609,10 @@ def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
 					print(f"\n/!\\ {warning_for_next_frame}\n")
 		
 		# Assuming _compute_landmark_transform returns a SimpleITK Transform object
-		initial_transform = _compute_landmark_transform(fixed_landmarks, moving_landmarks_for_frame, kwargs.get('TransformType', 'Affine').lower())
+		if Exact:
+			initial_transform = _compute_tps_transform(fixed_landmarks, moving_landmarks_for_frame, im_shifted)
+		else:
+			initial_transform = _compute_landmark_transform(fixed_landmarks, moving_landmarks_for_frame, kwargs.get('TransformType', 'Affine').lower())
 		
 		
 		# --- STAGE 2: APPLY LANDMARK TRANSFORM (B-SPLINE SKIPPED) ---
@@ -570,7 +662,7 @@ def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
 			
 		if Blurring:
 			try:
-				im_coregistered_final = gaussian_blur_nan(im_coregistered_final, sigma=Sigma)
+				im_coregistered_final = HySE.CoRegistrationTools.gaussian_blur_nan(im_coregistered_final, sigma=Sigma)
 			except NameError:
 				print("Moving Frame Warning: 'gaussian_blur_nan' not found. Blurring may be incorrect.")
 				im_coregistered_final = _sitk.GetArrayFromImage(_sitk.DiscreteGaussian(_sitk.GetImageFromArray(im_coregistered_final), Sigma))
