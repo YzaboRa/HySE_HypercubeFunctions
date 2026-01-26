@@ -971,7 +971,7 @@ def omit_frames(arr, indices):
 	return arr[keep_indices]
 
 
-def combine_hypercubes(hypercube1, NormaliseMixedHypercubehypercube2, wavelengths1, wavelengths2):
+def combine_hypercubes(hypercube1, hypercube2, wavelengths1, wavelengths2):
 	"""
 	Combine two hyperspectral sub-cubes into one cube sorted by wavelength.
 

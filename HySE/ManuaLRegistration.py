@@ -51,6 +51,9 @@ import SimpleITK as _sitk
 
 from matplotlib.widgets import Slider, RadioButtons
 
+
+## N.A. Functions and GUI written with Gemini
+
 class LandmarkPicker:
 	"""
 	An advanced interactive class to select corresponding points in two images

@@ -150,8 +150,10 @@ def RemoveSpecularReflections(Frames, **kwargs):
 			raise ValueError(f'If setting k with a list, make sure the length of the list ({len(k)}) matches the number of images ({Nwav}')
 		else:
 			k_list = k
-	elif isinstance(k, int):
+	elif (isinstance(k, int) or isinstance(k, float)):
 		k_list = [k for i in range(0,Nwav)]
+	
+	# print(f'k_list: {k_list}')
 	MaskedFrames = []
 	AllMasks = []
 	for n in range(0,Nwav):
