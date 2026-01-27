@@ -131,6 +131,8 @@ def RemoveSpecularReflections(Frames, **kwargs):
 			- NeighborhoodSize = 5 : When specified (default), used to compute median value around
 				masked area and use a fill value
 			- FillValue  : When specified, replace masked pixels by this value
+			- Buffer = 0 : When specified, number of pixels to expand the mask around
+				detected reflections.
 			- Max Size : Maximum size (pixels) for the specular reflection (larger areas will be kept)
 	
 	Outputs:
