@@ -384,6 +384,8 @@ def PlotHypercube(Hypercube, **kwargs):
 		plt.savefig(f'{SavingPathWithName}')
 	if ShowPlot:
 		plt.show()
+	else:
+		plt.close()
 
 
 
