@@ -242,6 +242,18 @@ else:
 
 ```
 
+
+This is what the GUI looks like:
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/0a0aa6c3-093c-4ac7-86e1-d0f5a88fcf48" width="800"/>
+</p>
+
+Automatic error detection flags cases when the corresponding point is further away than a pre-set maximal distance. This can help prevent cases when the user makes a mistake and for example forgets a point. It is however a very blunt tool, as it will not flag errors if the points confused are close enough to each other, and it will flag errors when the movement is larger than this set threhold (can be modified when launching the GUI). The errors do not affect the code and should be ignored when the user is confident that the point are where they should be.
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/8cf3d3bc-9d21-40b3-bb7c-03cd382df050" width="800"/>
+</p>
+
+
 Then save results:
 ```python
 NMI_Sweep_before = HySE.GetNMI(HypercubeForRegistration)
