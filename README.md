@@ -1200,6 +1200,9 @@ HySE.PlotPatchesSpectra(PatchesToPlot, WavelengthsAll, MacBethSpectraData, MacBe
 
 
 
+<details>
+<summary><b>Older Registration Documentation</b></summary>
+
 ## Co-Registration
 The co-registration must be done before the unmixing. But since it requires SimpleITK and is only necessary for in vivo data (as opposed to testing data), I will for now put the relevant documentation here.
 TO DO: Update description to incroporate registration at the right spot.
@@ -1452,6 +1455,8 @@ The output (0) will match the size of the expected output in order to allow debu
 ```python
 HySE.MakeMixingMatrix(_,_,Help=True)
 ```
+
+</details>
 
 ## To do
 - [ ] Reference chanel normalisation
