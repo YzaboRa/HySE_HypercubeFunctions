@@ -35,54 +35,377 @@ It also requires those additional libraries:
 
 If SimpleITK is not installed, or cannot be imported, the code will simply ignore it. This will not be a problem as long as the co-registration functions are not used.
 
-The code was written to be run in a jupyter notebook. Including
+
+## General information
+Last updated: 29 January 2026
+Includes handling of 3 wavelengths split unmixing with red reference channel.
+Does NOT include actual normalisation using the red references channel, to be added once finalised.
+
+### Help
+Every function in the HySE library includes documentation, which can be accessed using the Help function.
+A general help function allows to print all the modules and associated functions:
 ```python
-%matplotlib ipympl
+HySE.help()
 ```
-At the start of the notebook enables interactive figures.
 
-## How to use
+Adding a module in argument allows to print in more details the functinos it contains:
+```python
+HySE.help('Unmixing')
+```
 
-### Import parameters
-The pipeline must first be setup by importing the functions and setting up data and saving parameters:
+A detailed description of a given function with its inputs and outputs can be accessed by adding the function to the argument:
+```python
+HySE.help('Unmixing.MakeMixingMatrix')
+```
+
+Most functions also allow the input of 'Help=True' as an argument, which will print the same detailed function description. 
+The output (0) will match the size of the expected output in order to allow debugging on the go.
 
 ```python
-## Import functions
-import sys
-PathToFunctions = '{Path to where the HySE_HypercubeFunctions files are located}'
+HySE.MakeMixingMatrix(_,_,Help=True)
+```
+
+## Pre-Processing
+
+### Import 
+The raw data needs to be imported and registered. 
+Manual registration is done interactively with a QT GUI. To enable this feature in a jupyter notebook, ensure that the right matplotlib feature is set:
+```python
+%matplotlib qt
+```
+
+Import the HySE functions from wherever they are located:
+```python
+PathToFunctions = 'GitHub/HySE_HypercubeFunctions/'
 sys.path.append(PathToFunctions)
-import Hyse
+import HySE
+```
 
-## Indicate which wavelengths were used (Panel4, Panel2), in nm
-## 3 wav split hybrid, wavelengths 1:
-##                     0.   1.   2.   3.   4.   5.   6.   7
-Panel2_Wavelengths = [625, 606, 584, 560, 543, 511, 486, 418]
-Panel4_Wavelengths = [646, 617, 594, 576, 569, 526, 503, 478]
+Define where the data is located. Note that a "Name" is defined in order to be added when saving outputs. This helps identify what each output is for.
+```python
+SavingPath = '/SavingPath/'
 
-Wavelengths_list = np.array(Panel2_Wavelengths+Panel4_Wavelengths)
-Wavelengths_list_sorted = np.sort(Wavelengths_list)
+DataPath_General = SavingPath+'Videos/'
+DarkPath = DataPath_General+'2025-11-25_08-25-28_Dark.mp4'
 
-## Indicate the mixing matrix that was used in the Arduino code:
-Arduino_MixingMatrix = [[4, 5, 6],
-                        [1, 4, 6],
-                        [1, 5, 6],
-                        [1, 4, 5],
-                        [4, 5, 6, 7],
-                        [2, 3],
-                        [0, 3],
-                        [0, 2]]
-
-## Locate the data to analyse
-DataPath_General = '{Path_to_data}/Data/'
-
-
-DataPath = DataPath_General+'{Video_Name}.mp4'
-Name = '3Wavs1_StaticMacbeth'
-
-## Define Saving path:
-SavingPath = '{Path_to_save}'
+DataPath = DataPath_General+'2025-11-25_09-17-27_NegControl.mp4'
+Name = 'NegControl'
+RegistrationSavingPath = SavingPath+'Results/Registered/'
 
 ```
+
+### Load Dark
+This step only requires the dark video. If it doesn't exist, a dark estimate can be generated from the data itself.
+```python
+LongDark = HySE.GetDark_WholeVideo(DarkPath) #, CropImDimensions=CropImDimensions
+HySE.PlotDark(LongDark)
+```
+
+### Load Trace
+The following parameters are set for the current implementation. The automatic edge detection is enabled. Make sure that the edges have been properly identified.
+```python
+EdgePos_Data = HySE.FindHypercube_RGB(DataPath, Automatic=True, PlateauSize=9, DarkMin=12, MaxPlateauSize=20, SaveFig=False)
+```
+
+### Extract Frames
+This uses the edge positions found with the trace to extract usable frames. 
+The buffer sets how many frames a thrown out at the start end the end of the plateau. Only the middle frames are used, where the illumination and Olympus post-processing is more stable.
+```python
+Buffer = 3
+Frames, RGB_Dark = HySE.ComputeHypercube_RGB(DataPath, EdgePos_Data, Buffer=Buffer, BlueShift=1, SaveArray=False)
+```
+
+### Dark Subtraction
+Subtract the dark from all the frames
+(Not necessary for registration)
+```python
+## Data
+(Nsweeps, Nwav, Nframes, Y, X, _) = Frames.shape
+
+## BGR 
+Frames_Blue = Frames[:,:,:,:,:,0]
+Frames_Green = Frames[:,:,:,:,:,1]
+Frames_Red = Frames[:,:,:,:,:,2]
+
+# NormaliseMixedHypercube
+Frames_BlueD, MaskB = HySE.NormaliseMixedHypercube(Frames_Blue, Dark=LongDark, SaveFigure=False, Plot=False)
+Frames_GreenD, MaskG = HySE.NormaliseMixedHypercube(Frames_Green, Dark=LongDark, SaveFigure=False, Plot=False)
+Frames_RedD, MaskR = HySE.NormaliseMixedHypercube(Frames_Red, Dark=LongDark, SaveFigure=False, Plot=False)
+
+print(Frames_GreenD.shape)
+```
+
+### Save Frames to Identify Good Sweeps
+This step must only be done once and is best kept commented out the rest of the time.
+This function will create folders for each full sweep and save the frames for each wavelength/combination of wavelength, for each sweep. 
+This is done so that the user can manually identify which sweeps contain usable frames for the full sweep and to target registration on the best sweeps.
+There are two options.
+Option A saves every every frame as png images:
+```python
+RawFrames_SavingPath = SavingPath
+NameSub = ''
+HySE.SaveFramesSweeps(Frames_RedD, RawFrames_SavingPath, Name, NameSub, Video=False, Frames=[1], RescalePercentile=99) 
+```
+And option saves a mp4 video with of each frame in the sweep:
+```python
+RawFrames_SavingPath = SavingPath
+NameSub = ''
+HySE.SaveFramesSweeps(Frames_RedD, RawFrames_SavingPath, Name, NameSub, Video=True, Frames=[1], RescalePercentile=99)
+```
+The "Frames" argument can be used to save more or fewer frames per plateau. Frames=[0,1,2] will save all 3 frames.
+
+
+### Mask
+```python
+_, Mask = HySE.NormaliseMixedHypercube(Frames_GreenD[0,:,0,:,:], Dark=LongDark, Wavelengths_list=Wavelengths_list, 
+                                       SaveFigure=False, SavingPath=SavingPath+Name, vmax=160, Plot=False)
+
+EdgeMask = HySE.GetBestEdgeMask(Mask)
+```
+
+### Register
+#### Select Frames to Register
+We can only register specific sweeps at a time.
+```python
+Nsweep = 4
+Nframe = 1
+
+# If taking single frames
+HypercubeForRegistration = HySE.GetHypercubeForRegistration(Nsweep, Nframe, DataPath, EdgePos_Data, Wavelengths_list, Buffer=Buffer)
+print(HypercubeForRegistration.shape)
+```
+
+#### Manual Registration
+Manual registration hinges on fixed points in each images that must be manually annotated. The code will create a surface (thin plate spline) that goes through all the points. This code was written with Gemini.
+Previously defined points can be pre-loaded
+```python
+ManualRegistrationPointsPath = '/PATH_TO_POINTS/' ## npz file
+AllPoints_Loaded = np.load(ManualRegistrationPointsPath, allow_pickle=True)['arr_0'].item()
+```
+
+Otherwise points can be defined here. 
+Running this function will prompt a window to appear, requesting the user to define points. The code will first prompt the user to define points on the fixed frame, before then requesting the user to define those same points in every other frame to be registered. 
+There is no limit to the number of points defined, but point one must be present in all the frames.
+A series of features are available to make this step slightly easier. Pressing "z" will undo the last point defined. Pressing "p" will toggle the labels on and off. Use this to make sure that the points are set in the same order each time, to avoid issues.
+The colormap, min and max levels of the image can be adjusted. Normal matplotlib features remain available (zoom, saving, etc.)
+
+Another function (CoRegisterHypercubeAndMask) allows the user to set specific ROIs, but uses the automatic registration method on that area (see below).
+
+```python
+UserDefinedROI = False
+# Cropping = 0
+# GridSpacing = 100 # for automatix
+index = 0 # which frame is the static one
+
+AllLandmarkPoints = None
+# AllLandmarkPoints = AllPoints_Loaded
+
+if Manual:
+    if AllLandmarkPoints is not None:
+        print(f'Doing manual registration - Using provided fixed points')
+        CoregisteredHypercube, AllTransforms, CombinedMask, AllPoints = HySE.CoRegisterHypercubeAndMask_Manual(HypercubeForRegistration, Wavelengths_list, 
+                                                                                                               EdgeMask=EdgeMask, #AllReflectionsMasks=AllReflectionsMasks,
+                                                                                                               Blurring=True, Sigma=Sigma, StaticIndex=index,
+                                                                                                               DeviationThreshold=DeviationThreshold, 
+                                                                                                               AllLandmarkPoints=AllLandmarkPoints)
+        temp = AllPoints['fixed_points']
+        Info = f'Blurring{Sigma}_ManualRegistration_{len(temp)}points_Provided'
+    else:
+        print(f'Doing manual registration - Prompting user to define fixed points')
+        CoregisteredHypercube, AllTransforms, CombinedMask, AllPoints = HySE.CoRegisterHypercubeAndMask_Manual(HypercubeForRegistration, Wavelengths_list, 
+                                                                                                 EdgeMask=EdgeMask, #AllReflectionsMasks=AllReflectionsMasks, 
+                                                                                                 Blurring=True, Sigma=Sigma, StaticIndex=index,
+                                                                                                 DeviationThreshold=DeviationThreshold)
+        temp = AllPoints['fixed_points']
+        Info = f'Blurring{Sigma}_ManualRegistration_{len(temp)}points_UserDefined'
+    
+else:
+    if UserDefinedROI:
+        print(f'Doing SimpleITK registration, prompting user to define square ROI')
+        Info = f'Blurring{Sigma}_GridSpacing{GridSpacing}_i{index}_UserDefinedROI'
+    else:
+        print(f'Doing SimpleITK registration on the whole image')
+        Info = f'Blurring{Sigma}_GridSpacing{GridSpacing}_i{index}'
+    CoregisteredHypercube, AllTransforms, CombinedMask, AllROICoordinates = HySE.CoRegisterHypercubeAndMask(HypercubeForRegistration, Wavelengths_list, 
+                                                                                                            Verbose=False, Transform='BSplineTransform', 
+                                                                                                            Affine=False, Blurring=True, Sigma=Sigma, 
+                                                                                                            Static_Index=index, 
+                                                                                                            EdgeMask=EdgeMask, #AllReflectionsMasks=AllReflectionsMasks, 
+                                                                                                            GradientMagnitude=False, HistogramMatch=False, 
+                                                                                                            IntensityNorm=False, Cropping=60,
+                                                                                                            TwoStage=True, Metric='AdvancedMattesMutualInformation', 
+                                                                                                            GridSpacing=GridSpacing, MinVal=20, 
+                                                                                                            InteractiveMasks=InteractiveMasks)
+
+```
+
+Then save results:
+```python
+NMI_Sweep_before = HySE.GetNMI(HypercubeForRegistration)
+NMI_Sweep_after = HySE.GetNMI(CoregisteredHypercube)
+print(f'Average NMI before : {NMI_Sweep_before[0]:.4f}, Average NMI after : {NMI_Sweep_after[0]:.4f}')
+
+VideoSavingPath = f'{RegistrationSavingPath}Sweep{Nsweep}_Frame{Nframe}_{Info}_NMI{NMI_Sweep_after[0]:.2f}.mp4'
+
+
+## Not CoRegistered
+OrigVideoSavingPath = f'{RegistrationSavingPath}Sweep{Nsweep}_Frame{Nframe}_NoReg.mp4'
+HySE.MakeHypercubeVideo(HypercubeForRegistration, OrigVideoSavingPath)
+OrigArraySavingPath = OrigVideoSavingPath.replace('mp4', 'npz')
+np.savez(f'{OrigArraySavingPath}', HypercubeForRegistration)
+
+## Whole image
+HySE.MakeHypercubeVideo(CoregisteredHypercube, VideoSavingPath, Normalise=True)
+ArraySavingPath = VideoSavingPath.replace('.mp4','.npz')
+np.savez(f'{ArraySavingPath}', CoregisteredHypercube)
+## Masked
+VideoSavingPathMasked = VideoSavingPath.replace('.mp4','_Masked.mp4')
+HySE.MakeHypercubeVideo(CoregisteredHypercube, VideoSavingPathMasked, Mask=CombinedMask, Normalise=True)
+
+# ## Masked
+# VideoSavingPathMasked = VideoSavingPath.replace('.mp4','_Masked.mp4')
+# HySE.MakeHypercubeVideo(CoregisteredHypercube, VideoSavingPathMasked, Mask=CombinedMask, Normalise=True)
+## Mask
+MaskSavingPath = VideoSavingPath.replace('.mp4','_Mask.npz')
+np.savez(f'{MaskSavingPath}', CombinedMask)
+
+## Transforms
+TransformsSavingPath = VideoSavingPath.replace('.mp4','_Transforms')
+HySE.SaveTransforms(AllTransforms, TransformsSavingPath)
+
+# Wavelengths
+WavelengthsSavingPath_Sorted = VideoSavingPath.replace('.mp4','__SortedWavelengths.npz') # f'{SavingPath}{Name}_{NameSub}__SortedWavelengths.npz'
+WavelengthsSavingPath_Unsorted = VideoSavingPath.replace('.mp4','__UnsortedWavelengths.npz') #f'{SavingPath}{Name}_{NameSub}__UnsortedWavelengths.npz'
+np.savez(f'{WavelengthsSavingPath_Sorted}', Wavelengths_list_sorted)
+np.savez(f'{WavelengthsSavingPath_Unsorted}', Wavelengths_list)
+
+if Manual:
+    PointsSavingPath = VideoSavingPath.replace('.mp4','_UserDefinedPoints.npz')
+    np.savez(f'{PointsSavingPath}', AllPoints, allow_pickle=True)
+elif UserDefinedROI:
+    ROISavingPath = VideoSavingPath.replace('.mp4','_UserDefinedROI')
+    HySE.SaveTransforms(AllROICoordinates, ROISavingPath)
+
+print(f'\n\n Saved all data')
+
+```
+
+
+#### Automatic Registration
+Using SimpleITK, mutual information (metric). Does not always work very well. Can be applied after a quick manual registration.
+Most implementations do first an affine transform, followed by a bspline transform. The GridSpacing paramter allows to set the unit size for the bspline transform. Too large grids do not allow to register finely enough (looks more like affine), while too small grids overfit the data/noise and introduces artefacts and distortions.
+
+```python
+# ## --- If going straight to the automatic registration: ---
+# HypercubeForRegistration_Auto = HypercubeForRegistration
+
+## OR
+## --- If applying automatic registration after having done a manual pre-registration: ---
+
+# HypercubeForRegistration_Auto = CoregisteredHypercube
+
+## OR
+## --- If Loading a previously pre-registered hypercube from path: ---
+
+# ## Lesion2:
+# TEMP = '/Users/iracicot/Library/CloudStorage/OneDrive-UniversityofCambridge/Data/HySE/Patient7_20251125/Results/'
+# HypercubeForRegistration_Auto_Path = TEMP+'Lesion2_Registered/Manual_AllFeatures/Sweep3_Frame1_Blurring1_ManualRegistration_45points_Provided_NMI1.23.npz'
+# HypercubeForRegistration_Auto = np.load(HypercubeForRegistration_Auto_Path)['arr_0']
+# print(HypercubeForRegistration_Auto.shape)
+
+
+# ## # If Averaging
+# HypercubeForRegistration_Avg, _ = HySE.ComputeHypercube(DataPath, EdgePos_Data, Wavelengths_list, Buffer=Buffer, 
+#                                                     Average=False, Order=False, Help=False, SaveFig=False, SaveArray=False, 
+#                                                     Plot=False, ForCoRegistration=False)
+# HypercubeForRegistration_Auto = HypercubeForRegistration_Avg[Nsweep,:,:,:]
+
+
+
+Cropping = 100
+Sigma = 1
+
+index = 5
+
+GridSpacing = 60
+
+MinVal = 0 
+
+
+#### Register:
+
+CoregisteredHypercube_Auto, AllTransforms, CombinedMask, AllROICoordinates = HySE.CoRegisterHypercubeAndMask(HypercubeForRegistration_Auto, Wavelengths_list, 
+                                                                                                        Verbose=False, Transform='BSplineTransform', 
+                                                                                                        Cropping=Cropping,
+                                                                                                        Affine=False, Blurring=True, 
+                                                                                                        Sigma=Sigma, EdgeMask=EdgeMask,
+                                                                                                        StaticIndex=index, GradientMagnitude=False, 
+                                                                                                        HistogramMatch=False, IntensityNorm=False,
+                                                                                                        TwoStage=True, Metric='AdvancedMattesMutualInformation', 
+                                                                                                        GridSpacing=GridSpacing, MinVal=MinVal) 
+
+Info = f'f{Nframe}_Blur{Sigma}_Grid{GridSpacing}_i{index}_RegisterAndMask'
+
+
+
+# ####################################
+# #### Compute NMI and save results:
+# ####################################
+
+
+NMI_Sweep_before = HySE.GetNMI(HypercubeForRegistration_Auto)
+NMI_Sweep_after = HySE.GetNMI(CoregisteredHypercube_Auto)
+
+print(f'Average NMI before : {NMI_Sweep_before[0]:.4f}, Average NMI after : {NMI_Sweep_after[0]:.4f}')
+
+
+
+# print(f'\n\n')
+
+
+VideoSavingPath = f'{RegistrationSavingPath}Sweep{Nsweep}_Frame{Nframe}_{Info}_NMI{NMI_Sweep_after[0]:.2f}.mp4'
+
+## Not CoRegistered
+OrigVideoSavingPath = f'{RegistrationSavingPath}Sweep{Nsweep}_Frame{Nframe}_NoReg.mp4'
+HySE.MakeHypercubeVideo(HypercubeForRegistration_Auto, OrigVideoSavingPath)
+OrigArraySavingPath = OrigVideoSavingPath.replace('mp4', 'npz')
+np.savez(f'{OrigArraySavingPath}', HypercubeForRegistration_Auto)
+
+## Whole image
+HySE.MakeHypercubeVideo(CoregisteredHypercube_Auto, VideoSavingPath, Normalise=True)
+ArraySavingPath = VideoSavingPath.replace('.mp4','.npz')
+np.savez(f'{ArraySavingPath}', CoregisteredHypercube_Auto)
+## Masked
+VideoSavingPathMasked = VideoSavingPath.replace('.mp4','_Masked.mp4')
+HySE.MakeHypercubeVideo(CoregisteredHypercube_Auto, VideoSavingPathMasked, Mask=CombinedMask, Normalise=True)
+
+
+
+# ## Cropped image
+# VideoSavingPathCropped = VideoSavingPath.replace('.mp4','_Cropped.mp4')
+# HySE.MakeHypercubeVideo(CoregisteredHypercube_Auto[:,Cropping:-1*Cropping,Cropping:-1*Cropping], VideoSavingPathCropped, Normalise=True)
+
+
+# Wavelengths
+WavelengthsSavingPath_Sorted = VideoSavingPath.replace('.mp4','__SortedWavelengths.npz') # f'{SavingPath}{Name}_{NameSub}__SortedWavelengths.npz'
+WavelengthsSavingPath_Unsorted = VideoSavingPath.replace('.mp4','__UnsortedWavelengths.npz') #f'{SavingPath}{Name}_{NameSub}__UnsortedWavelengths.npz'
+np.savez(f'{WavelengthsSavingPath_Sorted}', Wavelengths_list_sorted)
+np.savez(f'{WavelengthsSavingPath_Unsorted}', Wavelengths_list)
+
+
+## Transforms
+TransformsSavingPath = VideoSavingPath.replace('.mp4','_Transforms')
+HySE.SaveTransforms(AllTransforms, TransformsSavingPath)
+
+## Mask
+MaskSavingPath = VideoSavingPath.replace('.mp4','_Mask.npz')
+np.savez(f'{MaskSavingPath}', CombinedMask)
+print(f'Saved all data')
+
+
+```
+
+
 
 ### Dark
 Use a video of dark frames to calculate the dark.
