@@ -60,9 +60,9 @@ def FindHypercube_RGB(DataPath, **kwargs):
 	
 	"""
 
-
 	## Check if user wants list of optional parameters
 	Help = kwargs.get('Help', False)
+	ReturnPeaks = kwargs.get("ReturnPeaks",False)
 	if Help:
 		print(inspect.getdoc(FindHypercube_RGB))
 		if ReturnPeaks:
@@ -743,7 +743,7 @@ def FindPeaks(trace, **kwargs):
 			  
 			  Expects:
 				window_length = integer (factor 3)
-				polyorder = interger (<window_length)
+				polyorder = integer (<window_length)
 				peak_height = float
 				peak_distance = integer
 				PlotGradient = True/False
