@@ -106,6 +106,9 @@ The following parameters are set for the current implementation. The automatic e
 ```python
 EdgePos_Data = HySE.FindHypercube_RGB(DataPath, Automatic=True, PlateauSize=9, DarkMin=12, MaxPlateauSize=20, SaveFig=False)
 ```
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/7fd87cd3-ab97-457a-9f21-80580b51f00e" width="800"/>
+</p>
 
 ### Extract Frames
 This uses the edge positions found with the trace to extract usable frames. 
@@ -402,180 +405,102 @@ MaskSavingPath = VideoSavingPath.replace('.mp4','_Mask.npz')
 np.savez(f'{MaskSavingPath}', CombinedMask)
 print(f'Saved all data')
 
-
 ```
 
 
 
-### Dark
-Use a video of dark frames to calculate the dark.
+## Unmixing
+
+### Define Wavelengths and Mixing Matrices:
 
 ```python
-LongDark = HySE.GetDark_WholeVideo(DarkPath) #, CropImDimensions=CropImDimensions
-HySE.PlotDark(LongDark)
-```
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/372215d3-dd7f-4275-864d-54b38a1339c5" width="400"/>
-</p>
+## 3 wav split hybrid, wavelengths 1:
+##                     0.   1.   2.   3.   4.   5.   6.   7
+Panel2_Wavelengths = [625, 606, 584, 560, 543, 511, 486, 418]
+Panel4_Wavelengths = [646, 617, 594, 576, 569, 526, 503, 478]
 
 
-### Trace
+indices_4x4 = [1,4,5,6]
+indices_3x3 = [0,2,3]
+indices_6x6 = [0,1,2,3,4,5,6]
+index_418 = 7
 
-Identify sweeps by plotting the trace to find at which frames each one starts. Updated to keep RGB chanels distinct.
+Green_Exposure = 6.5
+Blue_Exposure = 7
+Red_Exposure = 1.6
 
-```python
-## Start with:
-StartFrames = []
-## And then populate the position of the first green frame for each sweep:
-StartFrames = [160, 334, 508, 683]
 
-EdgePos_Data = HySE.FindHypercube_RGB(DataPath, PlateauSize=9, StartFrames=StartFrames, SaveFig=False, MaxPlateauSize=20, fps=60)
-```
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/7fd87cd3-ab97-457a-9f21-80580b51f00e" width="800"/>
-</p>
-### Extract Frames
-Knowing where each sweep is, we can now extract the right frames for each plateau (and remove buffer frames)
-```python
-Buffer = 3
-Frames, RGB_Dark = HySE.ComputeHypercube_RGB(DataPath, EdgePos_Data, Buffer=Buffer, BlueShift=1, SaveArray=False)
-```
+Green_3Wav_1 = [[4, 5, 6],
+                [1, 4, 6],
+                [1, 5, 6],
+                [1, 4, 5],
+                [4, 5, 6, 7],
+                [2, 3],
+                [0, 3],
+                [0, 2]]
 
-### Dark Subtraction
-Subtract dark from all frames
-```python
-(Nsweeps, Nwav, Nframes, Y, X, _) = Frames.shape
+MixingMatrix_Indices = Green_3Wav_1
 
-## BGR 
-Frames_Blue = Frames[:,:,:,:,:,0]
-Frames_Green = Frames[:,:,:,:,:,1]
-Frames_Red = Frames[:,:,:,:,:,2]
+print(f'Computing 6x6, 4x4 and 3x3 green matrices...')
+GreenMatrix_6x6_Indices, GreenMatrix_4x4_Indices, GreenMatrix_3x3_Indices = HySE.GetShortGreenMatrices_3Wav(MixingMatrix_Indices, index_418=index_418, 
+                                                                                indices_4x4=indices_4x4, indices_3x3=indices_3x3)
+print(f'Computing blue matrix..')
+BlueMatrix_Indices = HySE.GetBlueMatrix_3Wav(MixingMatrix_Indices, index_418=index_418)
 
-# NormaliseMixedHypercube
-Frames_BlueD, MaskB = HySE.NormaliseMixedHypercube(Frames_Blue, Dark=LongDark, SaveFigure=False, Plot=False)
-Frames_GreenD, MaskG = HySE.NormaliseMixedHypercube(Frames_Green, Dark=LongDark, SaveFigure=False, Plot=False)
-Frames_RedD, MaskR = HySE.NormaliseMixedHypercube(Frames_Red, Dark=LongDark, SaveFigure=False, Plot=False)
-```
+Wavelengths_list = np.array(Panel2_Wavelengths+Panel4_Wavelengths)
+Wavelengths_list_sorted = np.sort(Wavelengths_list)
 
-### Average over all Frames
-For all sweeps, all frames. Or select a single sweep, or only one frame.
-```python
-### JUST GREEN
-FramesCombined_Green = Frames_GreenD_avg
-FramesCombined_Blue = Frames_BlueD_avg
-FramesCombined_Red = Frames_RedD_avg
+print(f'computing short pannels...')
+Wavs_6x6_P2, Wavs_6x6_P4, Wavs_4x4_P2, Wavs_4x4_P4, Wavs_3x3_P2, Wavs_3x3_P4 = HySE.GetShortPanelWavs_3Wav(Panel2_Wavelengths, Panel4_Wavelengths, 
+                                                                                                      indices_4x4, indices_3x3, index_418)
 
-# ### OR JUST GREEN & Individual Sweeps
-NSweep = 2
-FramesCombined_Green = Frames_GreenD_avg[NSweep,:,:,:]
-FramesCombined_Blue = Frames_BlueD_avg[NSweep,:,:,:]
-FramesCombined_Reference = Frames_RedD_avg[NSweep,:,:,:]
+Wavs_6x6 = np.sort(np.array(Wavs_6x6_P2+Wavs_6x6_P4))
+
+Wavs_4x4 = np.sort(np.array(Wavs_4x4_P2+Wavs_4x4_P4))
+Wavs_3x3 = np.sort(np.array(Wavs_3x3_P2+Wavs_3x3_P4))
+
 ```
 
-### Normalisation
-<details>
-<summary>⚠️ Outdated section (click to expand)</summary>
-
-N.B.: This section needs updating to incorporate using the reference channel for spatial normalisation. The names used in this section might not reflect those earlier/later in this file. Normalisation can be skipped.
-
-The data now needs to be normalised. Several options are possible, all through the same function 'HySE.NormaliseMixedHypercube'. 
-Optional arguments allow to control what normalisation is done:
-* When 'Dark' is specified, the function with subtract the dark frame input
-* When WhiteCalibration is specified, the function with normalise (divide) each frame by the equivalent white calibration frame.
-
-The function also estimates a mask, from the white calibration when possible and from the data otherwise, that masks the dark corners from the endoscopic data.
-
-Depending on the selected normalisation, sometimes the automatic plotting range is inadequate. The 'vmax' option allows to manually adjust the upper scale.
-
-
+### Build Mixing Matrices
+Note that this example builds all the mixing matrices possible for the Green channel.
 ```python
-##The General function for normalising the data is the following:
-Hypercube_MacbethHySE_avg_ND, Mask_avg = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=False, SavingPath=SavingPath+Name,)
-Hypercube_MacbethHySE_avg_N, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=True, SavingPath=SavingPath+Name)
-Hypercube_MacbethHySE_avg_D, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_avg, Dark=LongDark, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=False, SavingPath=SavingPath+Name, vmax=80)
-```
+print(f'Green Mixing Matrix')
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/eb7f9bdb-0ee8-4985-a2ab-d9e3f19d4f36" width="500"/>
-</p>
-
-
-```python
-## Using the non averaged dataset:
-Hypercube_MacbethHySE_all_ND, Mask_all = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all, Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=False, SavingPath=SavingPath+Name)
-## Or a single individual sweep:
-Hypercube_MacbethHySE_1_ND, _ = HySE.NormaliseMixedHypercube(Hypercube_MacbethHySE_all[0,:,:,:], Dark=LongDark, WhiteCalibration=Hypercube_WhiteHySE, Wavelengths_list=Wavelengths_list,
-                                                           SaveFigure=True, SavingPath=SavingPath+Name)
-
-```
-</details>
-  
-### Mask
-Only really important if doing co-registration
-```python
-_, Mask = HySE.NormaliseMixedHypercube(Frames_GreenD[0,:,0,:,:], Dark=LongDark, Wavelengths_list=Wavelengths_list, 
-                                       SaveFigure=False, SavingPath=SavingPath+Name, vmax=160, Plot=False)
-
-EdgeMask = HySE.GetBestEdgeMask(Mask)
-```
-
-### Mixing Matrices
-First define mixing matrices.
-The hybrid mixing method involves several matrices. Currently not everything is automated, and some submatrices need to be input manually. Further updates should address this issue.
-
-```python
-
-### Blue Matrix full 16x16
-Title = 'Blue Matrix - '+Name
-BlueMatrix = HySE.MakeMixingMatrix_Flexible(Panel2_Wavelengths, BlueMatrix_Indices, 
-                                         Panel4_Wavelengths, BlueMatrix_Indices, 
-                                         SaveFig=False, Title=Title, SavingPath=f'{SavingPath}Blue_MixingMatrix_{Name}.png')
-
-cond_number = np.linalg.cond(BlueMatrix)
-print("Condition number:", cond_number)
-```
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/49fd5867-b39b-40b0-8cfc-38f39294e873" width="500"/>
-</p>
-
-```python
-### Green Matrix full 16x16
-Title = 'Green Matrix - '+Name
+Title = 'Green Matrix'
 GreenMatrix_7x7 = HySE.MakeMixingMatrix_Flexible(Panel2_Wavelengths, MixingMatrix_Indices, 
-                                         Panel4_Wavelengths, MixingMatrix_Indices, 
-                                         SaveFig=False, Title=Title, SavingPath=f'{SavingPath}Green_MixingMatrix_{Name}.png')
+                                         Panel4_Wavelengths, MixingMatrix_Indices, Plot=False,
+                                         SaveFig=False, Title=Title, SavingPath='')
 
 cond_number = np.linalg.cond(GreenMatrix_7x7)
-print("Condition number:", cond_number)
+print("   Condition number:", cond_number)
 
-```
+#####################
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/6b4f70ad-33ce-4103-be13-c6dd77184728" width="500"/>
-</p>
+print(f'Green short Mixing Matrix')
+Title = 'Green Matrix 6x6'
 
-```python
-### Short green Matrix 14x14 (remove frames with weak wavelengths)
-print(f'GREEN SHORT MIXING MATRIX')
-Title = 'Green Matrix 6x6 - '+Name
-
-GreenMatrix_6x6_sub_Indices = generate_local_index_matrix(GreenMatrix_6x6_Indices, indices_6x6)
-
+GreenMatrix_6x6_sub_Indices = HySE.generate_local_index_matrix(GreenMatrix_6x6_Indices, indices_6x6)
 
 GreenMatrix_6x6 = HySE.MakeMixingMatrix_Flexible(Wavs_6x6_P2, GreenMatrix_6x6_sub_Indices, 
-                                         Wavs_6x6_P4, GreenMatrix_6x6_sub_Indices, 
-                                         SaveFig=False, Title=Title, SavingPath=f'{SavingPath}GreenMatrix_6x6_{Name}.png')
+                                         Wavs_6x6_P4, GreenMatrix_6x6_sub_Indices, Plot=False,
+                                         SaveFig=False, Title=Title, SavingPath='')
 
 cond_number = np.linalg.cond(GreenMatrix_6x6)
-print("Condition number:", cond_number)
+print("   Condition number:", cond_number)
 
+#####################
 
-### Sub green mixing matrices (7x7)
+print(f'Blue Mixing Matrix')
+Title = 'Blue Matrix'
+BlueMatrix = HySE.MakeMixingMatrix_Flexible(Panel2_Wavelengths, BlueMatrix_Indices, 
+                                         Panel4_Wavelengths, BlueMatrix_Indices, Plot=False,
+                                         SaveFig=False, Title=Title, SavingPath='')
+
+cond_number = np.linalg.cond(BlueMatrix)
+print("   Condition number:", cond_number)
+
+#####################
+
 MixingMatrix_Sub1 = np.array([[1,1,1,0,0,0,0],
                               [1,0,1,0,0,1,0], 
                               [1,1,0,0,0,1,0], 
@@ -588,15 +513,15 @@ MixingMatrix_Sub2 = MixingMatrix_Sub1
 
 Wavelengths_Sub1 = np.array([486,511,543,560,584,606,625])
 Wavelengths_Sub2 = np.array([503,526,569,576,594,617,646])
+
+
+Sub1_indices = [6,5,4,3,2,1,0]
+Sub2_indices = [14,13,12,11,10,9,8]
+
 Sub1_indices_frames = [0,1,2,3,5,6,7]
 Sub2_indices_frames = [8,9,10,11,13,14,15]
 
-Title='Green SubMatrices'
-
-HySE.PlotMixingMatrix(MixingMatrix_Sub1, Wavelengths_Sub1, Title, '')
-
-
-### Sub Sub green mixing matrices (3x3 and 4x4)
+#####################
 
 MixingMatrix_SubSub1A = np.array([[1,1,1,0],
                                   [1,0,1,1],
@@ -620,38 +545,99 @@ SubSub1B_indices_frames = [5,6,7]
 SubSub2A_indices_frames = [8,9,10,11]
 SubSub2B_indices_frames = [13,14,15]
 
-Title='Green SubSubMatrix1A'
-PlotMixingMatrix(MixingMatrix_SubSub1A, MixingMatrix_SubSub1A, Title, '')
-
-Title='Green SubSubMatrix1B'
-PlotMixingMatrix(MixingMatrix_SubSub1B, MixingMatrix_SubSub1B, Title, '')
-
 ```
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/49fd5867-b39b-40b0-8cfc-38f39294e873" width="500"/>
+</p>
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/650e1403-c03a-44b0-9424-341d801b709a" width="850"/>
 </p>
 
-### Unmixing
-First select the appropriate frames to unmix each subset of the dataset:
+
+
+### Locate Data
+
 ```python
-## If we only have indices only for 8x8 logic (instead of the full 16x16
-## Use the omit_frames() function with propagates to the rest of the dataset
-Frames_6x6 = HySE.omit_frames(FramesCombined_Green_N, indices_6x6)
+GeneralPath = '/GENERAL_PATH/'
 
-## If indices are input manually for the whole dateset, use them directly
-## Working with only the larger submatrices (empirically: better results)
-Frames_Sub1 = FramesCombined_Green_N[Sub1_indices_frames]
-Frames_Sub2 = FramesCombined_Green_N[Sub2_indices_frames]
+DataPath_General = GeneralPath+'Videos/'
+DarkPath = DataPath_General+'2025-11-25_08-25-28_Dark.mp4'
 
-## Or working with the smallest submatrices (empirically: worse results)
-Frames_SubSub1A = FramesCombined_Green_N[SubSub1A_indices_frames]
-Frames_SubSub1B = FramesCombined_Green_N[SubSub1B_indices_frames]
-Frames_SubSub2A = FramesCombined_Green_N[SubSub2A_indices_frames]
-Frames_SubSub2B = FramesCombined_Green_N[SubSub2B_indices_frames]
+
+## Lesion
+DataPath = DataPath_General+'Lesion.mp4'
+Name = 'Lesion'
+
+TransformsPath = GeneralPath+'Results/Lesion1_Registered/'
+Nsweep = 3
+Nframe = 1
+RegisteredName = f'Sweep{Nsweep}f{Nframe}_Manual'
+
 ```
 
-Then unmixing can be done. 
+### Import Transforms, Dark and Trace
+
+```python
+Transforms = HySE.LoadTransforms(TransformsPath)
+print(len(Transforms))
+LongDark = HySE.GetDark_WholeVideo(DarkPath) #, CropImDimensions=CropImDimensions
+EdgePos_Data = HySE.FindHypercube_RGB(DataPath, Automatic=True, PlateauSize=9, DarkMin=12, MaxPlateauSize=20, SaveFig=False)
+```
+
+
+### Extract Frames and Subtract Dark
+```python
+Buffer = 3
+Frames, RGB_Dark = HySE.ComputeHypercube_RGB(DataPath, EdgePos_Data, Buffer=Buffer, BlueShift=1, SaveArray=False)
+
+## Data
+
+(Nsweeps, Nwav, Nframes, Y, X, _) = Frames.shape
+
+## BGR 
+Frames_Blue = Frames[:,:,:,:,:,0]
+Frames_Green = Frames[:,:,:,:,:,1]
+Frames_Red = Frames[:,:,:,:,:,2]
+
+# NormaliseMixedHypercube
+Frames_BlueD, MaskB = HySE.NormaliseMixedHypercube(Frames_Blue, Dark=LongDark, SaveFigure=False, Plot=False)
+Frames_GreenD, MaskG = HySE.NormaliseMixedHypercube(Frames_Green, Dark=LongDark, SaveFigure=False, Plot=False)
+Frames_RedD, MaskR = HySE.NormaliseMixedHypercube(Frames_Red, Dark=LongDark, SaveFigure=False, Plot=False)
+
+print(Frames_GreenD.shape)
+
+```
+
+### Apply Transforms to Data
+The transforms are determined using the red frames, which are all obtained using the same illumination.
+The data frames are in the green and blue channels. It is assumed that the movement between RGB frames is minimal, so that transforms from the red frames is applicable to equivalement GB frames.
+```python
+print(f'Taking a subset of normalised frames for sweep {Nsweep}, frame {Nframe}')
+Frames_GreenD_Sub = Frames_GreenD[Nsweep, :, Nframe, :, :]
+Frames_BlueD_Sub = Frames_BlueD[Nsweep, :, Nframe, :, :]
+
+RegFrames_GreenD_Sub = HySE.ApplyTransform(Frames_GreenD_Sub, Transforms)
+RegFrames_BlueD_Sub = HySE.ApplyTransform(Frames_BlueD_Sub, Transforms)
+```
+
+### Select Approprite frames to unmix in smaller chunks
+Only possible for the green channel
+```python
+## Green
+FramesG_6x6 = HySE.omit_frames(RegFrames_GreenD_Sub, indices_6x6)
+
+FramesG_Sub1 = RegFrames_GreenD_Sub[Sub1_indices_frames]
+FramesG_Sub2 = RegFrames_GreenD_Sub[Sub2_indices_frames]
+
+FramesG_SubSub1A = RegFrames_GreenD_Sub[SubSub1A_indices_frames]
+FramesG_SubSub1B = RegFrames_GreenD_Sub[SubSub1B_indices_frames]
+FramesG_SubSub2A = RegFrames_GreenD_Sub[SubSub2A_indices_frames]
+FramesG_SubSub2B = RegFrames_GreenD_Sub[SubSub2B_indices_frames]
+```
+
+### Unmix
+Note that these steps do all the possible ways the data can be unmixed. It can be shorten significantly by only doing one kind of unmixing (one for the blue channel, one for the green channel)
 There are 3 functions in this package that can be used for umxing:
 - UnmixData(): Basic matrix inversion using least squares
 - UnmixDataNNLS(): Matrix inversition using non-negative least squares (NNLS), with noise filtering and rejection of pixels with negative or invalid intensity
@@ -660,74 +646,78 @@ There are 3 functions in this package that can be used for umxing:
 
 The UnmixDataSmoothNNLS() function generally leads to the best results, with low lambda (~0.1)
 ```python
+lambda_value = 0.1
+
 
 ## Blue Matrix
 t0 = time.time()
-Unmixed_Blue = HySE.UnmixDataSmoothNNLS(FramesCombined_Blue_N, BlueMatrix, lambda_smooth=0.1)
+Unmixed_Blue = HySE.UnmixDataSmoothNNLS(RegFrames_BlueD_Sub, BlueMatrix, lambda_smooth=lambda_value)
 t1 = time.time()
 print(f'\nFull Blue - Smooth NNLS unmixing took {t1-t0:.0f}s')
 
-## Green Matrix
+
 
 ## Green Matrix, all frames:
 t0 = time.time()
-Unmixed_Green_7x7 = HySE.UnmixDataSmoothNNLS(FramesCombined_Green_N, GreenMatrix_7x7, lambda_smooth=0.1)
+Unmixed_Green_7x7 = HySE.UnmixDataSmoothNNLS(RegFrames_GreenD_Sub, GreenMatrix_7x7, lambda_smooth=lambda_value)
 t1 = time.time()
 print(f'Full Green - Smooth NNLS unmixing took {t1-t0:.0f}s')
 
 ## Green Matrix, 6x6:
 t0 = time.time()
-Unmixed_Green_6x6 = HySE.UnmixDataSmoothNNLS(Frames_6x6, GreenMatrix_6x6, lambda_smooth=0.1)
+Unmixed_Green_6x6 = HySE.UnmixDataSmoothNNLS(FramesG_6x6, GreenMatrix_6x6, lambda_smooth=lambda_value)
 t1 = time.time()
 print(f'Green 6x6 - Smooth NNLS unmixing took {t1-t0:.0f}s')
 
 
 ## Green Matrix, Sub1:
 t0 = time.time()
-Unmixed_Green_Sub1 = HySE.UnmixDataSmoothNNLS(Frames_Sub1, MixingMatrix_Sub1, lambda_smooth=0.1)
+Unmixed_Green_Sub1 = HySE.UnmixDataSmoothNNLS(FramesG_Sub1, MixingMatrix_Sub1, lambda_smooth=lambda_value)
 t1 = time.time()
 print(f'Green Sub1 - Smooth NNLS unmixing took {t1-t0:.0f}s')
 
 ## Green Matrix, Sub2:
 t0 = time.time()
-Unmixed_Green_Sub2 = HySE.UnmixDataSmoothNNLS(Frames_Sub2, MixingMatrix_Sub2, lambda_smooth=0.1)
+Unmixed_Green_Sub2 = HySE.UnmixDataSmoothNNLS(FramesG_Sub2, MixingMatrix_Sub2, lambda_smooth=lambda_value)
 t1 = time.time()
 print(f'Green Sub2 - Smooth NNLS unmixing took {t1-t0:.0f}s')
 
 ## Green Matrix, SubSub1A:
 t0 = time.time()
-Unmixed_Green_SubSub1A = HySE.UnmixDataSmoothNNLS(Frames_SubSub1A, MixingMatrix_SubSub1A, lambda_smooth=0.1)
+Unmixed_Green_SubSub1A = HySE.UnmixDataSmoothNNLS(FramesG_SubSub1A, MixingMatrix_SubSub1A, lambda_smooth=lambda_value)
 t1 = time.time()
 print(f'Green SubSub1A - Smooth NNLS unmixing took {t1-t0:.0f}s')
 
 ## Green Matrix, SubSub1B:
 t0 = time.time()
-Unmixed_Green_SubSub1B = HySE.UnmixDataSmoothNNLS(Frames_SubSub1B, MixingMatrix_SubSub1B, lambda_smooth=0.1)
+Unmixed_Green_SubSub1B = HySE.UnmixDataSmoothNNLS(FramesG_SubSub1B, MixingMatrix_SubSub1B, lambda_smooth=lambda_value)
 t1 = time.time()
 print(f'Green SubSub1B - Smooth NNLS unmixing took {t1-t0:.0f}s')
 
 ## Green Matrix, SubSub2A:
 t0 = time.time()
-Unmixed_Green_SubSub2A = HySE.UnmixDataSmoothNNLS(Frames_SubSub2A, MixingMatrix_SubSub2A, lambda_smooth=0.1)
+Unmixed_Green_SubSub2A = HySE.UnmixDataSmoothNNLS(FramesG_SubSub2A, MixingMatrix_SubSub2A, lambda_smooth=lambda_value)
 t1 = time.time()
 print(f'Green SubSub2A - Smooth NNLS unmixing took {t1-t0:.0f}s')
 
 ## Green Matrix, SubSub2B:
 t0 = time.time()
-Unmixed_Green_SubSub2B = HySE.UnmixDataSmoothNNLS(Frames_SubSub2B, MixingMatrix_SubSub2B, lambda_smooth=0.1)
+Unmixed_Green_SubSub2B = HySE.UnmixDataSmoothNNLS(FramesG_SubSub2B, MixingMatrix_SubSub2B, lambda_smooth=lambda_value)
 t1 = time.time()
 print(f'Green SubSub2B - Smooth NNLS unmixing took {t1-t0:.0f}s')
 
+# print(f'All the unmixing took {t1-t0:.0f}s')
 ```
 
-The results obtained from the submatrices need to be recombined so that a full spectra is obtained:
-
+### Recombine frames that were unmixed separatly (Green)
 ```python
-# Larger submatrices:
+## in two parts:
 Unmixed_GreenSub12_Combined, Wavs_Sub12_Combined = HySE.combine_hypercubes(Unmixed_Green_Sub1, Unmixed_Green_Sub2, 
                                                                            Wavelengths_Sub1, Wavelengths_Sub2)
 
-## Smaller submatrices:
+
+
+## in four parts:
 Unmixed_GreenSubSub1_Combined, Wavs_SubSub1_Combined = HySE.combine_hypercubes(Unmixed_Green_SubSub1A, Unmixed_Green_SubSub1B, 
                                                                                Wavelengths_SubSub1A, Wavelengths_SubSub1B)
 Unmixed_GreenSubSub2_Combined, Wavs_SubSub2_Combined = HySE.combine_hypercubes(Unmixed_Green_SubSub2A, Unmixed_Green_SubSub2B, 
@@ -735,44 +725,364 @@ Unmixed_GreenSubSub2_Combined, Wavs_SubSub2_Combined = HySE.combine_hypercubes(U
 
 Unmixed_GreenSubSubAll_Combined, Wavs_SubSubAll_Combined = HySE.combine_hypercubes(Unmixed_GreenSubSub1_Combined, Unmixed_GreenSubSub2_Combined, 
                                                                                    Wavs_SubSub1_Combined, Wavs_SubSub2_Combined)
-
 ```
 
-And save for future references/easier registration.
-
+### Save Results
 ```python
-print(f'Combined Wavelengths - Larger submatrices:')
-## Sanity check to make sure the combined wavelengths correspond to the right ones, ordered
-print(Wavs_Sub12_Combined) 
-np.savez(SavingPath+'HybridWav3_GreenCombined_Sub12.npz', Unmixed_GreenSub12_Combined)
-np.savez(SavingPath+'HybridWav3_GreenCombined_Sub12_wavelengths.npz', Wavs_Sub12_Combined)
+## Wavelengths (for GUI)
+np.savez(SavingPath+'wavelengths_sub.npz', Wavs_Sub12_Combined)
+np.savez(SavingPath+'wavelengths.npz', Wavelengths_list_sorted)
 
-print(f'Combined Wavelengths - Smaller submatrices:')
-print(Wavs_SubSubAll_Combined)
-np.savez(SavingPath+'HybridWav3_GreenCombined_SubSubAll.npz', Unmixed_GreenSubSubAll_Combined)
-np.savez(SavingPath+'HybridWav3_GreenCombined_SubSubAll_wavelengths.npz', Wavs_SubSubAll_Combined)
+## Blue
+np.savez(SavingPath+f'{Name}_{RegisteredName}_Umixed_Blue.npz', Unmixed_Blue)
 
+## Green
+np.savez(SavingPath+f'{Name}_{RegisteredName}_Umixed_Green_7x7.npz', Unmixed_Green_7x7)
+np.savez(SavingPath+'Umixed_Green_6x6.npz', Unmixed_Green_6x6)
 
+np.savez(SavingPath+f'{Name}_{RegisteredName}_Umixed_Green_Split2.npz', Unmixed_GreenSub12_Combined)
+np.savez(SavingPath+f'{Name}_{RegisteredName}_Umixed_Green_Split4.npz', Unmixed_GreenSubSubAll_Combined)
+
+HySE.MakeHypercubeVideo(Unmixed_Blue, SavingPath+f'{Name}_{RegisteredName}_Umixed_Blue.mp4', Normalise=True)
+HySE.MakeHypercubeVideo(RegFrames_BlueD_Sub, SavingPath+f'{Name}_{RegisteredName}_RegMixed_Blue.mp4', Normalise=True)
+HySE.MakeHypercubeVideo(Frames_BlueD_Sub, SavingPath+f'{Name}_{RegisteredName}_Raw_Blue.mp4', Normalise=True)
+
+HySE.MakeHypercubeVideo(Unmixed_GreenSub12_Combined, SavingPath+f'{Name}_{RegisteredName}_Umixed_Green_Split2.mp4', Normalise=True)
+HySE.MakeHypercubeVideo(RegFrames_GreenD_Sub, SavingPath+f'{Name}_{RegisteredName}_RegMixed_Green.mp4', Normalise=True)
+HySE.MakeHypercubeVideo(Frames_GreenD_Sub, SavingPath+f'{Name}_{RegisteredName}_Raw_Green.mp4', Normalise=True)
 ```
 
-We can plot this hypercube for visualisation:
+### For Visualisation:
+Save Hypercube Figures
 ```python
-HySE.PlotHypercube(Unmixed_Blue, Wavelengths=Wavelengths_list_sorted, SameScale=False, SavePlot=False, SavingPathWithName='')
-```
+# ## Blue
+# Unmixed_Blue
 
+# ## Green
+# Unmixed_Green_7x7
+# Unmixed_Green_6x6
+# Unmixed_GreenSub12_Combined
+# Unmixed_GreenSubSubAll_Combined
+
+# ## Wavelenghts
+# Wavs_Sub12_Combined
+# Wavelengths_list_sorted
+
+SavingPathWithName = f'{SavingPath}{Name}_{RegisteredName}_Hypercube_Green_Split4.png'
+HySE.PlotHypercube(Unmixed_GreenSubSubAll_Combined[:,90:900,45:995], Wavelengths=Wavs_Sub12_Combined, SameScale=False,# vmax=30,
+                   SavePlot=True, ShowPlot=False, SavingPathWithName=SavingPathWithName)
+
+SavingPathWithName = f'{SavingPath}{Name}_{RegisteredName}_Hypercube_Green_Split2.png'
+HySE.PlotHypercube(Unmixed_GreenSub12_Combined[:,90:900,45:995], Wavelengths=Wavs_Sub12_Combined, SameScale=False,# vmax=30,
+                   SavePlot=True, ShowPlot=False, SavingPathWithName=SavingPathWithName)
+
+SavingPathWithName = f'{SavingPath}{Name}_{RegisteredName}_Hypercube_Green_6x6.png'
+HySE.PlotHypercube(Unmixed_Green_6x6[:,90:900,45:995], Wavelengths=Wavs_Sub12_Combined, SameScale=False,# vmax=30,
+                   SavePlot=True, ShowPlot=False, SavingPathWithName=SavingPathWithName)
+
+SavingPathWithName = f'{SavingPath}{Name}_{RegisteredName}_Hypercube_Green_7x7.png'
+HySE.PlotHypercube(Unmixed_Green_7x7[:,90:900,45:995], Wavelengths=Wavelengths_list_sorted, SameScale=False,# vmax=30,
+                   SavePlot=True, ShowPlot=False, SavingPathWithName=SavingPathWithName)
+
+SavingPathWithName = f'{SavingPath}{Name}_{RegisteredName}_Hypercube_Blue.png'
+HySE.PlotHypercube(Unmixed_Blue[:,90:900,45:995], Wavelengths=Wavelengths_list_sorted, SameScale=False,# vmax=30,
+                   SavePlot=True, ShowPlot=False, SavingPathWithName=SavingPathWithName)
+```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/5a08ee78-a088-4881-aba4-c79da1dfaa03" width="550"/>
 </p>
 
-### Saving
-Don't forget to save the unmixed hypercubes! The functions may save figures, but you need to save the array itself.
-For example:
 
+## Visualisation
+
+### BiopsyPicker
+This GUI allows to draw ROIs where the user has determined the biopsies were taken.
+
+As with the other PyQT GUI, the correct matplotlib settings must be set:
+``` python
+%matplotlib qt
+```
+
+The registerd (but ideally not yet unmixed) hypercube must be loaded:
+``` python
+# Lesion
+GeneralPath = '/PATH_TO_DATA/'
+SavingPath = GeneralPath
+
+CoregisteredHypercube_Path = GeneralPath+'RegisteredLesion.npz'
+Name = 'Sweep3_Frame1'
+Wavelengths_Path = GeneralPath+'wavelengths.npz'
+
+CoregisteredHypercube = np.load(CoregisteredHypercube_Path)['arr_0']
+Wavelengths_list = np.load(Wavelengths_Path)['arr_0']
+```
+Before being fed to the function.
+Note that previously defined points can be loaded as arguments to this function for modifications.
+``` python
+ROI_coordinates, ROI_AvgSpectra, ROI_AllSpectra, preview_img = HySE.GetBiopsyLocations(CoregisteredHypercube)
+```
+Pressing "r" allowd to draw one ROI by clicking on the image. The ROI is set by closing the loop (clicking back on the first point). Double clicking on any ROI allows to modify it. Points can be modified by draging them somewhere else, removed by double-clicking on them, or added by double-clicking on the image. Pressing "e" exist the ROI modifying mode. 
+
+Once the window is closed, the ROI parameters are output the following way:
+ROI_coordinates: List of lenght N_rois. Each element is a 2D array of size [Npoints, 2] for the x and y coordinates
+ROI_AvgSpectra: List of lenght N_rois. Each element is the average spectral in the ROI (length Nwavelengths)
+ROI_AllSpectra: List of lenght N_rois. Each element is a 2D array of size [Npixels, Nwavelengths] containing the spectral for each pixel in the ROI
+preview_img: image of a frame with the ROIs overlapped. To be saved as a png image for quick reference. 
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/978406ad-5385-4458-8e22-ab2f0f2e7db8" width="550"/>
+</p>
+
+Save the results for future references:
 ```python
-np.savez(f'{SavingPath}{Name}_UnmixedHypercube_Blue.npz', Unmixed_Blue)
+plt.close()
+fig, ax = plt.subplots(1, 1, figsize=(6,4))
+ax.imshow(preview_img)
+ax.axis('off')
+ax.set_title('Identified ROIs', fontsize=14)
+plt.tight_layout()
+plt.savefig(f'{SavingPath}{Name}_ROIs_Preview.png')
+plt.show()
 
-## The Hypercube Visualiser GUI will also require a list of the wavelengths:
-np.savez(f'{SavingPath}{Name}_SortedWavelengths.npz', Wavelengths_list_sorted)
+
+ROIs = [
+    dict(
+        Coordinates=c,
+        AvgSpectra=a,
+        AllSpectra=s
+    )
+    for c, a, s in zip(ROI_coordinates, ROI_AvgSpectra, ROI_AllSpectra)
+]
+
+ROI_SavingPath = f'{SavingPath}{Name}_ROIs.npz'
+np.savez_compressed(ROI_SavingPath, ROIs=np.array(ROIs, dtype=object))
+```
+
+
+### Registration Visualisation
+Those functions allow to visualise the registration.
+
+Load the unregistered and registered hypercubes:
+```python
+# Lesion
+GeneralPath = '/GENERAL_PATH_LESION/'
+SavingPath = GeneralPath
+
+HypercubeForRegistration_Path = GeneralPath+'Sweep3_Frame1_NoReg.npz'
+CoregisteredHypercube_Path = GeneralPath+'Sweep3_Frame1_Blurring1_ManualRegistration_45points_Provided_NMI1.23.npz'
+Name = 'Sweep3_Frame1'
+
+RegisteredMask_Path = GeneralPath+'Sweep3_Frame1_Blurring1_ManualRegistration_45points_Provided_NMI1.23_Mask.npz'
+Wavelengths_Path = GeneralPath+'wavelengths.npz'
+
+HypercubeForRegistration = np.load(HypercubeForRegistration_Path)['arr_0']
+CoregisteredHypercube = np.load(CoregisteredHypercube_Path)['arr_0']
+RegisteredMask = np.load(RegisteredMask_Path)['arr_0']
+Wavelengths_list = np.load(Wavelengths_Path)['arr_0']
+
+```
+
+Specular reflections dominate the sobel (edge detection). They must be filtered out
+```python
+Unregistered = HypercubeForRegistration
+Registered = CoregisteredHypercube
+
+
+Unregistered_ = np.clip(Unregistered, 0, None)
+
+## Sweep 13:
+##.        0.   1.   2.   3.   4.   5   6.   7.     8.   9.   10.  11.  12.  13.  14.  15. 
+k_list = [4.0, 2.0, 2.0, 2.0, 3.0, 3.0, 2.0, 2.0,   2.0, 2.0, 2.0, 2.0, 3.0, 3.0, 2.0, 2.0]
+
+HypercubeForRegistration_Masked, AllReflectionsMasks = HySE.RemoveSpecularReflections(Unregistered_, k=k_list, FillValue=0, Buffer=4, MaxSize=2800)
+print(AllReflectionsMasks.shape)
+
+fs=11
+## Make sure reflections are masked appropriately
+# Indices = [0,5,14]
+Indices = [i for i in range(0,len(Wavelengths_list))]
+
+plt.close()
+fig, ax = plt.subplots(nrows=len(Indices), ncols=3, figsize=(10,2.5*len(Indices)))
+for i in range(0,len(Indices)):
+    u = Indices[i]
+    m, M = np.nanmin(Unregistered_[u,:,:]), np.nanmax(Unregistered_[u,:,:])
+    ax[i,0].imshow(Unregistered_[u,:,:], vmin=m, vmax=M, cmap='gray')
+    ax[i,0].set_title(f'Hypercube u={u}', fontsize=fs)
+    ax[i,1].imshow(HypercubeForRegistration_Masked[u,:,:], vmin=m, vmax=M, cmap='gray')
+    ax[i,1].set_title(f'Masked hypercube u={u} - k={k_list[u]}', fontsize=fs)
+    ax[i,2].imshow(AllReflectionsMasks[u,:,:])
+    ax[i,2].set_title(f'Mask u={u} - Sum = {np.sum(AllReflectionsMasks[u,:,:])}', fontsize=fs)
+    for j in range(0,3):
+        ax[i,j].set_axis_off()
+plt.tight_layout()
+plt.show()
+```
+
+This function plots just the edges
+```python
+
+ReflectionsMask = AllReflectionsMasks
+RegisteredMask = RegisteredMask
+
+## Lesion
+UnregCoords = [200,-45, 45,-45] ## ys,ye, xs,xe
+RegCoords = [200,-45, 45,-45]
+
+
+method = 'sobel'                   # sobel', 'canny', or 'raw_thresholded'.
+sobel_ksize = 3
+canny_sigma = 2.0                  # Sigma for Canny edge detection
+cap_intensity = 0.2                # Clips high-intensity features (0.0 to 1.0)
+raw_threshold = 0.4                # Threshold for 'raw_thresholded' -> Set everything below to 0
+nframe = 1                         # Context frame index
+mask_dilation_kernel = 10          # Size of dilation for reflection mask.
+denoise_sigma = 0                  # Pre-filtering strength.
+denoise_method = 'gaussian'          # 'gaussian' or 'median'.
+mask_inpaint_method = 'inpaint'    # 'zero_fill' or 'inpaint'.
+display_power_gamma = 2.0          # Power law (val^gamma) to darken background noise.
+min_gradient_threshold = 0.20      # Hard cutoff (0.0 to 1.0). Signals below this are set to 0.
+
+plt.close()
+plt.close()
+
+fig_unregistered, im_unregistered =  HySE.visualize_hypercube_movement(Unregistered[:,UnregCoords[0]:UnregCoords[1],UnregCoords[2]:UnregCoords[3]], 
+                                    method=method,
+                                    sobel_ksize=sobel_ksize, 
+                                    canny_sigma=canny_sigma,
+                                    cap_intensity=cap_intensity, 
+                                    raw_threshold=raw_threshold, 
+                                    reflection_mask=ReflectionsMask[:,UnregCoords[0]:UnregCoords[1],UnregCoords[2]:UnregCoords[3]], 
+                                    nframe=nframe, 
+                                    mask_dilation_kernel=mask_dilation_kernel, 
+                                    denoise_sigma=denoise_sigma, 
+                                    denoise_method=denoise_method,
+                                    mask_inpaint_method=mask_inpaint_method, 
+                                    display_power_gamma=display_power_gamma,
+                                    min_gradient_threshold=min_gradient_threshold)
+
+
+
+fig_registered, im_registered =  HySE.visualize_hypercube_movement(Registered[:,RegCoords[0]:RegCoords[1],RegCoords[2]:RegCoords[3]], 
+                                    method=method,
+                                    sobel_ksize=sobel_ksize,
+                                    canny_sigma=canny_sigma, 
+                                    cap_intensity=cap_intensity, 
+                                    raw_threshold=raw_threshold, 
+                                    reflection_mask=RegisteredMask[RegCoords[0]:RegCoords[1],RegCoords[2]:RegCoords[3]], 
+                                    nframe=nframe, 
+                                    mask_dilation_kernel=4, 
+                                    denoise_sigma=denoise_sigma, 
+                                    denoise_method=denoise_method,
+                                    mask_inpaint_method=mask_inpaint_method, 
+                                    display_power_gamma=display_power_gamma,
+                                    min_gradient_threshold=min_gradient_threshold)
+
+```
+```python
+plt.close()
+fig, ax = plt.subplots(1, 2, figsize=(12,4))
+
+ax[0].imshow(fig_unregistered)
+ax[0].axis('off')
+ax[0].set_title('Unregistered', fontsize=14)
+
+ax[1].imshow(fig_registered)
+ax[1].axis('off')
+ax[1].set_title('Registered', fontsize=14)
+
+plt.tight_layout()
+plt.savefig(f'{SavingPath}{Name}_RegistrationCommparison.png', transparent=True)
+plt.savefig(f'{SavingPath}{Name}_RegistrationCommparison.svg', transparent=True)
+plt.show()
+```
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/62a9f037-b6ed-4032-ad89-f6aff8c826b7" width="750"/>
+</p>
+
+While this function overlays the edges on top of a greyscale image of the lesion:
+```python
+
+method = 'sobel'                   # sobel', 'canny', or 'raw_thresholded'.
+sobel_ksize = 15
+canny_sigma = 2.0                  # Sigma for Canny edge detection
+cap_intensity = 0.005                # Clips high-intensity features (0.0 to 1.0)
+raw_threshold = 0.4                # Threshold for 'raw_thresholded' -> Set everything below to 0
+nframe = 1                         # Context frame index
+mask_dilation_kernel = 10          # Size of dilation for reflection mask.
+denoise_sigma = 0                  # Pre-filtering strength.
+denoise_method = 'gaussian'          # 'gaussian' or 'median'.
+mask_inpaint_method = 'inpaint'    # 'zero_fill' or 'inpaint'.
+min_gradient_threshold = 0.20      # Hard cutoff (0.0 to 1.0). Signals below this are set to 0.
+
+opacity_gain = 1.2
+
+plt.close()
+plt.close()
+
+overlay_unregistered =  HySE.visualize_edge_density_overlay(Unregistered[:,UnregCoords[0]:UnregCoords[1],UnregCoords[2]:UnregCoords[3]], 
+                                                       sobel_ksize=sobel_ksize, 
+                                                       cap_intensity=cap_intensity, 
+                                                       raw_threshold=raw_threshold,
+                                                       reflection_mask=ReflectionsMask[:,UnregCoords[0]:UnregCoords[1],UnregCoords[2]:UnregCoords[3]],
+                                                       mask_dilation_kernel=mask_dilation_kernel,
+                                                       denoise_sigma=denoise_sigma,
+                                                       denoise_method=denoise_method,
+                                                       mask_inpaint_method=mask_inpaint_method,
+                                                       min_gradient_threshold=min_gradient_threshold,
+                                                       opacity_gain=opacity_gain)
+
+overlay_registered =  HySE.visualize_edge_density_overlay(Registered[:,RegCoords[0]:RegCoords[1],RegCoords[2]:RegCoords[3]], 
+                                                       sobel_ksize=sobel_ksize, 
+                                                       cap_intensity=cap_intensity, 
+                                                       raw_threshold=raw_threshold,
+                                                       reflection_mask=RegisteredMask[RegCoords[0]:RegCoords[1],RegCoords[2]:RegCoords[3]], 
+                                                       mask_dilation_kernel=mask_dilation_kernel,
+                                                       denoise_sigma=denoise_sigma,
+                                                       denoise_method=denoise_method,
+                                                       mask_inpaint_method=mask_inpaint_method,
+                                                       min_gradient_threshold=min_gradient_threshold,
+                                                       opacity_gain=opacity_gain)
+```
+```python
+plt.close()
+fig, ax = plt.subplots(1, 2, figsize=(12,4))
+
+ax[0].imshow(overlay_unregistered)
+ax[0].axis('off')
+ax[0].set_title('Unregistered', fontsize=14)
+
+ax[1].imshow(overlay_registered)
+ax[1].axis('off')
+ax[1].set_title('Registered', fontsize=14)
+
+plt.tight_layout()
+plt.savefig(f'{SavingPath}{Name}_RegistrationOverlay.png', transparent=True)
+plt.savefig(f'{SavingPath}{Name}_RegistrationOverlay.svg', transparent=True)
+plt.show()
+```
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/96662f5e-df99-4f84-97c8-0266aba6cb56" width="750"/>
+</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ```
 
