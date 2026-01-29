@@ -331,3 +331,325 @@ def visualize_hypercube_movement(hypercube, method='sobel',
 	
 	plt.tight_layout()
 	return final_display, ref_frame_processed
+
+
+
+
+#### ------------------------------------------------
+#### ------------------------------------------------
+#### ------------------------------------------------
+#### ------------------------------------------------
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.widgets import RadioButtons
+from matplotlib.path import Path
+import matplotlib.patches as patches
+
+def GetBiopsyLocations(RegisteredHypercube, Wavelengths, **kwargs):
+	"""
+	GUI to draw ROIs on a hyperspectral image (Shape: Bands, Y, X) and extract spectral data.
+
+	Parameters:
+	-----------
+	RegisteredHypercube : numpy.ndarray
+		3D array of shape (Nwavelengths, Height, Width).
+	Wavelengths : list or numpy.ndarray
+		List of wavelengths corresponding to the Bands.
+	**kwargs :
+		display_band_idx (int): Index of the band to display (default: middle band).
+		figsize (tuple): Figure size (default: (16, 9)).
+
+	Returns:
+	--------
+	ROI_coordinates : list
+		List of (N, 2) arrays containing (x, y) vertices for each ROI.
+	ROI_AvgSpectra : list
+		List of 1D arrays containing the average spectrum for each ROI.
+	ROI_AllSpectra : list
+		List of 2D arrays (M_pixels, Bands) containing spectra for all pixels in each ROI.
+	"""
+
+	class BiopsyPicker:
+		def __init__(self, cube, wavelengths, display_band_idx=None, figsize=(16, 9)):
+			self.cube = cube
+			self.wavelengths = wavelengths
+			# --- FIX: Handle (Bands, Y, X) shape ---
+			self.bands, self.h, self.w = cube.shape
+			
+			# Display setup
+			if display_band_idx is None:
+				self.display_band_idx = self.bands // 2
+			else:
+				self.display_band_idx = int(display_band_idx)
+			
+			# Extract the 2D image for display (Slice the first dimension)
+			self.image_data = self.cube[self.display_band_idx, :, :]
+			
+			self.rois = [] 
+			self.current_roi_verts = []
+			
+			self.state = 'IDLE' 
+			self.active_roi_idx = -1
+			self.active_vertex_idx = -1
+			self.drag_active = False
+			
+			# Colors and Styles
+			self.cmap_cycle = plt.cm.tab10.colors 
+			self.alpha_draw = 0.4
+			self.alpha_done = 0.7
+
+			self.fig, self.ax = plt.subplots(figsize=figsize)
+			plt.subplots_adjust(bottom=0.2)
+			
+			# --- REUSE: Normalization from LandmarkPicker ---
+			self.img_norm = self._normalize(self.image_data)
+			self.im_obj = self.ax.imshow(self.img_norm, cmap='gray', vmin=0, vmax=1)
+			
+			wl_label = self.wavelengths[self.display_band_idx] if self.display_band_idx < len(self.wavelengths) else "N/A"
+			self.ax.set_title(f"Band {self.display_band_idx} ({wl_label} nm) | "
+							  f"'r': Start ROI | 'z': Undo | Double-click ROI to Edit | CLOSE to finish")
+
+			# Temporary artist for drawing active lines
+			self.line_active, = self.ax.plot([], [], linestyle='--', marker='o', color='white', lw=1.5, animated=False)
+			
+			# Widgets
+			ax_color = 'lightgoldenrodyellow'
+			ax_radio = self.fig.add_axes([0.92, 0.05, 0.07, 0.15], facecolor=ax_color)
+			self.radio = RadioButtons(ax_radio, ('gray', 'magma', 'viridis'))
+			self.radio.on_clicked(self.update_cmap)
+			
+			# Event Connections
+			self.cid_click = self.fig.canvas.mpl_connect('button_press_event', self.on_click)
+			self.cid_move = self.fig.canvas.mpl_connect('motion_notify_event', self.on_move)
+			self.cid_release = self.fig.canvas.mpl_connect('button_release_event', self.on_release)
+			self.cid_key = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
+			self.cid_close = self.fig.canvas.mpl_connect('close_event', self.on_close)
+
+		def _normalize(self, img):
+			"""Reuse normalization logic from LandmarkPicker"""
+			p2, p98 = np.percentile(img, (2, 98))
+			denom = p98 - p2
+			return np.clip((img - p2) / (denom if denom != 0 else 1), 0, 1)
+
+		def update_cmap(self, label):
+			self.im_obj.set_cmap(label)
+			self.fig.canvas.draw_idle()
+
+		def _get_next_color(self):
+			idx = len(self.rois) % len(self.cmap_cycle)
+			return self.cmap_cycle[idx]
+
+		def _redraw_active_line(self):
+			if not self.current_roi_verts:
+				self.line_active.set_data([], [])
+			else:
+				xs, ys = zip(*self.current_roi_verts)
+				self.line_active.set_data(xs, ys)
+				self.line_active.set_color(self._get_next_color())
+			self.fig.canvas.draw_idle()
+
+		def _finish_roi(self):
+			if len(self.current_roi_verts) < 3:
+				print("ROI needs at least 3 points.")
+				self.current_roi_verts = []
+				self._redraw_active_line()
+				self.state = 'IDLE'
+				return
+
+			color = self._get_next_color()
+			poly = plt.Polygon(self.current_roi_verts, closed=True, 
+							   facecolor=color, edgecolor=color, alpha=self.alpha_done, label=f"ROI {len(self.rois)+1}")
+			self.ax.add_patch(poly)
+			
+			cx = np.mean([v[0] for v in self.current_roi_verts])
+			cy = np.mean([v[1] for v in self.current_roi_verts])
+			text = self.ax.text(cx, cy, str(len(self.rois) + 1), color='white', 
+								weight='bold', ha='center', va='center', fontsize=10)
+
+			self.rois.append({
+				'vertices': list(self.current_roi_verts),
+				'color': color,
+				'artist_poly': poly,
+				'artist_text': text,
+				'artist_markers': None 
+			})
+			
+			self.current_roi_verts = []
+			self._redraw_active_line()
+			self.state = 'IDLE'
+			self.fig.canvas.draw_idle()
+
+		def _update_roi_visuals(self, roi_idx):
+			roi = self.rois[roi_idx]
+			roi['artist_poly'].set_xy(roi['vertices'])
+			cx = np.mean([v[0] for v in roi['vertices']])
+			cy = np.mean([v[1] for v in roi['vertices']])
+			roi['artist_text'].set_position((cx, cy))
+			if roi['artist_markers']:
+				xs, ys = zip(*roi['vertices'])
+				roi['artist_markers'].set_data(xs, ys)
+
+		def on_key(self, event):
+			if event.key == 'r':
+				if self.state == 'IDLE':
+					self.state = 'DRAWING'
+					self.current_roi_verts = []
+					print("Mode: DRAWING")
+				elif self.state == 'EDITING':
+					self._exit_edit_mode()
+					self.state = 'DRAWING'
+					self.current_roi_verts = []
+					print("Exited Edit Mode -> DRAWING")
+
+			elif event.key == 'z':
+				if self.state == 'DRAWING' and self.current_roi_verts:
+					self.current_roi_verts.pop()
+					self._redraw_active_line()
+				elif self.state == 'IDLE' and self.rois:
+					roi = self.rois.pop()
+					roi['artist_poly'].remove()
+					roi['artist_text'].remove()
+					self.fig.canvas.draw_idle()
+					print(f"Removed ROI {len(self.rois)+1}")
+
+		def on_click(self, event):
+			if event.inaxes != self.ax or event.button != 1: return
+			
+			# --- REUSE: Check toolbar state from LandmarkPicker ---
+			toolbar = self.fig.canvas.manager.toolbar
+			if toolbar is not None and toolbar.mode != '':
+				return
+
+			# Double Click Handling
+			if event.dblclick:
+				if self.state == 'IDLE':
+					for i, roi in enumerate(self.rois):
+						path = Path(roi['vertices'])
+						if path.contains_point((event.xdata, event.ydata)):
+							self._enter_edit_mode(i)
+							return
+				elif self.state == 'EDITING':
+					# Delete vertex on double click
+					roi = self.rois[self.active_roi_idx]
+					verts = roi['vertices']
+					dist = np.linalg.norm(np.array(verts) - np.array([event.xdata, event.ydata]), axis=1)
+					if np.min(dist) < 10: 
+						idx_to_remove = np.argmin(dist)
+						if len(verts) > 3:
+							verts.pop(idx_to_remove)
+							self._update_roi_visuals(self.active_roi_idx)
+							self.fig.canvas.draw_idle()
+					else:
+						self._exit_edit_mode()
+				return
+
+			# Single Click Handling
+			if self.state == 'DRAWING':
+				# Check closure
+				if len(self.current_roi_verts) > 2:
+					start_pt = np.array(self.current_roi_verts[0])
+					curr_pt = np.array([event.xdata, event.ydata])
+					xlim = self.ax.get_xlim()
+					tol = (xlim[1] - xlim[0]) * 0.02 
+					if np.linalg.norm(start_pt - curr_pt) < tol:
+						self._finish_roi()
+						return
+
+				self.current_roi_verts.append((event.xdata, event.ydata))
+				self._redraw_active_line()
+
+			elif self.state == 'EDITING':
+				roi = self.rois[self.active_roi_idx]
+				verts = roi['vertices']
+				dist = np.linalg.norm(np.array(verts) - np.array([event.xdata, event.ydata]), axis=1)
+				xlim = self.ax.get_xlim()
+				tol = (xlim[1] - xlim[0]) * 0.02
+				
+				if np.min(dist) < tol:
+					self.active_vertex_idx = np.argmin(dist)
+					self.drag_active = True
+
+		def on_move(self, event):
+			if event.inaxes != self.ax: return
+			if self.state == 'EDITING' and self.drag_active:
+				roi = self.rois[self.active_roi_idx]
+				roi['vertices'][self.active_vertex_idx] = (event.xdata, event.ydata)
+				self._update_roi_visuals(self.active_roi_idx)
+				self.fig.canvas.draw_idle()
+
+		def on_release(self, event):
+			if self.state == 'EDITING':
+				self.drag_active = False
+				self.active_vertex_idx = -1
+
+		def _enter_edit_mode(self, idx):
+			if self.state == 'EDITING' and self.active_roi_idx != idx:
+				self._exit_edit_mode()
+			self.state = 'EDITING'
+			self.active_roi_idx = idx
+			roi = self.rois[idx]
+			roi['artist_poly'].set_alpha(self.alpha_draw)
+			xs, ys = zip(*roi['vertices'])
+			line, = self.ax.plot(xs, ys, 'o', color='white', markeredgecolor=roi['color'], markersize=8, zorder=10)
+			roi['artist_markers'] = line
+			self.fig.canvas.draw_idle()
+
+		def _exit_edit_mode(self):
+			if self.active_roi_idx == -1: return
+			roi = self.rois[self.active_roi_idx]
+			roi['artist_poly'].set_alpha(self.alpha_done)
+			if roi['artist_markers']:
+				roi['artist_markers'].remove()
+				roi['artist_markers'] = None
+			self.state = 'IDLE'
+			self.active_roi_idx = -1
+			self.drag_active = False
+			self.fig.canvas.draw_idle()
+
+		def disconnect(self):
+			"""Disconnects all matplotlib events."""
+			self.fig.canvas.mpl_disconnect(self.cid_click)
+			self.fig.canvas.mpl_disconnect(self.cid_move)
+			self.fig.canvas.mpl_disconnect(self.cid_release)
+			self.fig.canvas.mpl_disconnect(self.cid_key)
+			self.fig.canvas.mpl_disconnect(self.cid_close)
+
+		def on_close(self, event):
+			self.disconnect()
+
+		def get_results(self):
+			all_coords = [np.array(r['vertices']) for r in self.rois]
+			avg_spectra = []
+			all_spectra = []
+			
+			# Create grid for masking
+			y_indices, x_indices = np.mgrid[:self.h, :self.w]
+			points = np.vstack((x_indices.ravel(), y_indices.ravel())).T
+			
+			for roi in self.rois:
+				path = Path(roi['vertices'])
+				mask_flat = path.contains_points(points)
+				mask = mask_flat.reshape((self.h, self.w))
+				
+				# --- FIX: Extract from (Bands, Y, X) ---
+				# mask is (Y, X), cube is (Bands, Y, X)
+				# We select all bands, and pixels where mask is True
+				pixels = self.cube[:, mask]  # Shape becomes (Bands, N_pixels)
+				
+				if pixels.shape[1] > 0:
+					# Transpose to (N_pixels, Bands) for standard spectral format
+					pixels = pixels.T 
+					all_spectra.append(pixels)
+					avg_spectra.append(np.mean(pixels, axis=0))
+				else:
+					all_spectra.append(np.empty((0, self.bands)))
+					avg_spectra.append(np.zeros(self.bands))
+					
+			return all_coords, avg_spectra, all_spectra
+
+	picker = BiopsyPicker(RegisteredHypercube, Wavelengths, **kwargs)
+	plt.show(block=True)
+	return picker.get_results()
+		 
