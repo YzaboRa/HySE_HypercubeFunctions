@@ -1441,6 +1441,8 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 			else:
 				print(f'Nframe format not accepted.')
 				HypercubeForRegistration=0
+		else:
+			HypercubeForRegistration = Hypercube_all[:,:,Nframe,:,:,Channel]
 		
 		
 	else:
