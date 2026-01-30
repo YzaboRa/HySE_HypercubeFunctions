@@ -1374,6 +1374,8 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 			concatenate all hypercubes
 		- Path : Where the data is located
 		- EdgePos : Positions of the start of each sweep
+		- OnlySweep = True: If True, uses ComputeHypercube_RGB_FrameIterator() to only load identified sweep. Otherwise
+			loads all sweeps.
 		- Wavelengths_list
 		- kwargs:
 			- Help
@@ -1393,6 +1395,7 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 		return 0
 
 	Buffer = kwargs.get('Buffer')
+	OnlySweep = kwargs.get('OnlySweep', True)
 	if Buffer is None:
 		Buffer = 3
 		print(f'Setting Buffer to default {Buffer}')
@@ -1401,7 +1404,15 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 	if RGB:
 #         Frames, RGB_Dark = HySE.ComputeHypercube_RGB(DataPath, EdgePos_Data, Buffer=Buffer, BlueShift=1, SaveArray=False)
 
-		Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB(Path, EdgePos, Buffer=Buffer, BlueShift=1, SaveArray=False)
+		if OnlySweep:
+			print(f'Only loading single sweep:')
+			Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB_FrameIterator(Path, EdgePos, Buffer=Buffer, NsweepOnly=Nsweep, BlueShift=1, SaveArray=False)
+		else:
+			print(f'Loading all sweeps (frame interator for memory efficiency):')
+			Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB_FrameIterator(Path, EdgePos, Buffer=Buffer, BlueShift=1, SaveArray=False)
+
+		# Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB_FrameIterator(Path, EdgePos, Buffer=Buffer, BlueShift=1, SaveArray=False)
+		# Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB(Path, EdgePos, Buffer=Buffer, BlueShift=1, SaveArray=False)
 		print(f' -> Hypercube_all.shape: {Hypercube_all.shape}')
 		
 		if Channel=='G' or Channel==1:
@@ -1415,20 +1426,21 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 			print('  Setting to defaul green channel')
 			Channel=1
 		
-		if isinstance(Nframe, int):
-			print(Hypercube_all.shape)
-			HypercubeForRegistration = Hypercube_all[Nsweep,:,Nframe,:,:,Channel]
-		elif isinstance(Nframe, list):
-			HypercubeForRegistration = []
-			for i in range(0,len(Nframe)):
-				HypercubeForRegistration_sub = Hypercube_all[Nsweep,:,Nframe[i],:,:,Channel]
-				if i==0:
-					HypercubeForRegistration = HypercubeForRegistration_sub
-				else:
-					HypercubeForRegistration = np.concatenate((HypercubeForRegistration, HypercubeForRegistration_sub), axis=0)
-		else:
-			print(f'Nframe format not accepted.')
-			HypercubeForRegistration=0
+		if OnlySweep==False:
+			if isinstance(Nframe, int):
+				print(Hypercube_all.shape)
+				HypercubeForRegistration = Hypercube_all[Nsweep,:,Nframe,:,:,Channel]
+			elif isinstance(Nframe, list):
+				HypercubeForRegistration = []
+				for i in range(0,len(Nframe)):
+					HypercubeForRegistration_sub = Hypercube_all[Nsweep,:,Nframe[i],:,:,Channel]
+					if i==0:
+						HypercubeForRegistration = HypercubeForRegistration_sub
+					else:
+						HypercubeForRegistration = np.concatenate((HypercubeForRegistration, HypercubeForRegistration_sub), axis=0)
+			else:
+				print(f'Nframe format not accepted.')
+				HypercubeForRegistration=0
 		
 		
 	else:
