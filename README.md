@@ -173,8 +173,8 @@ We can only register specific sweeps at a time.
 Nsweep = 4
 Nframe = 1
 
-# If taking single frames
-HypercubeForRegistration = HySE.GetHypercubeForRegistration(Nsweep, Nframe, DataPath, EdgePos_Data, Wavelengths_list, Buffer=Buffer)
+# If taking single frames, using red frame
+HypercubeForRegistration = HySE.GetHypercubeForRegistration(Nsweep, Nframe, DataPath, EdgePos_Data, Wavelengths_list, Channel='R', Buffer=Buffer)
 print(HypercubeForRegistration.shape)
 ```
 
