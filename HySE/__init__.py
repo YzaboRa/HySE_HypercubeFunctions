@@ -27,7 +27,7 @@ for loader, module_name, is_pkg in pkgutil.iter_modules(__path__):
 			globals()[name] = obj
 			__all__.append(name)
 
-
+from .FramesSelection import FrameSelector
 
 def help(name=None):
 	"""

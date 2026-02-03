@@ -43,6 +43,9 @@ import copy
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import tempfile
+import pickle
+import re
+
 
 import SimpleITK as _sitk
 # import matplotlib.colors as mcolors
@@ -92,7 +95,7 @@ class LandmarkPicker:
 			self.num_total_points = None
 			self.fig.suptitle("PHASE 1: Select landmarks. Use toolbar to Zoom/Pan.\n'z': undo, 'p': labels. CLOSE to finish.", fontsize=14)
 			self.fixed_img_norm = self._normalize(self.fixed_image)
-			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='gray', vmin=0, vmax=1)
+			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='magma', vmin=0, vmax=1)
 			self.ax_fixed.set_title('Click to select FIXED points')
 			self.ax_moving.axis('off')
 			self.im_moving_obj = None
@@ -475,7 +478,7 @@ def CoRegisterImages_Manual(im_static, im_shifted, **kwargs):
 
 
 
-def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
+def ManualRegistration(RawHypercube, Wavelengths_list, **kwargs):
 	"""
 	Apply a LANDMARK-ONLY co-registration to a hypercube.
 
@@ -696,3 +699,227 @@ def CoRegisterHypercubeAndMask_Manual(RawHypercube, Wavelengths_list, **kwargs):
 		pass
 
 	return Hypercube_sorted, AllTransforms_sorted, CombinedMask, AllLandmarkPoints_output
+
+
+
+
+
+
+def MakeCombinedHypercubeForRegistration(hypercube, selector_results, original_wavelengths=None):
+	"""
+	Flattens a 4D Hypercube into a 3D stack based on valid frames selected in the GUI.
+	
+	Parameters:
+	-----------
+	hypercube : np.ndarray
+		Input 4D array of shape [Nsweeps, Nwavelengths, Y, X].
+	selector_results : tuple
+		The output from selector.get_results(), containing (mask, indices).
+	original_wavelengths : list, optional
+		List of strings describing the wavelengths (length Nwavelengths).
+		Used to generate unique labels for the flattened stack (e.g., "Sweep0_Wav2").
+		
+	Returns:
+	--------
+	filtered_stack : np.ndarray
+		3D array [N_valid, Y, X] ready for ManualRegistration.
+	new_labels : list
+		List of strings describing each frame in the filtered stack, 
+		matching the length of filtered_stack.
+	"""
+	# Unpack the results from the GUI
+	_, good_indices = selector_results
+	
+	# good_indices is shape [N_valid, 2] where cols are [sweep_idx, wav_idx]
+	# We use advanced indexing to extract all valid frames at once
+	# Resulting shape: [N_valid, Y, X]
+	filtered_stack = hypercube[good_indices[:, 0], good_indices[:, 1]]
+	
+	# Generate updated Wavelengths_list for ManualRegistration
+	new_labels = []
+	
+	# Default labels if none provided
+	if original_wavelengths is None:
+		num_wavs = hypercube.shape[1]
+		original_wavelengths = [f"Frame{i}" for i in range(num_wavs)]
+		
+	for i in range(len(good_indices)):
+		s_idx, w_idx = good_indices[i]
+		# Create a label that preserves the sweep and wavelength identity
+		# e.g., "S0_Frame0"
+		label = f"S{s_idx}_{original_wavelengths[w_idx]}"
+		new_labels.append(label)
+		
+	return filtered_stack, new_labels
+
+
+
+
+
+def SaveAllTransforms(transforms_list, labels_list, filename="RegistrationTransforms.pkl"):
+    """
+    Saves a list of SimpleITK transforms and their associated labels to a single file.
+
+    Parameters:
+    -----------
+    transforms_list : list
+        List of SimpleITK transform objects (output from ManualRegistration).
+    labels_list : list
+        List of strings identifying each transform (output from MakeCombinedHypercubeForRegistration).
+    filename : str
+        Path to save the output file.
+    """
+    if len(transforms_list) != len(labels_list):
+        raise ValueError("Error: The number of transforms must match the number of labels.")
+
+    # Create a dictionary mapping Label -> Transform
+    # This ensures we always know exactly which transform belongs to which frame
+    transform_dict = dict(zip(labels_list, transforms_list))
+
+    # Save to a single pickle file
+    with open(filename, 'wb') as f:
+        pickle.dump(transform_dict, f)
+    
+    print(f"Successfully saved {len(transforms_list)} transforms to {filename}")
+
+
+
+
+def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, original_wavelengths=None):
+    """
+    Applies loaded transforms to the valid frames of a Data Hypercube.
+
+    Parameters:
+    -----------
+    data_hypercube : np.ndarray
+        4D array [Nsweeps, Nwavelengths, Y, X] containing the data to be warped.
+    selector_results : tuple
+        The (mask, indices) tuple from the FrameSelector GUI.
+    transforms_file_path : str
+        Path to the .pkl file created by SaveAllTransforms.
+    original_wavelengths : list, optional
+        List of original frame names (e.g., ['Frame0', 'Frame1'...]).
+        Must match what was used during registration to generate the keys.
+
+    Returns:
+    --------
+    transformed_stack : np.ndarray
+        3D array [N_valid, Y, X] of coregistered data frames.
+    valid_labels : list
+        List of labels corresponding to the output stack.
+    """
+    # 1. Load Transforms
+    with open(transforms_file_path, 'rb') as f:
+        transform_dict = pickle.load(f)
+
+    # 2. Unpack indices
+    _, good_indices = selector_results
+    n_valid = len(good_indices)
+    _, _, h, w = data_hypercube.shape
+
+    # 3. Handle default labels
+    if original_wavelengths is None:
+        num_wavs = data_hypercube.shape[1]
+        original_wavelengths = [f"Frame{i}" for i in range(num_wavs)]
+
+    # 4. Prepare Output Array
+    transformed_stack = np.zeros((n_valid, h, w), dtype=data_hypercube.dtype)
+    valid_labels = []
+
+    print(f"Applying transforms to {n_valid} frames...")
+
+    for i, (s_idx, w_idx) in enumerate(good_indices):
+        # Extract the frame
+        image_np = data_hypercube[s_idx, w_idx, :, :]
+        
+        # Reconstruct the label key to find the correct transform
+        # e.g. "S2_Frame5"
+        label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
+        
+        if label_key not in transform_dict:
+            print(f"Warning: No transform found for {label_key}. Skipping (leaving as zeros).")
+            continue
+
+        # Get transform
+        tform = transform_dict[label_key]
+
+        # Convert numpy -> SimpleITK
+        sitk_img = _sitk.GetImageFromArray(image_np)
+        
+        # Apply Resampling
+        # Note: We use the image itself as the reference for size/spacing
+        resampler = _sitk.ResampleImageFilter()
+        resampler.SetReferenceImage(sitk_img)
+        resampler.SetTransform(tform)
+        resampler.SetInterpolator(_sitk.sitkLinear) # Use sitkNearestNeighbor for masks
+        resampler.SetDefaultPixelValue(0) # Value for pixels outside the image
+        
+        warped_sitk = resampler.Execute(sitk_img)
+        
+        # Convert back to numpy
+        transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+        valid_labels.append(label_key)
+
+    return transformed_stack, valid_labels
+
+
+
+def CombineFrames(transformed_stack, labels_list, n_wavelengths):
+    """
+    Averages registered frames belonging to the same wavelength index.
+
+    Parameters:
+    -----------
+    transformed_stack : np.ndarray
+        3D array [N_valid, Y, X] output from ApplyAllTransforms.
+    labels_list : list
+        List of labels matching transformed_stack (e.g., ["S0_Frame0", "S1_Frame0"...]).
+    n_wavelengths : int
+        The expected number of unique wavelengths (frames per sweep).
+
+    Returns:
+    --------
+    combined_cube : np.ndarray
+        3D array [Nwavelengths, Y, X] containing the averaged data.
+    """
+    N, h, w = transformed_stack.shape
+    
+    # Initialize accumulators
+    # sum_cube stores the pixel sums
+    sum_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
+    # count_cube stores how many frames contributed to each pixel
+    count_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
+
+    print("Combining frames by averaging...")
+
+    for i, label in enumerate(labels_list):
+        # Parse the label to get the frame index
+        # Assuming label format "S{sweep}_Frame{wav}" or similar
+        # We look for the part after the underscore or explicitly find the Wav index
+        
+        # Regex to find the index associated with the "Frame" part
+        # Looks for "Frame" followed by digits
+        match = re.search(r'Frame(\d+)', label)
+        if match:
+            wav_idx = int(match.group(1))
+        else:
+            # Fallback: if you used a custom list like ['Blue', 'Red']
+            # We have to map string -> index manually. 
+            # For now, assuming "FrameX" format as per previous steps.
+            print(f"Error parsing label {label}. Skipping.")
+            continue
+            
+        if wav_idx >= n_wavelengths:
+            continue
+
+        # Add current frame to accumulator
+        sum_cube[wav_idx] += transformed_stack[i]
+        count_cube[wav_idx] += 1
+
+    # Divide by count to get average
+    # Avoid division by zero where no frames were present
+    with np.errstate(divide='ignore', invalid='ignore'):
+        combined_cube = sum_cube / count_cube
+        combined_cube[count_cube == 0] = 0 # Handle empty frames
+
+    return combined_cube
