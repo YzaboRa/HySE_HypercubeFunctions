@@ -457,7 +457,7 @@ np.savez(f'{MaskSavingPath}', CombinedMask)
 print(f'Saved all data')
 
 ```
-<details>
+</details>
 
 
 ## Unmixing
@@ -672,7 +672,7 @@ Frames_BlueD_Sub = Frames_BlueD[Nsweep, :, Nframe, :, :]
 RegFrames_GreenD_Sub = HySE.ApplyTransform(Frames_GreenD_Sub, Transforms)
 RegFrames_BlueD_Sub = HySE.ApplyTransform(Frames_BlueD_Sub, Transforms)
 ```
-<details>
+</details>
 ```python
 Nframe = 1
 RegGreen, RegGreen_labels = HySE.ApplyAllTransforms(Frames_GreenD[:,:,Nframe,:,:], SelectedFramesLabels, TransformsPath)
