@@ -663,6 +663,7 @@ print(Frames_GreenD.shape)
 ### Apply Transforms to Data
 The transforms are determined using the red frames, which are all obtained using the same illumination.
 The data frames are in the green and blue channels. It is assumed that the movement between RGB frames is minimal, so that transforms from the red frames is applicable to equivalement GB frames.
+
 <details><summary>Old method (individual files)</summary>
 ```python
 print(f'Taking a subset of normalised frames for sweep {Nsweep}, frame {Nframe}')
@@ -672,7 +673,10 @@ Frames_BlueD_Sub = Frames_BlueD[Nsweep, :, Nframe, :, :]
 RegFrames_GreenD_Sub = HySE.ApplyTransform(Frames_GreenD_Sub, Transforms)
 RegFrames_BlueD_Sub = HySE.ApplyTransform(Frames_BlueD_Sub, Transforms)
 ```
+
 </details>
+
+
 ```python
 Nframe = 1
 RegGreen, RegGreen_labels = HySE.ApplyAllTransforms(Frames_GreenD[:,:,Nframe,:,:], SelectedFramesLabels, TransformsPath)
