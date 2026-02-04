@@ -139,7 +139,7 @@ print(Frames_GreenD.shape)
 ```
 
 ### Save Frames to Identify Good Sweeps
-<details><summary>Old method</summary>
+<details markdown="1"><summary>Old method</summary>
 This step must only be done once and is best kept commented out the rest of the time.
 This function will create folders for each full sweep and save the frames for each wavelength/combination of wavelength, for each sweep. 
 This is done so that the user can manually identify which sweeps contain usable frames for the full sweep and to target registration on the best sweeps.
@@ -334,9 +334,11 @@ print(f'\n\n Saved all data')
 ```
 
 Saving Transforms:
-<details><summary>Old method (individual files)</summary>
+<details markdown="1"><summary>Old method (individual files)</summary>
+```python
 TransformsSavingPath = VideoSavingPath.replace('.mp4','_Transforms')
 HySE.SaveTransforms(AllTransforms, TransformsSavingPath)
+```
 </details>
 
 ```python
@@ -664,8 +666,7 @@ print(Frames_GreenD.shape)
 The transforms are determined using the red frames, which are all obtained using the same illumination.
 The data frames are in the green and blue channels. It is assumed that the movement between RGB frames is minimal, so that transforms from the red frames is applicable to equivalement GB frames.
 
-<details><summary>Old method (individual files)</summary>
-```python
+  ```python
 print(f'Taking a subset of normalised frames for sweep {Nsweep}, frame {Nframe}')
 Frames_GreenD_Sub = Frames_GreenD[Nsweep, :, Nframe, :, :]
 Frames_BlueD_Sub = Frames_BlueD[Nsweep, :, Nframe, :, :]
@@ -673,8 +674,6 @@ Frames_BlueD_Sub = Frames_BlueD[Nsweep, :, Nframe, :, :]
 RegFrames_GreenD_Sub = HySE.ApplyTransform(Frames_GreenD_Sub, Transforms)
 RegFrames_BlueD_Sub = HySE.ApplyTransform(Frames_BlueD_Sub, Transforms)
 ```
-
-</details>
 
 
 ```python
