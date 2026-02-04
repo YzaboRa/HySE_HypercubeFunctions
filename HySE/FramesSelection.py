@@ -63,6 +63,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button, CheckButtons, RadioButtons
 
+OriginPosition = 'lower'
+
 class FrameSelector:
 	def __init__(self, hypercube, wavelength_labels=None):
 		"""
@@ -224,7 +226,7 @@ class FrameSelector:
 				cmap=self.cmap_name, 
 				vmin=self.vmin, 
 				vmax=self.vmax, 
-				origin='lower'
+				origin=OriginPosition
 			)
 			self.ax_img.set_title(f"Sweep {self.curr_sweep} | {self.wav_labels[self.curr_wav]}")
 		else:

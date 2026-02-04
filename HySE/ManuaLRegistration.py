@@ -12,6 +12,7 @@ from datetime import datetime
 from scipy.signal import savgol_filter, find_peaks
 import matplotlib
 from matplotlib import pyplot as plt
+import matplotlib.pyplot as plt
 import imageio
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.widgets import RectangleSelector
@@ -54,6 +55,8 @@ import SimpleITK as _sitk
 
 from matplotlib.widgets import Slider, RadioButtons
 
+OriginPosition = 'lower'
+# OriginPosition = 'upper' ## standard python
 
 ## N.A. Functions and GUI written with Gemini
 
@@ -95,7 +98,7 @@ class LandmarkPicker:
 			self.num_total_points = None
 			self.fig.suptitle("PHASE 1: Select landmarks. Use toolbar to Zoom/Pan.\n'z': undo, 'p': labels. CLOSE to finish.", fontsize=14)
 			self.fixed_img_norm = self._normalize(self.fixed_image)
-			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='magma', vmin=0, vmax=1)
+			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='magma', vmin=0, vmax=1, origin=OriginPosition)
 			self.ax_fixed.set_title('Click to select FIXED points')
 			self.ax_moving.axis('off')
 			self.im_moving_obj = None
@@ -106,11 +109,11 @@ class LandmarkPicker:
 			self.fig.suptitle(f"PHASE 2: {frame_str}\nUse toolbar to Zoom/Pan. 'z': undo, 'p': labels. MUST select {self.num_total_points} points.", fontsize=14)
 			
 			self.fixed_img_norm = self._normalize(self.fixed_image)
-			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='gray', vmin=0, vmax=1)
+			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='magma', vmin=0, vmax=1, origin=OriginPosition)
 			self.ax_fixed.set_title('FIXED points (reference)')
 			
 			self.moving_img_norm = self._normalize(self.moving_image)
-			self.im_moving_obj = self.ax_moving.imshow(self.moving_img_norm, cmap='gray', vmin=0, vmax=1)
+			self.im_moving_obj = self.ax_moving.imshow(self.moving_img_norm, cmap='magma', vmin=0, vmax=1, origin=OriginPosition)
 		
 		if warning_message:
 			self.fig.text(0.5, 0.95, warning_message, color='red', ha='center', fontsize=12, weight='bold',
@@ -280,6 +283,10 @@ class LandmarkPicker:
 				]
 				self.moving_points.pop()
 			self._redraw()
+
+		if event.key == 'w':
+			print(f'Erasing Warning Messages')
+			self.warning_messages = ''
 		elif event.key == 'p':
 			self.show_text_labels = not self.show_text_labels
 			print(f"Text labels toggled {'ON' if self.show_text_labels else 'OFF'}")
@@ -334,11 +341,6 @@ class LandmarkPicker:
 		return self.fixed_points if self.phase == 'fixed' else self.moving_points
 
 
-
-
-
-
-import matplotlib.pyplot as plt
 
 	
 
@@ -612,10 +614,10 @@ def ManualRegistration(RawHypercube, Wavelengths_list, **kwargs):
 			deviations = [np.linalg.norm(np.array(p1) - np.array(p2)) for p1, p2 in zip(fixed_landmarks, moving_landmarks_for_frame)]
 			if deviations:
 				max_dev = np.max(deviations)
-				if max_dev > deviation_threshold:
-					warning_for_next_frame = (f"WARNING on PREVIOUS frame ({c+1}):\n"
-											  f"Max landmark deviation was {max_dev:.1f} pixels (Threshold: {deviation_threshold})")
-					print(f"\n/!\\ {warning_for_next_frame}\n")
+				# if max_dev > deviation_threshold:
+					# warning_for_next_frame = (f"WARNING on PREVIOUS frame ({c+1}):\n"
+											  # f"Max landmark deviation was {max_dev:.1f} pixels (Threshold: {deviation_threshold})")
+					# print(f"\n/!\\ {warning_for_next_frame}\n")
 		
 		# Assuming _compute_landmark_transform returns a SimpleITK Transform object
 		if Exact:
@@ -793,8 +795,8 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
     -----------
     data_hypercube : np.ndarray
         4D array [Nsweeps, Nwavelengths, Y, X] containing the data to be warped.
-    selector_results : tuple
-        The (mask, indices) tuple from the FrameSelector GUI.
+    selector_results_indices : lists
+        The indices output from the (mask, indices) tuple from the FrameSelector GUI.
     transforms_file_path : str
         Path to the .pkl file created by SaveAllTransforms.
     original_wavelengths : list, optional
@@ -813,7 +815,7 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
         transform_dict = pickle.load(f)
 
     # 2. Unpack indices
-    _, good_indices = selector_results
+    good_indices = selector_results
     n_valid = len(good_indices)
     _, _, h, w = data_hypercube.shape
 
