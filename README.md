@@ -347,7 +347,7 @@ HySE.SaveAllTransforms(AllTransforms,GoodFramesLabels,filename=PathToSaveTransfo
 ```
 
 #### Automatic Registration
-<details><summary>Click to expand</summary>
+<details markdown="1"><summary>Click to expand</summary>
 Using SimpleITK, mutual information (metric). Does not always work very well. Can be applied after a quick manual registration.
 Most implementations do first an affine transform, followed by a bspline transform. The GridSpacing paramter allows to set the unit size for the bspline transform. Too large grids do not allow to register finely enough (looks more like affine), while too small grids overfit the data/noise and introduces artefacts and distortions.
 
