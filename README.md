@@ -139,6 +139,7 @@ print(Frames_GreenD.shape)
 ```
 
 ### Save Frames to Identify Good Sweeps
+<details><summary>Old method</summary>
 This step must only be done once and is best kept commented out the rest of the time.
 This function will create folders for each full sweep and save the frames for each wavelength/combination of wavelength, for each sweep. 
 This is done so that the user can manually identify which sweeps contain usable frames for the full sweep and to target registration on the best sweeps.
@@ -148,7 +149,7 @@ Option A saves every every frame as png images:
 RawFrames_SavingPath = SavingPath
 NameSub = ''
 HySE.SaveFramesSweeps(Frames_RedD, RawFrames_SavingPath, Name, NameSub, Video=False, Frames=[1], RescalePercentile=99) 
-```
+`
 And option saves a mp4 video with of each frame in the sweep:
 ```python
 RawFrames_SavingPath = SavingPath
@@ -156,7 +157,38 @@ NameSub = ''
 HySE.SaveFramesSweeps(Frames_RedD, RawFrames_SavingPath, Name, NameSub, Video=True, Frames=[1], RescalePercentile=99)
 ```
 The "Frames" argument can be used to save more or fewer frames per plateau. Frames=[0,1,2] will save all 3 frames.
+</details>
 
+New: A GUI is now available to faciliate the selection of which frames to use.
+
+The frames must still be extracted, but all sweeps must be kept. The resulting array will have a shape (Nsweeps, Nwavelengths, Y, X).
+```python
+HypercubeForSelection = HySE.GetHypercubeForRegistration(Nsweep, Nframe, DataPath, EdgePos_Data, Wavelengths_list, 
+                                                            Channel='R', Buffer=Buffer, AllSweeps=True, OnlySweep=False)
+```
+This array can be fed directly to the frame selector tool:
+```python
+GUI = HySE.FrameSelector(HypercubeForSelection)
+```
+Inside the GUI, the user can scan sweeps and frames independently. All frames are by default exluded; the user must manually tick the box to indicate good frames.
+
+A menu keeps track of how many frames are kept for each frame index (corresponding to a specifici wavelength/wavelength combination). Make sure that there is at least one frame per index, otherwise the hypercube will be incomplete. 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/a58d9e78-0c77-4d49-9d21-6de429dfb30c" width="800"/>
+</p>
+
+Save this selection for future references
+```python
+good_frames_mask, good_indices = GUI.get_results()
+np.savez(f'{RegistrationSavingPath}GoodFrames_Mask.npz', good_frames_mask)
+np.savez(f'{RegistrationSavingPath}GoodFrames_Indices.npz', good_indices)
+```
+
+The selected frames must all be registered. This function creates an array of size (Nframes, Y,X) that can be fed to the manualr registration tool. The labels are generated in order to recombine the frames after registration appropriately.
+```python
+GoodFrames, GoodFramesLabels = HySE.MakeCombinedHypercubeForRegistration(HypercubeForSelection, GUI.get_results())
+HypercubeForRegistration = GoodFrames
+```
 
 ### Mask
 ```python
@@ -284,10 +316,6 @@ HySE.MakeHypercubeVideo(CoregisteredHypercube, VideoSavingPathMasked, Mask=Combi
 MaskSavingPath = VideoSavingPath.replace('.mp4','_Mask.npz')
 np.savez(f'{MaskSavingPath}', CombinedMask)
 
-## Transforms
-TransformsSavingPath = VideoSavingPath.replace('.mp4','_Transforms')
-HySE.SaveTransforms(AllTransforms, TransformsSavingPath)
-
 # Wavelengths
 WavelengthsSavingPath_Sorted = VideoSavingPath.replace('.mp4','__SortedWavelengths.npz') # f'{SavingPath}{Name}_{NameSub}__SortedWavelengths.npz'
 WavelengthsSavingPath_Unsorted = VideoSavingPath.replace('.mp4','__UnsortedWavelengths.npz') #f'{SavingPath}{Name}_{NameSub}__UnsortedWavelengths.npz'
@@ -305,8 +333,19 @@ print(f'\n\n Saved all data')
 
 ```
 
+Saving Transforms:
+<details><summary>Old method (individual files)</summary>
+TransformsSavingPath = VideoSavingPath.replace('.mp4','_Transforms')
+HySE.SaveTransforms(AllTransforms, TransformsSavingPath)
+</details>
+
+```python
+PathToSaveTransforms = f'{RegistrationSavingPath}{Info}_NMI{NMI_Sweep_after[0]:.2f}__Transforms.pkl'
+HySE.SaveAllTransforms(AllTransforms,GoodFramesLabels,filename=PathToSaveTransforms)
+```
 
 #### Automatic Registration
+<details><summary>Click to expand</summary>
 Using SimpleITK, mutual information (metric). Does not always work very well. Can be applied after a quick manual registration.
 Most implementations do first an affine transform, followed by a bspline transform. The GridSpacing paramter allows to set the unit size for the bspline transform. Too large grids do not allow to register finely enough (looks more like affine), while too small grids overfit the data/noise and introduces artefacts and distortions.
 
@@ -418,7 +457,7 @@ np.savez(f'{MaskSavingPath}', CombinedMask)
 print(f'Saved all data')
 
 ```
-
+<details>
 
 
 ## Unmixing
@@ -624,6 +663,7 @@ print(Frames_GreenD.shape)
 ### Apply Transforms to Data
 The transforms are determined using the red frames, which are all obtained using the same illumination.
 The data frames are in the green and blue channels. It is assumed that the movement between RGB frames is minimal, so that transforms from the red frames is applicable to equivalement GB frames.
+<details><summary>Old method (individual files)</summary>
 ```python
 print(f'Taking a subset of normalised frames for sweep {Nsweep}, frame {Nframe}')
 Frames_GreenD_Sub = Frames_GreenD[Nsweep, :, Nframe, :, :]
@@ -631,6 +671,11 @@ Frames_BlueD_Sub = Frames_BlueD[Nsweep, :, Nframe, :, :]
 
 RegFrames_GreenD_Sub = HySE.ApplyTransform(Frames_GreenD_Sub, Transforms)
 RegFrames_BlueD_Sub = HySE.ApplyTransform(Frames_BlueD_Sub, Transforms)
+```
+<details>
+```python
+Nframe = 1
+RegGreen, RegGreen_labels = HySE.ApplyAllTransforms(Frames_GreenD[:,:,Nframe,:,:], SelectedFramesLabels, TransformsPath)
 ```
 
 ### Select Approprite frames to unmix in smaller chunks
