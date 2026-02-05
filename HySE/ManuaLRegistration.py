@@ -96,7 +96,7 @@ class LandmarkPicker:
 		# We store the image objects (im_obj) to update clims/cmap later without clearing axes
 		if self.phase == 'fixed':
 			self.num_total_points = None
-			self.fig.suptitle("PHASE 1: Select landmarks. Use toolbar to Zoom/Pan.\n'z': undo, 'p': labels. CLOSE to finish.", fontsize=14)
+			self.fig.suptitle("PHASE 1: Select landmarks. Use toolbar to Zoom/Pan.\n'z': undo, 'p': labels. Close to finish.", fontsize=14)
 			self.fixed_img_norm = self._normalize(self.fixed_image)
 			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='magma', vmin=0, vmax=1, origin=OriginPosition)
 			self.ax_fixed.set_title('Click to select FIXED points')
@@ -106,7 +106,7 @@ class LandmarkPicker:
 			self.fixed_points_to_display = fixed_points_to_display
 			self.num_total_points = len(self.fixed_points_to_display)
 			frame_str = f"Frame {frame_info[0]} / {frame_info[1]}"
-			self.fig.suptitle(f"PHASE 2: {frame_str}\nUse toolbar to Zoom/Pan. 'z': undo, 'p': labels. MUST select {self.num_total_points} points.", fontsize=14)
+			self.fig.suptitle(f"PHASE 2: {frame_str}\nUse toolbar to Zoom/Pan. 'z': undo, 'p': labels, 'w': warnings. Select {self.num_total_points} points.", fontsize=14)
 			
 			self.fixed_img_norm = self._normalize(self.fixed_image)
 			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='magma', vmin=0, vmax=1, origin=OriginPosition)
@@ -286,7 +286,8 @@ class LandmarkPicker:
 
 		if event.key == 'w':
 			print(f'Erasing Warning Messages')
-			self.warning_messages = ''
+			self.warning_messages = ['']
+			self._redraw()
 		elif event.key == 'p':
 			self.show_text_labels = not self.show_text_labels
 			print(f"Text labels toggled {'ON' if self.show_text_labels else 'OFF'}")
