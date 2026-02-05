@@ -1375,7 +1375,7 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 			concatenate all hypercubes
 		- Path : Where the data is located
 		- EdgePos : Positions of the start of each sweep
-		- OnlySweep = True: If True, uses ComputeHypercube_RGB_FrameIterator() to only load identified sweep. Otherwise
+		- OnlySweep = True: If True, uses ComputeHypercube_RGB() to only load identified sweep. Otherwise
 			loads all sweeps.
 		- Wavelengths_list
 		- kwargs:
@@ -1404,17 +1404,15 @@ def GetHypercubeForRegistration(Nsweep, Nframe, Path, EdgePos, Wavelengths_list,
 	RGB = kwargs.get('RGB', True)
 	Channel = kwargs.get('Channel')
 	if RGB:
-#         Frames, RGB_Dark = HySE.ComputeHypercube_RGB(DataPath, EdgePos_Data, Buffer=Buffer, BlueShift=1, SaveArray=False)
+#         Frames, RGB_Dark = HySE.ComputeHypercube_RGB_orig(DataPath, EdgePos_Data, Buffer=Buffer, BlueShift=1, SaveArray=False)
 
 		if OnlySweep:
 			print(f'Only loading single sweep:')
-			Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB_FrameIterator(Path, EdgePos, Buffer=Buffer, NsweepOnly=Nsweep, BlueShift=1, SaveArray=False)
+			Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB(Path, EdgePos, Buffer=Buffer, NsweepOnly=Nsweep, BlueShift=1, SaveArray=False)
 		else:
 			print(f'Loading all sweeps (frame interator for memory efficiency):')
-			Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB_FrameIterator(Path, EdgePos, Buffer=Buffer, BlueShift=1, SaveArray=False)
+			Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB(Path, EdgePos, Buffer=Buffer, BlueShift=1, SaveArray=False)
 
-		# Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB_FrameIterator(Path, EdgePos, Buffer=Buffer, BlueShift=1, SaveArray=False)
-		# Hypercube_all, Dark_all = HySE.ComputeHypercube_RGB(Path, EdgePos, Buffer=Buffer, BlueShift=1, SaveArray=False)
 		print(f' -> Hypercube_all.shape: {Hypercube_all.shape}')
 		
 		if Channel=='G' or Channel==1:

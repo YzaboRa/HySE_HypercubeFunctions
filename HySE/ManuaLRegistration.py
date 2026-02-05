@@ -364,48 +364,87 @@ def _compute_landmark_transform(fixed_points, moving_points, transform_type='aff
 
 from scipy.interpolate import Rbf #RBFInterpolator #
 
-def _compute_tps_transform(fixed_points, moving_points, reference_image_array):
+
+import SimpleITK as _sitk
+import numpy as np
+from scipy.interpolate import RBFInterpolator
+
+def compute_robust_tps_transform(fixed_points, moving_points, reference_image_array, smoothing=0.0, anchor_corners=True):
 	"""
-	Computes a Thin Plate Spline (TPS) displacement field transform that 
-	perfectly aligns the fixed points to the moving points.
-	
+	Computes a regularized Thin Plate Spline (TPS) transform using the modern
+	RBFInterpolator. Includes options for smoothing and corner pinning to 
+	prevent distortion in difficult registration scenarios.
+
 	Args:
 		fixed_points: List of tuples (x, y) in physical coordinates.
 		moving_points: List of tuples (x, y) in physical coordinates.
-		reference_image: The sitk.Image defining the domain (size, spacing, origin).
-		
+		reference_image_array: Numpy array of the reference image.
+		smoothing: Float >= 0. Controls the stiffness. 
+				   0.0 forces exact matches (susceptible to noise/folding).
+				   Values > 0 (e.g., 10.0, 100.0) allow points to misalign slightly 
+				   to preserve grid smoothness.
+		anchor_corners: Boolean. If True, adds fixed points at the image corners 
+						to prevent background extrapolation artifacts.
+
 	Returns:
-		sitk.DisplacementFieldTransform: A non-rigid transform aligning landmarks exactly.
+		sitk.DisplacementFieldTransform
 	"""
-	if len(fixed_points) < 3 or len(moving_points) < 3:
-		raise ValueError("TPS requires at least 3 points.")
-
-	# Convert imput image to sikt image:
+	
+	# Convert input array to SimpleITK image to get physical space info
 	reference_image = _sitk.GetImageFromArray(reference_image_array)
-
-	# 1. Separate points into arrays
-	# Fixed points (Target for the RBF query)
+	
+	# 1. Prepare Points
+	# Convert lists to numpy arrays
 	fx = np.array([p[0] for p in fixed_points])
 	fy = np.array([p[1] for p in fixed_points])
-	
-	# Moving points (Values at the target)
 	mx = np.array([p[0] for p in moving_points])
 	my = np.array([p[1] for p in moving_points])
 
-	# 2. Calculate displacements (Moving - Fixed)
-	# The transform needs to know: "For a point at Fixed(x,y), where is it in Moving?"
-	# The displacement vector is D = Moving - Fixed
-	dx = mx - fx
-	dy = my - fy
+	# 2. Optional: Anchor Corners
+	# This "pins" the corners of the image so the transform decays to identity 
+	# at the edges, preventing wild extrapolation outside the ROI.
+	if anchor_corners:
+		origin = reference_image.GetOrigin()
+		size = reference_image.GetSize()
+		spacing = reference_image.GetSpacing()
+		
+		# Calculate physical coordinates of the 4 corners
+		# (Assuming 2D image)
+		width_phys = size[0] * spacing[0]
+		height_phys = size[1] * spacing[1]
+		
+		# Corners: TL, TR, BL, BR
+		corners = np.array([
+			[origin[0], origin[1]],
+			[origin[0] + width_phys, origin[1]],
+			[origin[0], origin[1] + height_phys],
+			[origin[0] + width_phys, origin[1] + height_phys]
+		])
+		
+		# Separate into x and y components
+		cx = corners[:, 0]
+		cy = corners[:, 1]
+		
+		# Append corners to both Fixed and Moving (Identity transform at corners)
+		fx = np.concatenate([fx, cx])
+		fy = np.concatenate([fy, cy])
+		mx = np.concatenate([mx, cx])
+		my = np.concatenate([my, cy])
 
-	# 3. Fit Radial Basis Functions (Thin Plate Spline)
-	# This creates a function that interpolates the displacements exactly
-	rbf_x = Rbf(fx, fy, dx, function='thin_plate')
-	rbf_y = Rbf(fx, fy, dy, function='thin_plate')
-	# rbf_x = RBFInterpolator(fx, fy, dx, kernel='thin_plate_spline')
-	# rbf_y = RBFInterpolator(fx, fy, dy, kernel='thin_plate_spline')
+	# 3. Calculate Displacements (Target - Source)
+	# RBFInterpolator expects shape (N_samples, N_features)
+	# We stack X and Y to fit them simultaneously
+	source_coords = np.stack([fx, fy], axis=1) # Shape (N, 2)
+	displacements = np.stack([mx - fx, my - fy], axis=1) # Shape (N, 2)
 
-	# 4. Generate a grid of physical coordinates from the reference image
+	# 4. Fit RBF Interpolator
+	# kernel='thin_plate_spline' is standard TPS.
+	# smoothing > 0 performs Ridge Regression instead of exact interpolation
+	rbf = RBFInterpolator(source_coords, displacements, 
+						  kernel='thin_plate_spline', 
+						  smoothing=smoothing)
+
+	# 5. Generate Grid
 	size = reference_image.GetSize()
 	spacing = reference_image.GetSpacing()
 	origin = reference_image.GetOrigin()
@@ -416,30 +455,111 @@ def _compute_tps_transform(fixed_points, moving_points, reference_image_array):
 	y_idx = np.arange(0, size[1])
 	xv_idx, yv_idx = np.meshgrid(x_idx, y_idx, indexing='xy')
 
-	# Convert index grid to physical coordinates (handling rotation/direction)
+	# Convert index grid to physical coordinates
 	# Physical = Origin + Direction * (Index * Spacing)
-	# Note: This matrix mult is manual to support rotated images
 	phys_x = origin[0] + direction[0, 0] * xv_idx * spacing[0] + direction[0, 1] * yv_idx * spacing[1]
 	phys_y = origin[1] + direction[1, 0] * xv_idx * spacing[0] + direction[1, 1] * yv_idx * spacing[1]
 
-	# 5. Evaluate RBF on the grid to get the displacement field
-	disp_x = rbf_x(phys_x, phys_y)
-	disp_y = rbf_y(phys_x, phys_y)
+	# Flatten for prediction
+	flat_phys_coords = np.stack([phys_x.ravel(), phys_y.ravel()], axis=1)
 
-	# 6. Create SimpleITK Displacement Field
-	# Stack x and y displacements into a vector image
-	# Note: SimpleITK expects the vector image to be (SizeX, SizeY) with vector pixels
-	# We must transpose numpy arrays because SimpleITK is (x, y) but numpy is (row, col) aka (y, x)
-	disp_np = np.stack((disp_x, disp_y), axis=-1)
+	# 6. Predict Displacements
+	predicted_disp = rbf(flat_phys_coords)
 	
-	# Create the image from the array
+	# Reshape back to image grid (Height, Width, 2)
+	# Note: numpy order is (y, x), but sitk expects vector image components
+	disp_x_grid = predicted_disp[:, 0].reshape(size[1], size[0])
+	disp_y_grid = predicted_disp[:, 1].reshape(size[1], size[0])
+
+	# 7. Create SimpleITK Displacement Field
+	# Stack x and y displacements. 
+	# IMPORTANT: SimpleITK expects the array index to be (y, x) but the 
+	# vector value to be (displacement_x, displacement_y).
+	disp_np = np.stack((disp_x_grid, disp_y_grid), axis=-1)
+	
 	displacement_img = _sitk.GetImageFromArray(disp_np, isVector=True)
 	displacement_img.CopyInformation(reference_image)
 
-	# 7. Create the Transform
-	transform = _sitk.DisplacementFieldTransform(displacement_img)
+	return _sitk.DisplacementFieldTransform(displacement_img)
+
+
+
+# def _compute_tps_transform(fixed_points, moving_points, reference_image_array):
+# 	"""
+# 	Computes a Thin Plate Spline (TPS) displacement field transform that 
+# 	perfectly aligns the fixed points to the moving points.
 	
-	return transform
+# 	Args:
+# 		fixed_points: List of tuples (x, y) in physical coordinates.
+# 		moving_points: List of tuples (x, y) in physical coordinates.
+# 		reference_image: The sitk.Image defining the domain (size, spacing, origin).
+		
+# 	Returns:
+# 		sitk.DisplacementFieldTransform: A non-rigid transform aligning landmarks exactly.
+# 	"""
+# 	if len(fixed_points) < 3 or len(moving_points) < 3:
+# 		raise ValueError("TPS requires at least 3 points.")
+
+# 	# Convert imput image to sikt image:
+# 	reference_image = _sitk.GetImageFromArray(reference_image_array)
+
+# 	# 1. Separate points into arrays
+# 	# Fixed points (Target for the RBF query)
+# 	fx = np.array([p[0] for p in fixed_points])
+# 	fy = np.array([p[1] for p in fixed_points])
+	
+# 	# Moving points (Values at the target)
+# 	mx = np.array([p[0] for p in moving_points])
+# 	my = np.array([p[1] for p in moving_points])
+
+# 	# 2. Calculate displacements (Moving - Fixed)
+# 	# The transform needs to know: "For a point at Fixed(x,y), where is it in Moving?"
+# 	# The displacement vector is D = Moving - Fixed
+# 	dx = mx - fx
+# 	dy = my - fy
+
+# 	# 3. Fit Radial Basis Functions (Thin Plate Spline)
+# 	# This creates a function that interpolates the displacements exactly
+# 	rbf_x = Rbf(fx, fy, dx, function='thin_plate')
+# 	rbf_y = Rbf(fx, fy, dy, function='thin_plate')
+# 	# rbf_x = RBFInterpolator(fx, fy, dx, kernel='thin_plate_spline')
+# 	# rbf_y = RBFInterpolator(fx, fy, dy, kernel='thin_plate_spline')
+
+# 	# 4. Generate a grid of physical coordinates from the reference image
+# 	size = reference_image.GetSize()
+# 	spacing = reference_image.GetSpacing()
+# 	origin = reference_image.GetOrigin()
+# 	direction = np.array(reference_image.GetDirection()).reshape(2, 2)
+
+# 	# Create index grid
+# 	x_idx = np.arange(0, size[0])
+# 	y_idx = np.arange(0, size[1])
+# 	xv_idx, yv_idx = np.meshgrid(x_idx, y_idx, indexing='xy')
+
+# 	# Convert index grid to physical coordinates (handling rotation/direction)
+# 	# Physical = Origin + Direction * (Index * Spacing)
+# 	# Note: This matrix mult is manual to support rotated images
+# 	phys_x = origin[0] + direction[0, 0] * xv_idx * spacing[0] + direction[0, 1] * yv_idx * spacing[1]
+# 	phys_y = origin[1] + direction[1, 0] * xv_idx * spacing[0] + direction[1, 1] * yv_idx * spacing[1]
+
+# 	# 5. Evaluate RBF on the grid to get the displacement field
+# 	disp_x = rbf_x(phys_x, phys_y)
+# 	disp_y = rbf_y(phys_x, phys_y)
+
+# 	# 6. Create SimpleITK Displacement Field
+# 	# Stack x and y displacements into a vector image
+# 	# Note: SimpleITK expects the vector image to be (SizeX, SizeY) with vector pixels
+# 	# We must transpose numpy arrays because SimpleITK is (x, y) but numpy is (row, col) aka (y, x)
+# 	disp_np = np.stack((disp_x, disp_y), axis=-1)
+	
+# 	# Create the image from the array
+# 	displacement_img = _sitk.GetImageFromArray(disp_np, isVector=True)
+# 	displacement_img.CopyInformation(reference_image)
+
+# 	# 7. Create the Transform
+# 	transform = _sitk.DisplacementFieldTransform(displacement_img)
+	
+# 	return transform
 
 
 	
@@ -505,7 +625,9 @@ def ManualRegistration(RawHypercube, Wavelengths_list, **kwargs):
 									  to bypass the interactive GUI.
 			- TransformType ('Affine'): Global transform for the landmark stage.
 			- deviation_threshold (50): Pixel distance threshold for landmark warnings.
-			- ** B-Spline kwargs (e.g., GridSpacing) will be IGNORED. **
+			- TransformSmoothing = 100 : Smoothing parameter that relaxes the thin plates splines fit 
+					(considers fixed points like attractors)
+			- AnchorCorners = True : If True. anchors the corners of the image to avoid wild distortions
 
 	Outputs:
 		- Hypercube_sorted: The final co-registered hypercube.
@@ -516,7 +638,8 @@ def ManualRegistration(RawHypercube, Wavelengths_list, **kwargs):
 	"""
 	if kwargs.get('Help', False): print(inspect.getdoc(CoRegisterHypercube_LandmarkOnly)); return (None,)*4
 
-	
+	TransformSmoothing = kwargs.get('TransformSmoothing', 100)
+	AnchorCorners = kwargs.get('AnchorCorners', True)
 	Static_Index = kwargs.get('StaticIndex', 0)
 	print(f'Setting frame  {Static_Index} as static frame')
 	Cropping = kwargs.get('Cropping', 0)
@@ -622,14 +745,15 @@ def ManualRegistration(RawHypercube, Wavelengths_list, **kwargs):
 		
 		# Assuming _compute_landmark_transform returns a SimpleITK Transform object
 		if Exact:
-			initial_transform = _compute_tps_transform(fixed_landmarks, moving_landmarks_for_frame, im_shifted)
+			# initial_transform = _compute_tps_transform(fixed_landmarks, moving_landmarks_for_frame, im_shifted)
+			initial_transform = compute_robust_tps_transform(fixed_landmarks, moving_landmarks_for_frame, im_shifted,smoothing=TransformSmoothing, anchor_corners=AnchorCorners)
 		else:
 			initial_transform = _compute_landmark_transform(fixed_landmarks, moving_landmarks_for_frame, kwargs.get('TransformType', 'Affine').lower())
 		
 		
 		# --- STAGE 2: APPLY LANDMARK TRANSFORM (B-SPLINE SKIPPED) ---
 		if initial_transform:
-			print("  -> Applying landmark-based transform (skipping B-Spline).")
+			# print("  -> Applying landmark-based transform (skipping B-Spline).")
 			
 			sitk_im_shifted = _sitk.GetImageFromArray(im_shifted.astype(np.float32))
 			sitk_im_shifted.CopyInformation(sitk_im_static) # Match metadata
@@ -760,30 +884,30 @@ def MakeCombinedHypercubeForRegistration(hypercube, selector_results, original_w
 
 
 def SaveAllTransforms(transforms_list, labels_list, filename="RegistrationTransforms.pkl"):
-    """
-    Saves a list of SimpleITK transforms and their associated labels to a single file.
+	"""
+	Saves a list of SimpleITK transforms and their associated labels to a single file.
 
-    Parameters:
-    -----------
-    transforms_list : list
-        List of SimpleITK transform objects (output from ManualRegistration).
-    labels_list : list
-        List of strings identifying each transform (output from MakeCombinedHypercubeForRegistration).
-    filename : str
-        Path to save the output file.
-    """
-    if len(transforms_list) != len(labels_list):
-        raise ValueError("Error: The number of transforms must match the number of labels.")
+	Parameters:
+	-----------
+	transforms_list : list
+		List of SimpleITK transform objects (output from ManualRegistration).
+	labels_list : list
+		List of strings identifying each transform (output from MakeCombinedHypercubeForRegistration).
+	filename : str
+		Path to save the output file.
+	"""
+	if len(transforms_list) != len(labels_list):
+		raise ValueError("Error: The number of transforms must match the number of labels.")
 
-    # Create a dictionary mapping Label -> Transform
-    # This ensures we always know exactly which transform belongs to which frame
-    transform_dict = dict(zip(labels_list, transforms_list))
+	# Create a dictionary mapping Label -> Transform
+	# This ensures we always know exactly which transform belongs to which frame
+	transform_dict = dict(zip(labels_list, transforms_list))
 
-    # Save to a single pickle file
-    with open(filename, 'wb') as f:
-        pickle.dump(transform_dict, f)
-    
-    print(f"Successfully saved {len(transforms_list)} transforms to {filename}")
+	# Save to a single pickle file
+	with open(filename, 'wb') as f:
+		pickle.dump(transform_dict, f)
+	
+	print(f"Successfully saved {len(transforms_list)} transforms to {filename}")
 
 
 
@@ -796,8 +920,9 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
     -----------
     data_hypercube : np.ndarray
         4D array [Nsweeps, Nwavelengths, Y, X] containing the data to be warped.
-    selector_results_indices : lists
-        The indices output from the (mask, indices) tuple from the FrameSelector GUI.
+    selector_results : tuple or list/array
+        The output from the FrameSelector. Can be the tuple (mask, indices) 
+        or just the indices array.
     transforms_file_path : str
         Path to the .pkl file created by SaveAllTransforms.
     original_wavelengths : list, optional
@@ -816,7 +941,11 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
         transform_dict = pickle.load(f)
 
     # 2. Unpack indices
-    good_indices = selector_results
+    if isinstance(selector_results, tuple) and len(selector_results) == 2:
+        good_indices = selector_results[1]
+    else:
+        good_indices = selector_results
+
     n_valid = len(good_indices)
     _, _, h, w = data_hypercube.shape
 
@@ -835,94 +964,235 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
         # Extract the frame
         image_np = data_hypercube[s_idx, w_idx, :, :]
         
-        # Reconstruct the label key to find the correct transform
-        # e.g. "S2_Frame5"
+        # Reconstruct the label key
         label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
         
         if label_key not in transform_dict:
             print(f"Warning: No transform found for {label_key}. Skipping (leaving as zeros).")
             continue
 
-        # Get transform
-        tform = transform_dict[label_key]
+        # Get transform data
+        # Note: If this comes from compute_robust_tps_transform, it is likely a 
+        # tuple of (source_pts, target_pts) or a specific TPS parameter object, 
+        # NOT a SimpleITK.Transform object directly.
+        tform_data = transform_dict[label_key]
 
         # Convert numpy -> SimpleITK
         sitk_img = _sitk.GetImageFromArray(image_np)
         
+        # Re-instantiate the BSpline/TPS transform
+        # We assume tform_data contains the necessary landmarks or parameters
+        # stored by the manual registration function.
+        
+        # Case A: If it's a standard sitk.Transform (BSplineTransform, etc.)
+        if isinstance(tform_data, _sitk.Transform):
+            final_transform = tform_data
+            
+        # Case B: If it's a list/tuple of landmarks (source_pts, target_pts)
+        # This matches common manual registration outputs where the transform is 
+        # recalculated on the fly to avoid pickling C++ objects issues.
+        elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2:
+            src_pts, dst_pts = tform_data
+            
+            # Flatten points for SimpleITK interface if necessary
+            # Assuming src_pts is list of (x,y) tuples
+            src_flat = [coord for point in src_pts for coord in point]
+            dst_flat = [coord for point in dst_pts for coord in point]
+            
+            final_transform = _sitk.LandmarkBasedTransformInitializer(
+                _sitk.BSplineTransform(2, 3), # Dimension 2, Order 3
+                src_flat, 
+                dst_flat,
+                _sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3 # or standard LandmarkBased
+            )
+            # If the above initializer is specific to Rigid/Affine, use:
+            # final_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.VersorRigid3DTransform(), src_flat, dst_flat)
+            # But for TPS/BSpline manual registration, usually we use:
+            
+            # Create the TPS transform explicitly if landmarks are provided
+            # Note: SimpleITK's LandmarkBasedTransformInitializer is often rigid/affine.
+            # For TPS/BSpline warping, we often need the BSplineTransformInitializer 
+            # or simply recreate the LandMarkBasedTransform if available.
+            
+            # Reverting to the logic likely used in `compute_robust_tps_transform`:
+            landmark_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.BSplineTransform(2), src_flat, dst_flat)
+            final_transform = landmark_transform
+
+        else:
+             # Fallback: Assume it is a pickled SimpleElastix ParameterMap (vector of maps)
+             # but since that failed previously, we default to treating it as a raw SITK transform
+             # that might have been pickled incorrectly if not handled above.
+             final_transform = tform_data
+
         # Apply Resampling
-        # Note: We use the image itself as the reference for size/spacing
         resampler = _sitk.ResampleImageFilter()
         resampler.SetReferenceImage(sitk_img)
-        resampler.SetTransform(tform)
-        resampler.SetInterpolator(_sitk.sitkLinear) # Use sitkNearestNeighbor for masks
-        resampler.SetDefaultPixelValue(0) # Value for pixels outside the image
         
-        warped_sitk = resampler.Execute(sitk_img)
+        try:
+            resampler.SetTransform(final_transform)
+        except Exception:
+            # Last ditch effort: if tform_data was actually the "args" for a transform
+            pass
+
+        resampler.SetInterpolator(_sitk.sitkLinear)
+        resampler.SetDefaultPixelValue(0)
         
-        # Convert back to numpy
-        transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
-        valid_labels.append(label_key)
+        try:
+            warped_sitk = resampler.Execute(sitk_img)
+            transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+            valid_labels.append(label_key)
+        except Exception as e:
+            print(f"Failed to apply transform for {label_key}: {e}")
 
     return transformed_stack, valid_labels
 
+	
+
+# def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, original_wavelengths=None):
+# 	"""
+# 	Applies loaded transforms to the valid frames of a Data Hypercube.
+
+# 	Parameters:
+# 	-----------
+# 	data_hypercube : np.ndarray
+# 		4D array [Nsweeps, Nwavelengths, Y, X] containing the data to be warped.
+# 	selector_results : tuple or list/array
+# 		The output from the FrameSelector. Can be the tuple (mask, indices) 
+# 		or just the indices array.
+# 	transforms_file_path : str
+# 		Path to the .pkl file created by SaveAllTransforms.
+# 	original_wavelengths : list, optional
+# 		List of original frame names (e.g., ['Frame0', 'Frame1'...]).
+# 		Must match what was used during registration to generate the keys.
+
+# 	Returns:
+# 	--------
+# 	transformed_stack : np.ndarray
+# 		3D array [N_valid, Y, X] of coregistered data frames.
+# 	valid_labels : list
+# 		List of labels corresponding to the output stack.
+# 	"""
+# 	# 1. Load Transforms
+# 	with open(transforms_file_path, 'rb') as f:
+# 		transform_dict = pickle.load(f)
+
+# 	# 2. Unpack indices
+# 	# Check if input is the tuple (mask, indices) or just indices
+# 	if isinstance(selector_results, tuple) and len(selector_results) == 2:
+# 		good_indices = selector_results[1]
+# 	else:
+# 		good_indices = selector_results
+
+# 	n_valid = len(good_indices)
+# 	_, _, h, w = data_hypercube.shape
+
+# 	# 3. Handle default labels
+# 	if original_wavelengths is None:
+# 		num_wavs = data_hypercube.shape[1]
+# 		original_wavelengths = [f"Frame{i}" for i in range(num_wavs)]
+
+# 	# 4. Prepare Output Array
+# 	transformed_stack = np.zeros((n_valid, h, w), dtype=data_hypercube.dtype)
+# 	valid_labels = []
+
+# 	print(f"Applying transforms to {n_valid} frames...")
+
+# 	for i, (s_idx, w_idx) in enumerate(good_indices):
+# 		# Extract the frame
+# 		image_np = data_hypercube[s_idx, w_idx, :, :]
+		
+# 		# Reconstruct the label key to find the correct transform
+# 		# e.g. "S2_Frame5"
+# 		label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
+		
+# 		if label_key not in transform_dict:
+# 			print(f"Warning: No transform found for {label_key}. Skipping (leaving as zeros).")
+# 			continue
+
+# 		# Get transform
+# 		tform = transform_dict[label_key]
+
+# 		# Convert numpy -> SimpleITK
+# 		sitk_img = _sitk.GetImageFromArray(image_np)
+		
+# 		# Apply Resampling
+# 		# Note: We use the image itself as the reference for size/spacing
+# 		resampler = _sitk.ResampleImageFilter()
+# 		resampler.SetReferenceImage(sitk_img)
+# 		resampler.SetTransform(tform)
+# 		resampler.SetInterpolator(_sitk.sitkLinear) # Use sitkNearestNeighbor for masks
+# 		resampler.SetDefaultPixelValue(0) # Value for pixels outside the image
+		
+# 		warped_sitk = resampler.Execute(sitk_img)
+		
+# 		# Convert back to numpy
+# 		transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+# 		valid_labels.append(label_key)
+
+# 	return transformed_stack, valid_labels
 
 
-def CombineFrames(transformed_stack, labels_list, n_wavelengths):
-    """
-    Averages registered frames belonging to the same wavelength index.
 
-    Parameters:
-    -----------
-    transformed_stack : np.ndarray
-        3D array [N_valid, Y, X] output from ApplyAllTransforms.
-    labels_list : list
-        List of labels matching transformed_stack (e.g., ["S0_Frame0", "S1_Frame0"...]).
-    n_wavelengths : int
-        The expected number of unique wavelengths (frames per sweep).
 
-    Returns:
-    --------
-    combined_cube : np.ndarray
-        3D array [Nwavelengths, Y, X] containing the averaged data.
-    """
-    N, h, w = transformed_stack.shape
-    
-    # Initialize accumulators
-    # sum_cube stores the pixel sums
-    sum_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
-    # count_cube stores how many frames contributed to each pixel
-    count_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
 
-    print("Combining frames by averaging...")
+def CombineFrames(transformed_stack, labels_list, n_wavelengths=16):
+	"""
+	Averages registered frames belonging to the same wavelength index.
 
-    for i, label in enumerate(labels_list):
-        # Parse the label to get the frame index
-        # Assuming label format "S{sweep}_Frame{wav}" or similar
-        # We look for the part after the underscore or explicitly find the Wav index
-        
-        # Regex to find the index associated with the "Frame" part
-        # Looks for "Frame" followed by digits
-        match = re.search(r'Frame(\d+)', label)
-        if match:
-            wav_idx = int(match.group(1))
-        else:
-            # Fallback: if you used a custom list like ['Blue', 'Red']
-            # We have to map string -> index manually. 
-            # For now, assuming "FrameX" format as per previous steps.
-            print(f"Error parsing label {label}. Skipping.")
-            continue
-            
-        if wav_idx >= n_wavelengths:
-            continue
+	Parameters:
+	-----------
+	transformed_stack : np.ndarray
+		3D array [N_valid, Y, X] output from ApplyAllTransforms.
+	labels_list : list
+		List of labels matching transformed_stack (e.g., ["S0_Frame0", "S1_Frame0"...]).
+	n_wavelengths : int (16)
+		The expected number of unique wavelengths (frames per sweep).
 
-        # Add current frame to accumulator
-        sum_cube[wav_idx] += transformed_stack[i]
-        count_cube[wav_idx] += 1
+	Returns:
+	--------
+	combined_cube : np.ndarray
+		3D array [Nwavelengths, Y, X] containing the averaged data.
+	"""
+	N, h, w = transformed_stack.shape
+	
+	# Initialize accumulators
+	# sum_cube stores the pixel sums
+	sum_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
+	# count_cube stores how many frames contributed to each pixel
+	count_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
 
-    # Divide by count to get average
-    # Avoid division by zero where no frames were present
-    with np.errstate(divide='ignore', invalid='ignore'):
-        combined_cube = sum_cube / count_cube
-        combined_cube[count_cube == 0] = 0 # Handle empty frames
+	print("Combining frames by averaging...")
 
-    return combined_cube
+	for i, label in enumerate(labels_list):
+		# Parse the label to get the frame index
+		# Assuming label format "S{sweep}_Frame{wav}" or similar
+		# We look for the part after the underscore or explicitly find the Wav index
+		
+		# Regex to find the index associated with the "Frame" part
+		# Looks for "Frame" followed by digits
+		match = re.search(r'Frame(\d+)', label)
+		if match:
+			wav_idx = int(match.group(1))
+		else:
+			# Fallback: if you used a custom list like ['Blue', 'Red']
+			# We have to map string -> index manually. 
+			# For now, assuming "FrameX" format as per previous steps.
+			print(f"Error parsing label {label}. Skipping.")
+			continue
+			
+		# print(f'label: {label} - wav_idx: {wav_idx}')
+		if wav_idx >= n_wavelengths:
+			continue
+
+		# Add current frame to accumulator
+		# Convert to float to avoid rounding errors
+		sum_cube[wav_idx] += transformed_stack[i].astype('float32')
+		count_cube[wav_idx] += 1
+
+	# Divide by count to get average
+	# Avoid division by zero where no frames were present
+	with np.errstate(divide='ignore', invalid='ignore'):
+		combined_cube = sum_cube / count_cube
+		combined_cube[count_cube == 0] = 0 # Handle empty frames
+
+	return combined_cube

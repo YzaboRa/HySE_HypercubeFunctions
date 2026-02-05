@@ -268,7 +268,7 @@ def ComputeHypercube(DataPath, EdgePos, **kwargs):
 
 
 
-def ComputeHypercube_RGB_FrameIterator(DataPath, EdgePos, **kwargs):
+def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 	"""
 	Memory-efficient version of ComputeHypercube_RGB that processes frames iteratively.
 	
@@ -320,7 +320,7 @@ def ComputeHypercube_RGB_FrameIterator(DataPath, EdgePos, **kwargs):
 
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(inspect.getdoc(ComputeHypercube_RGB_FrameIterator))
+		print(inspect.getdoc(ComputeHypercube_RGB))
 		return 0, 0
 	
 
@@ -548,7 +548,7 @@ def ComputeHypercube_RGB_FrameIterator(DataPath, EdgePos, **kwargs):
 
 
 
-def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
+def ComputeHypercube_RGB_orig(DataPath, EdgePos, **kwargs):
 	"""
 	Function to compute the hypercube. It inputs the path to the data and
 	the EdgePos output from the FindHypercube function (which indicates where
@@ -593,7 +593,7 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 
 	Help = kwargs.get('Help', False)
 	if Help:
-		print(inspect.getdoc(ComputeHypercube_RGB))
+		print(inspect.getdoc(ComputeHypercube_RGB_orig))
 		return 0, 0
 
 
