@@ -1248,8 +1248,7 @@ def CoRegisterHypercubeAndMask(RawHypercube, Wavelengths_list, **kwargs):
 				ShiftedMask_for_reg = HySE.GetGlobalMask(EdgeMask=EdgeMask, ReflectionsMask=ReflectionsMask_Shifted, PrintInfo=False)
 
 			# 3. Perform the masked registration
-			im_coregistered_smeared, transform_map = HySE.CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask_for_reg,
-																		 ShiftedMask=ShiftedMask_for_reg, **kwargs)
+			im_coregistered_smeared, transform_map = HySE.CoRegisterImages(im_static, im_shifted, StaticMask=StaticMask_for_reg, ShiftedMask=ShiftedMask_for_reg, **kwargs)
 
 			im_coregistered_final = im_coregistered_smeared.astype(np.float32)
 

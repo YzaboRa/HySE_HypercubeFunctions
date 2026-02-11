@@ -20,6 +20,8 @@ from matplotlib.widgets import RectangleSelector
 import time
 from tqdm import trange
 import inspect
+import matplotlib.patheffects as PathEffects
+
 
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
@@ -883,25 +885,82 @@ def MakeCombinedHypercubeForRegistration(hypercube, selector_results, original_w
 
 
 
+# def SaveAllTransforms(transforms_list, labels_list, filename="RegistrationTransforms.pkl"):
+# 	"""
+# 	Saves a list of SimpleITK transforms and their associated labels to a single file.
+
+# 	Parameters:
+# 	-----------
+# 	transforms_list : list
+# 		List of SimpleITK transform objects (output from ManualRegistration).
+# 	labels_list : list
+# 		List of strings identifying each transform (output from MakeCombinedHypercubeForRegistration).
+# 	filename : str
+# 		Path to save the output file.
+# 	"""
+# 	if len(transforms_list) != len(labels_list):
+# 		raise ValueError("Error: The number of transforms must match the number of labels.")
+
+# 	# Create a dictionary mapping Label -> Transform
+# 	# This ensures we always know exactly which transform belongs to which frame
+# 	transform_dict = dict(zip(labels_list, transforms_list))
+
+# 	# Save to a single pickle file
+# 	with open(filename, 'wb') as f:
+# 		pickle.dump(transform_dict, f)
+	
+# 	print(f"Successfully saved {len(transforms_list)} transforms to {filename}")
+
+
 def SaveAllTransforms(transforms_list, labels_list, filename="RegistrationTransforms.pkl"):
 	"""
 	Saves a list of SimpleITK transforms and their associated labels to a single file.
+	
+	Backwards compatible with Automatic Registration output (tuples of ParameterMaps)
+	and Manual Registration output (sitk.Transform objects).
 
 	Parameters:
 	-----------
 	transforms_list : list
-		List of SimpleITK transform objects (output from ManualRegistration).
+		List of transform objects. Can be:
+		- sitk.Transform (Manual Registration)
+		- int (0 for fixed frames)
+		- tuple of sitk.ParameterMap (Automatic Registration)
 	labels_list : list
-		List of strings identifying each transform (output from MakeCombinedHypercubeForRegistration).
+		List of strings identifying each transform.
 	filename : str
 		Path to save the output file.
 	"""
 	if len(transforms_list) != len(labels_list):
 		raise ValueError("Error: The number of transforms must match the number of labels.")
 
+	def _make_serializable(item):
+		"""Recursively converts SwigPyObjects (like ParameterMaps) to pickle-able Python types."""
+		# Pass integers through (handles the '0' for fixed frames)
+		if isinstance(item, int):
+			return item
+		
+		# Handle tuples recursively (handles the tuple of 2 ParameterMaps)
+		if isinstance(item, tuple):
+			return tuple(_make_serializable(x) for x in item)
+		
+		# Handle lists recursively
+		if isinstance(item, list):
+			return [_make_serializable(x) for x in item]
+
+		# Handle SimpleITK ParameterMaps (The source of the TypeError)
+		# converting them to dicts makes them serializable.
+		if "ParameterMap" in item.__class__.__name__:
+			return dict(item)
+
+		# Default: Return the item as is (e.g., sitk.Transform objects from Manual Registration)
+		return item
+
+	# Clean the input list to ensure all items are serializable
+	clean_transforms_list = [_make_serializable(t) for t in transforms_list]
+
 	# Create a dictionary mapping Label -> Transform
-	# This ensures we always know exactly which transform belongs to which frame
-	transform_dict = dict(zip(labels_list, transforms_list))
+	transform_dict = dict(zip(labels_list, clean_transforms_list))
 
 	# Save to a single pickle file
 	with open(filename, 'wb') as f:
@@ -913,138 +972,138 @@ def SaveAllTransforms(transforms_list, labels_list, filename="RegistrationTransf
 
 
 def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, original_wavelengths=None):
-    """
-    Applies loaded transforms to the valid frames of a Data Hypercube.
+	"""
+	Applies loaded transforms to the valid frames of a Data Hypercube.
 
-    Parameters:
-    -----------
-    data_hypercube : np.ndarray
-        4D array [Nsweeps, Nwavelengths, Y, X] containing the data to be warped.
-    selector_results : tuple or list/array
-        The output from the FrameSelector. Can be the tuple (mask, indices) 
-        or just the indices array.
-    transforms_file_path : str
-        Path to the .pkl file created by SaveAllTransforms.
-    original_wavelengths : list, optional
-        List of original frame names (e.g., ['Frame0', 'Frame1'...]).
-        Must match what was used during registration to generate the keys.
+	Parameters:
+	-----------
+	data_hypercube : np.ndarray
+		4D array [Nsweeps, Nwavelengths, Y, X] containing the data to be warped.
+	selector_results : tuple or list/array
+		The output from the FrameSelector. Can be the tuple (mask, indices) 
+		or just the indices array.
+	transforms_file_path : str
+		Path to the .pkl file created by SaveAllTransforms.
+	original_wavelengths : list, optional
+		List of original frame names (e.g., ['Frame0', 'Frame1'...]).
+		Must match what was used during registration to generate the keys.
 
-    Returns:
-    --------
-    transformed_stack : np.ndarray
-        3D array [N_valid, Y, X] of coregistered data frames.
-    valid_labels : list
-        List of labels corresponding to the output stack.
-    """
-    # 1. Load Transforms
-    with open(transforms_file_path, 'rb') as f:
-        transform_dict = pickle.load(f)
+	Returns:
+	--------
+	transformed_stack : np.ndarray
+		3D array [N_valid, Y, X] of coregistered data frames.
+	valid_labels : list
+		List of labels corresponding to the output stack.
+	"""
+	# 1. Load Transforms
+	with open(transforms_file_path, 'rb') as f:
+		transform_dict = pickle.load(f)
 
-    # 2. Unpack indices
-    if isinstance(selector_results, tuple) and len(selector_results) == 2:
-        good_indices = selector_results[1]
-    else:
-        good_indices = selector_results
+	# 2. Unpack indices
+	if isinstance(selector_results, tuple) and len(selector_results) == 2:
+		good_indices = selector_results[1]
+	else:
+		good_indices = selector_results
 
-    n_valid = len(good_indices)
-    _, _, h, w = data_hypercube.shape
+	n_valid = len(good_indices)
+	_, _, h, w = data_hypercube.shape
 
-    # 3. Handle default labels
-    if original_wavelengths is None:
-        num_wavs = data_hypercube.shape[1]
-        original_wavelengths = [f"Frame{i}" for i in range(num_wavs)]
+	# 3. Handle default labels
+	if original_wavelengths is None:
+		num_wavs = data_hypercube.shape[1]
+		original_wavelengths = [f"Frame{i}" for i in range(num_wavs)]
 
-    # 4. Prepare Output Array
-    transformed_stack = np.zeros((n_valid, h, w), dtype=data_hypercube.dtype)
-    valid_labels = []
+	# 4. Prepare Output Array
+	transformed_stack = np.zeros((n_valid, h, w), dtype=data_hypercube.dtype)
+	valid_labels = []
 
-    print(f"Applying transforms to {n_valid} frames...")
+	print(f"Applying transforms to {n_valid} frames...")
 
-    for i, (s_idx, w_idx) in enumerate(good_indices):
-        # Extract the frame
-        image_np = data_hypercube[s_idx, w_idx, :, :]
-        
-        # Reconstruct the label key
-        label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
-        
-        if label_key not in transform_dict:
-            print(f"Warning: No transform found for {label_key}. Skipping (leaving as zeros).")
-            continue
+	for i, (s_idx, w_idx) in enumerate(good_indices):
+		# Extract the frame
+		image_np = data_hypercube[s_idx, w_idx, :, :]
+		
+		# Reconstruct the label key
+		label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
+		
+		if label_key not in transform_dict:
+			print(f"Warning: No transform found for {label_key}. Skipping (leaving as zeros).")
+			continue
 
-        # Get transform data
-        # Note: If this comes from compute_robust_tps_transform, it is likely a 
-        # tuple of (source_pts, target_pts) or a specific TPS parameter object, 
-        # NOT a SimpleITK.Transform object directly.
-        tform_data = transform_dict[label_key]
+		# Get transform data
+		# Note: If this comes from compute_robust_tps_transform, it is likely a 
+		# tuple of (source_pts, target_pts) or a specific TPS parameter object, 
+		# NOT a SimpleITK.Transform object directly.
+		tform_data = transform_dict[label_key]
 
-        # Convert numpy -> SimpleITK
-        sitk_img = _sitk.GetImageFromArray(image_np)
-        
-        # Re-instantiate the BSpline/TPS transform
-        # We assume tform_data contains the necessary landmarks or parameters
-        # stored by the manual registration function.
-        
-        # Case A: If it's a standard sitk.Transform (BSplineTransform, etc.)
-        if isinstance(tform_data, _sitk.Transform):
-            final_transform = tform_data
-            
-        # Case B: If it's a list/tuple of landmarks (source_pts, target_pts)
-        # This matches common manual registration outputs where the transform is 
-        # recalculated on the fly to avoid pickling C++ objects issues.
-        elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2:
-            src_pts, dst_pts = tform_data
-            
-            # Flatten points for SimpleITK interface if necessary
-            # Assuming src_pts is list of (x,y) tuples
-            src_flat = [coord for point in src_pts for coord in point]
-            dst_flat = [coord for point in dst_pts for coord in point]
-            
-            final_transform = _sitk.LandmarkBasedTransformInitializer(
-                _sitk.BSplineTransform(2, 3), # Dimension 2, Order 3
-                src_flat, 
-                dst_flat,
-                _sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3 # or standard LandmarkBased
-            )
-            # If the above initializer is specific to Rigid/Affine, use:
-            # final_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.VersorRigid3DTransform(), src_flat, dst_flat)
-            # But for TPS/BSpline manual registration, usually we use:
-            
-            # Create the TPS transform explicitly if landmarks are provided
-            # Note: SimpleITK's LandmarkBasedTransformInitializer is often rigid/affine.
-            # For TPS/BSpline warping, we often need the BSplineTransformInitializer 
-            # or simply recreate the LandMarkBasedTransform if available.
-            
-            # Reverting to the logic likely used in `compute_robust_tps_transform`:
-            landmark_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.BSplineTransform(2), src_flat, dst_flat)
-            final_transform = landmark_transform
+		# Convert numpy -> SimpleITK
+		sitk_img = _sitk.GetImageFromArray(image_np)
+		
+		# Re-instantiate the BSpline/TPS transform
+		# We assume tform_data contains the necessary landmarks or parameters
+		# stored by the manual registration function.
+		
+		# Case A: If it's a standard sitk.Transform (BSplineTransform, etc.)
+		if isinstance(tform_data, _sitk.Transform):
+			final_transform = tform_data
+			
+		# Case B: If it's a list/tuple of landmarks (source_pts, target_pts)
+		# This matches common manual registration outputs where the transform is 
+		# recalculated on the fly to avoid pickling C++ objects issues.
+		elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2:
+			src_pts, dst_pts = tform_data
+			
+			# Flatten points for SimpleITK interface if necessary
+			# Assuming src_pts is list of (x,y) tuples
+			src_flat = [coord for point in src_pts for coord in point]
+			dst_flat = [coord for point in dst_pts for coord in point]
+			
+			final_transform = _sitk.LandmarkBasedTransformInitializer(
+				_sitk.BSplineTransform(2, 3), # Dimension 2, Order 3
+				src_flat, 
+				dst_flat,
+				_sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3 # or standard LandmarkBased
+			)
+			# If the above initializer is specific to Rigid/Affine, use:
+			# final_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.VersorRigid3DTransform(), src_flat, dst_flat)
+			# But for TPS/BSpline manual registration, usually we use:
+			
+			# Create the TPS transform explicitly if landmarks are provided
+			# Note: SimpleITK's LandmarkBasedTransformInitializer is often rigid/affine.
+			# For TPS/BSpline warping, we often need the BSplineTransformInitializer 
+			# or simply recreate the LandMarkBasedTransform if available.
+			
+			# Reverting to the logic likely used in `compute_robust_tps_transform`:
+			landmark_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.BSplineTransform(2), src_flat, dst_flat)
+			final_transform = landmark_transform
 
-        else:
-             # Fallback: Assume it is a pickled SimpleElastix ParameterMap (vector of maps)
-             # but since that failed previously, we default to treating it as a raw SITK transform
-             # that might have been pickled incorrectly if not handled above.
-             final_transform = tform_data
+		else:
+			 # Fallback: Assume it is a pickled SimpleElastix ParameterMap (vector of maps)
+			 # but since that failed previously, we default to treating it as a raw SITK transform
+			 # that might have been pickled incorrectly if not handled above.
+			 final_transform = tform_data
 
-        # Apply Resampling
-        resampler = _sitk.ResampleImageFilter()
-        resampler.SetReferenceImage(sitk_img)
-        
-        try:
-            resampler.SetTransform(final_transform)
-        except Exception:
-            # Last ditch effort: if tform_data was actually the "args" for a transform
-            pass
+		# Apply Resampling
+		resampler = _sitk.ResampleImageFilter()
+		resampler.SetReferenceImage(sitk_img)
+		
+		try:
+			resampler.SetTransform(final_transform)
+		except Exception:
+			# Last ditch effort: if tform_data was actually the "args" for a transform
+			pass
 
-        resampler.SetInterpolator(_sitk.sitkLinear)
-        resampler.SetDefaultPixelValue(0)
-        
-        try:
-            warped_sitk = resampler.Execute(sitk_img)
-            transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
-            valid_labels.append(label_key)
-        except Exception as e:
-            print(f"Failed to apply transform for {label_key}: {e}")
+		resampler.SetInterpolator(_sitk.sitkLinear)
+		resampler.SetDefaultPixelValue(0)
+		
+		try:
+			warped_sitk = resampler.Execute(sitk_img)
+			transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+			valid_labels.append(label_key)
+		except Exception as e:
+			print(f"Failed to apply transform for {label_key}: {e}")
 
-    return transformed_stack, valid_labels
+	return transformed_stack, valid_labels
 
 	
 
@@ -1196,3 +1255,46 @@ def CombineFrames(transformed_stack, labels_list, n_wavelengths=16):
 		combined_cube[count_cube == 0] = 0 # Handle empty frames
 
 	return combined_cube
+
+
+
+
+
+def PlotFixedPoints(HypercubeForRegistration, StaticIndex, AllPoints, SavingPath="StaticFramePoints.png", Labels=False):
+	"""
+	Plots and saves the static frame from a hypercube with the identified registration points.
+
+	Args:
+		HypercubeForRegistration (numpy.ndarray): The unregistered hypercube (H, W, Bands).
+		StaticIndex (int): The index of the static frame.
+		AllPoints (list or dict): Structure containing control points. Assumes AllPoints[StaticIndex] 
+								  returns an array of shape (N, 2) representing (x, y) coordinates.
+		filename (str): Path to save the resulting figure.
+		Labels (bool): If True, plots the numerical index (1-based) of each point.
+	"""
+	# Extract the static frame image
+	static_image = HypercubeForRegistration[StaticIndex, :, :]
+	
+	# Extract fixed points and convert list of tuples to numpy array for slicing
+	points = np.array(AllPoints['fixed_points'])
+	num_points = len(points)
+
+	# Generate colors from the jet colormap
+	colors = cm.jet(np.linspace(0, 1, num_points))
+
+	plt.figure(figsize=(10, 10))
+	plt.imshow(static_image, cmap='gray')
+	
+	# Plot each point (assuming points are x, y)
+	plt.scatter(points[:, 0], points[:, 1], c=colors, s=50, edgecolors='white', linewidths=0.5)
+
+	if Labels:
+		for i, (x, y) in enumerate(points):
+			plt.text(x, y, str(i + 1), color='yellow', fontsize=12, fontweight='bold', 
+					 path_effects=[PathEffects.withStroke(linewidth=2, foreground="black")])
+
+	plt.title(f"Static Frame (Index {StaticIndex}) with Fixed Points")
+	plt.axis('off')
+	plt.tight_layout()
+	plt.savefig(SavingPath, bbox_inches='tight', dpi=300)
+	plt.close()
