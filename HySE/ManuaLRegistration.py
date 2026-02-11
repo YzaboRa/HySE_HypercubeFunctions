@@ -974,6 +974,10 @@ def SaveAllTransforms(transforms_list, labels_list, filename="RegistrationTransf
 def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, original_wavelengths=None):
 	"""
 	Applies loaded transforms to the valid frames of a Data Hypercube.
+	Compatible with:
+	1. Manual Registration (sitk.Transform objects)
+	2. Automatic Registration (dictionaries representing SimpleElastix ParameterMaps)
+	3. Fixed Frames (integer 0)
 
 	Parameters:
 	-----------
@@ -1022,77 +1026,82 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
 	for i, (s_idx, w_idx) in enumerate(good_indices):
 		# Extract the frame
 		image_np = data_hypercube[s_idx, w_idx, :, :]
+		sitk_img = _sitk.GetImageFromArray(image_np)
 		
 		# Reconstruct the label key
 		label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
 		
 		if label_key not in transform_dict:
-			print(f"Warning: No transform found for {label_key}. Skipping (leaving as zeros).")
+			# Warning only if strict checking is desired, otherwise just append raw
+			# print(f"Warning: No transform found for {label_key}. Skipping.")
+			transformed_stack[i, :, :] = image_np
+			valid_labels.append(label_key)
 			continue
 
-		# Get transform data
-		# Note: If this comes from compute_robust_tps_transform, it is likely a 
-		# tuple of (source_pts, target_pts) or a specific TPS parameter object, 
-		# NOT a SimpleITK.Transform object directly.
 		tform_data = transform_dict[label_key]
 
-		# Convert numpy -> SimpleITK
-		sitk_img = _sitk.GetImageFromArray(image_np)
-		
-		# Re-instantiate the BSpline/TPS transform
-		# We assume tform_data contains the necessary landmarks or parameters
-		# stored by the manual registration function.
-		
-		# Case A: If it's a standard sitk.Transform (BSplineTransform, etc.)
-		if isinstance(tform_data, _sitk.Transform):
+		# --- CASE 1: FIXED FRAME (No Transform) ---
+		if isinstance(tform_data, int) and tform_data == 0:
+			transformed_stack[i, :, :] = image_np
+			valid_labels.append(label_key)
+			continue
+
+		# --- CASE 2: AUTOMATIC REGISTRATION (SimpleElastix ParameterMaps as Dicts) ---
+		# The new Save function converts ParameterMaps -> Dicts. We must convert them back.
+		elif isinstance(tform_data, (list, tuple)) and len(tform_data) > 0 and isinstance(tform_data[0], dict):
+			try:
+				# Create a Vector of ParameterMaps
+				pm_vector = _sitk.VectorOfParameterMap()
+				
+				for p_dict in tform_data:
+					# Create a new ParameterMap for each dictionary in the list
+					pm = _sitk.ParameterMap()
+					for k, v in p_dict.items():
+						pm[k] = v
+					pm_vector.append(pm)
+
+				# Use Transformix to apply the map
+				transformix = _sitk.TransformixImageFilter()
+				transformix.SetMovingImage(sitk_img)
+				transformix.SetTransformParameterMap(pm_vector)
+				transformix.LogToConsoleOff() # Suppress extensive logging
+				
+				warped_sitk = transformix.Execute()
+				transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+				valid_labels.append(label_key)
+				continue # Done for this frame
+			except Exception as e:
+				print(f"Error applying Elastix map for {label_key}: {e}")
+				continue
+
+		# --- CASE 3: MANUAL REGISTRATION (SimpleITK Transform Object) ---
+		# If the object is already a valid SimpleITK Transform
+		elif isinstance(tform_data, _sitk.Transform):
 			final_transform = tform_data
-			
-		# Case B: If it's a list/tuple of landmarks (source_pts, target_pts)
-		# This matches common manual registration outputs where the transform is 
-		# recalculated on the fly to avoid pickling C++ objects issues.
-		elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2:
+
+		# --- CASE 4: LEGACY LANDMARKS (Tuple of points) ---
+		# Backwards compatibility for raw landmark tuples
+		elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2 and not isinstance(tform_data[0], dict):
 			src_pts, dst_pts = tform_data
-			
-			# Flatten points for SimpleITK interface if necessary
-			# Assuming src_pts is list of (x,y) tuples
 			src_flat = [coord for point in src_pts for coord in point]
 			dst_flat = [coord for point in dst_pts for coord in point]
 			
+			# Recreate BSpline Transform from points
 			final_transform = _sitk.LandmarkBasedTransformInitializer(
-				_sitk.BSplineTransform(2, 3), # Dimension 2, Order 3
+				_sitk.BSplineTransform(2, 3), 
 				src_flat, 
 				dst_flat,
-				_sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3 # or standard LandmarkBased
+				_sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3
 			)
-			# If the above initializer is specific to Rigid/Affine, use:
-			# final_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.VersorRigid3DTransform(), src_flat, dst_flat)
-			# But for TPS/BSpline manual registration, usually we use:
-			
-			# Create the TPS transform explicitly if landmarks are provided
-			# Note: SimpleITK's LandmarkBasedTransformInitializer is often rigid/affine.
-			# For TPS/BSpline warping, we often need the BSplineTransformInitializer 
-			# or simply recreate the LandMarkBasedTransform if available.
-			
-			# Reverting to the logic likely used in `compute_robust_tps_transform`:
-			landmark_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.BSplineTransform(2), src_flat, dst_flat)
-			final_transform = landmark_transform
-
+		
 		else:
-			 # Fallback: Assume it is a pickled SimpleElastix ParameterMap (vector of maps)
-			 # but since that failed previously, we default to treating it as a raw SITK transform
-			 # that might have been pickled incorrectly if not handled above.
-			 final_transform = tform_data
+			print(f"Unknown transform format for {label_key}. Skipping.")
+			continue
 
-		# Apply Resampling
+		# Apply Standard SimpleITK Resampling (For Cases 3 & 4)
 		resampler = _sitk.ResampleImageFilter()
 		resampler.SetReferenceImage(sitk_img)
-		
-		try:
-			resampler.SetTransform(final_transform)
-		except Exception:
-			# Last ditch effort: if tform_data was actually the "args" for a transform
-			pass
-
+		resampler.SetTransform(final_transform)
 		resampler.SetInterpolator(_sitk.sitkLinear)
 		resampler.SetDefaultPixelValue(0)
 		
@@ -1104,6 +1113,7 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
 			print(f"Failed to apply transform for {label_key}: {e}")
 
 	return transformed_stack, valid_labels
+
 
 	
 
@@ -1136,7 +1146,6 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
 # 		transform_dict = pickle.load(f)
 
 # 	# 2. Unpack indices
-# 	# Check if input is the tuple (mask, indices) or just indices
 # 	if isinstance(selector_results, tuple) and len(selector_results) == 2:
 # 		good_indices = selector_results[1]
 # 	else:
@@ -1160,37 +1169,89 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
 # 		# Extract the frame
 # 		image_np = data_hypercube[s_idx, w_idx, :, :]
 		
-# 		# Reconstruct the label key to find the correct transform
-# 		# e.g. "S2_Frame5"
+# 		# Reconstruct the label key
 # 		label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
 		
 # 		if label_key not in transform_dict:
 # 			print(f"Warning: No transform found for {label_key}. Skipping (leaving as zeros).")
 # 			continue
 
-# 		# Get transform
-# 		tform = transform_dict[label_key]
+# 		# Get transform data
+# 		# Note: If this comes from compute_robust_tps_transform, it is likely a 
+# 		# tuple of (source_pts, target_pts) or a specific TPS parameter object, 
+# 		# NOT a SimpleITK.Transform object directly.
+# 		tform_data = transform_dict[label_key]
 
 # 		# Convert numpy -> SimpleITK
 # 		sitk_img = _sitk.GetImageFromArray(image_np)
 		
+# 		# Re-instantiate the BSpline/TPS transform
+# 		# We assume tform_data contains the necessary landmarks or parameters
+# 		# stored by the manual registration function.
+		
+# 		# Case A: If it's a standard sitk.Transform (BSplineTransform, etc.)
+# 		if isinstance(tform_data, _sitk.Transform):
+# 			final_transform = tform_data
+			
+# 		# Case B: If it's a list/tuple of landmarks (source_pts, target_pts)
+# 		# This matches common manual registration outputs where the transform is 
+# 		# recalculated on the fly to avoid pickling C++ objects issues.
+# 		elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2:
+# 			src_pts, dst_pts = tform_data
+			
+# 			# Flatten points for SimpleITK interface if necessary
+# 			# Assuming src_pts is list of (x,y) tuples
+# 			src_flat = [coord for point in src_pts for coord in point]
+# 			dst_flat = [coord for point in dst_pts for coord in point]
+			
+# 			final_transform = _sitk.LandmarkBasedTransformInitializer(
+# 				_sitk.BSplineTransform(2, 3), # Dimension 2, Order 3
+# 				src_flat, 
+# 				dst_flat,
+# 				_sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3 # or standard LandmarkBased
+# 			)
+# 			# If the above initializer is specific to Rigid/Affine, use:
+# 			# final_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.VersorRigid3DTransform(), src_flat, dst_flat)
+# 			# But for TPS/BSpline manual registration, usually we use:
+			
+# 			# Create the TPS transform explicitly if landmarks are provided
+# 			# Note: SimpleITK's LandmarkBasedTransformInitializer is often rigid/affine.
+# 			# For TPS/BSpline warping, we often need the BSplineTransformInitializer 
+# 			# or simply recreate the LandMarkBasedTransform if available.
+			
+# 			# Reverting to the logic likely used in `compute_robust_tps_transform`:
+# 			landmark_transform = _sitk.LandmarkBasedTransformInitializer(_sitk.BSplineTransform(2), src_flat, dst_flat)
+# 			final_transform = landmark_transform
+
+# 		else:
+# 			 # Fallback: Assume it is a pickled SimpleElastix ParameterMap (vector of maps)
+# 			 # but since that failed previously, we default to treating it as a raw SITK transform
+# 			 # that might have been pickled incorrectly if not handled above.
+# 			 final_transform = tform_data
+
 # 		# Apply Resampling
-# 		# Note: We use the image itself as the reference for size/spacing
 # 		resampler = _sitk.ResampleImageFilter()
 # 		resampler.SetReferenceImage(sitk_img)
-# 		resampler.SetTransform(tform)
-# 		resampler.SetInterpolator(_sitk.sitkLinear) # Use sitkNearestNeighbor for masks
-# 		resampler.SetDefaultPixelValue(0) # Value for pixels outside the image
 		
-# 		warped_sitk = resampler.Execute(sitk_img)
+# 		try:
+# 			resampler.SetTransform(final_transform)
+# 		except Exception:
+# 			# Last ditch effort: if tform_data was actually the "args" for a transform
+# 			pass
+
+# 		resampler.SetInterpolator(_sitk.sitkLinear)
+# 		resampler.SetDefaultPixelValue(0)
 		
-# 		# Convert back to numpy
-# 		transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
-# 		valid_labels.append(label_key)
+# 		try:
+# 			warped_sitk = resampler.Execute(sitk_img)
+# 			transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+# 			valid_labels.append(label_key)
+# 		except Exception as e:
+# 			print(f"Failed to apply transform for {label_key}: {e}")
 
 # 	return transformed_stack, valid_labels
 
-
+	
 
 
 
