@@ -22,6 +22,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import math
 import inspect
 import copy
+
+from matplotlib.widgets import Slider, Button
+
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
 
@@ -1513,6 +1516,182 @@ def GetPatchesMetrics(PatchesSpectra_All, Wavelengths_sorted, MacBethSpectraData
 	
 
 
+
+def SelectMacbethPatches(image_frame):
+	"""
+	Interactive tool to define 30 Macbeth chart patches on an endoscopic image.
+	
+	Features:
+	- Click to add points (up to 30).
+	- Double-click an existing point to 'pick it up', move mouse to position, 
+	  click again to drop.
+	- Slider to adjust the sample area size (transparent square overlay).
+	- 'Done' button to close and return data.
+
+	Parameters:
+		image_frame (numpy.ndarray): The 2D or 3D image data.
+
+	Returns:
+		tuple: 
+			- positions (numpy.ndarray): Shape (30, 3) containing [n_patch, x, y].
+			- sample_size (int): The side length of the square sampling area.
+	"""
+	
+	class MacbethSelector:
+		def __init__(self, ax, img_shape):
+			self.ax = ax
+			self.points = []      # List of (x, y)
+			self.labels = []      # List of text objects
+			self.rects = []       # List of Rectangle objects
+			self.dots = []        # List of plot objects (visual dots)
+			self.dragging = None  # Index of point currently being moved
+			self.img_h, self.img_w = img_shape[:2]
+			
+			# Initial sample size
+			self.sample_size = 10
+			
+			self.canvas = ax.figure.canvas
+
+		def add_point(self, x, y):
+			if len(self.points) >= 30:
+				return
+			
+			idx = len(self.points) + 1
+			self.points.append([x, y])
+			
+			# 1. Plot center dot
+			dot, = self.ax.plot(x, y, 'r+', markersize=10, markeredgewidth=2)
+			self.dots.append(dot)
+			
+			# 2. Add Label
+			lbl = self.ax.text(x, y - 15, str(idx), color='yellow', 
+							   fontsize=12, ha='center', fontweight='bold')
+			self.labels.append(lbl)
+			
+			# 3. Add Square (centered)
+			offset = self.sample_size / 2
+			rect = Rectangle((x - offset, y - offset), 
+							 self.sample_size, self.sample_size,
+							 linewidth=1, edgecolor='cyan', 
+							 facecolor=(0, 1, 1, 0.3)) # Transparent cyan
+			self.ax.add_patch(rect)
+			self.rects.append(rect)
+			
+			self.update_title()
+			self.canvas.draw_idle()
+
+		def update_point_position(self, idx, x, y):
+			# Update data
+			self.points[idx] = [x, y]
+			
+			# Update visuals
+			self.dots[idx].set_data([x], [y])
+			self.labels[idx].set_position((x, y - 15))
+			
+			offset = self.sample_size / 2
+			self.rects[idx].set_xy((x - offset, y - offset))
+			
+			self.canvas.draw_idle()
+
+		def update_square_size(self, val):
+			self.sample_size = int(val)
+			offset = self.sample_size / 2
+			
+			for i, rect in enumerate(self.rects):
+				x, y = self.points[i]
+				rect.set_width(self.sample_size)
+				rect.set_height(self.sample_size)
+				rect.set_xy((x - offset, y - offset))
+			
+			self.canvas.draw_idle()
+
+		def get_closest_point(self, x, y, threshold=50):
+			if not self.points:
+				return None
+			
+			dists = np.sqrt(np.sum((np.array(self.points) - np.array([x, y]))**2, axis=1))
+			min_idx = np.argmin(dists)
+			
+			if dists[min_idx] < threshold:
+				return min_idx
+			return None
+
+		def update_title(self):
+			self.ax.set_title(f"Patches identified: {len(self.points)}/30\n"
+							  "Click to add. Double-click point to grab/move.")
+
+	# --- Setup Figure and Widgets ---
+	fig, ax = plt.subplots(figsize=(10, 8))
+	plt.subplots_adjust(bottom=0.2) # Make room for controls
+	
+	ax.imshow(image_frame, cmap='gray' if image_frame.ndim == 2 else None)
+	ax.axis('off')
+	
+	selector = MacbethSelector(ax, image_frame.shape)
+	selector.update_title()
+
+	# Slider
+	ax_slider = plt.axes([0.2, 0.1, 0.6, 0.03])
+	slider = Slider(ax_slider, 'Sample Size', 1, 100, valinit=10, valstep=1)
+	
+	# Done Button
+	ax_button = plt.axes([0.81, 0.01, 0.1, 0.075])
+	btn = Button(ax_button, 'Done')
+
+	# --- Event Callbacks ---
+
+	def on_click(event):
+		# Ignore clicks outside main axes (like on the slider/button)
+		if event.inaxes != ax:
+			return
+
+		# Double Click: Pick up a point
+		if event.dblclick:
+			idx = selector.get_closest_point(event.xdata, event.ydata)
+			if idx is not None:
+				selector.dragging = idx
+				# Visual feedback: change label color to red while dragging
+				selector.labels[idx].set_color('red')
+				selector.canvas.draw_idle()
+		
+		# Single Click
+		else:
+			# If currently dragging, drop it
+			if selector.dragging is not None:
+				selector.labels[selector.dragging].set_color('yellow')
+				selector.dragging = None
+				selector.canvas.draw_idle()
+			# Otherwise, add new point
+			else:
+				selector.add_point(event.xdata, event.ydata)
+
+	def on_move(event):
+		if event.inaxes == ax and selector.dragging is not None:
+			selector.update_point_position(selector.dragging, event.xdata, event.ydata)
+
+	def on_slider_update(val):
+		selector.update_square_size(val)
+
+	def on_done(event):
+		plt.close(fig)
+
+	# Wiring events
+	fig.canvas.mpl_connect('button_press_event', on_click)
+	fig.canvas.mpl_connect('motion_notify_event', on_move)
+	slider.on_changed(on_slider_update)
+	btn.on_clicked(on_done)
+
+	plt.show(block=True)
+
+	# --- Format Output ---
+	# Construct (30, 3) array: [patch_num, x, y]
+	positions = np.zeros((30, 3))
+	for i, (x, y) in enumerate(selector.points):
+		# Ensure we don't exceed 30 in the output array if user clicked too many times
+		if i >= 30: break 
+		positions[i] = [i + 1, x, y]
+
+	return positions, selector.sample_size
 
 def PlotMixingMatrix(MixingMatrix, Wavelengths, Title, SavingPath):
 	Nwavs_ = len(Wavelengths)
