@@ -14,10 +14,157 @@ from scipy.ndimage import gaussian_filter
 from scipy.optimize import lsq_linear
 matplotlib.rcParams.update({'font.size': 14})
 plt.rcParams["font.family"] = "arial"
-
-
+from joblib import Parallel, delayed
 import HySE.Masking
 
+
+def MakeMixingMatrix_Flexible(Panel1_Wavelengths, Arduino_MixingMatrix_P1,
+							  Panel2_Wavelengths, Arduino_MixingMatrix_P2, **kwargs):
+	'''
+	Computes a mixing matrix based on the Arduino matrices used during data recording.
+	This version allows for a variable number of wavelengths to be combined in each image.
+
+	Inputs:
+		- Panel1_Wavelengths: List of wavelengths available in the first panel (e.g., REDs).
+		- Arduino_MixingMatrix_P1: A list of lists. Each inner list contains the indices
+		  of wavelengths from Panel1_Wavelengths to be combined for a single image.
+		  Example: [[0, 1], [2, 3, 4], [5]] for 3 images.
+
+		- Panel2_Wavelengths: List of wavelengths available in the second panel (e.g., BLUEs).
+		- Arduino_MixingMatrix_P2: A list of lists, similar to P1 but for Panel2_Wavelengths.
+
+		- kwargs:
+			- Help: Print this information message
+			- FromCalib = False: If true, use the single wavelength calibration hypercube
+				to compute the mixing matrix.
+			- Hypercube_WhiteCalib: Hypercube computed from the single wavelength calibration.
+				Required if setting FromCalib to True.
+			- UseMean = False: Sets the mean value of the calibration instead of the maximal value.
+				Only used if FromCalib = True.
+			- Plot=True: Plot the resulting mixing matrix.
+			- Title : string
+			- SaveFig = False: Save the plot to a file.
+			- SavingPath = '': Path to save the figure.
+
+	Outputs:
+		- MixingMatrix: The computed mixing matrix. Dimensions are (total_images, total_unique_wavelengths).
+	'''
+
+	# --- Argument Handling ---
+	Help = kwargs.get('Help', False)
+	FromCalib = kwargs.get('FromCalib', False)
+	UseMean = kwargs.get('UseMean', False)
+	Plot = kwargs.get('Plot', True)
+	Title = kwargs.get('Title', '')
+	SaveFig = kwargs.get('SaveFig', False)
+	SavingPath = kwargs.get('SavingPath', '')
+
+	if Help:
+		print(inspect.getdoc(MakeMixingMatrix_Flexible))
+		return None
+
+	if FromCalib:
+		print('Computing mixing matrix from single wavelength calibration')
+		Hypercube_WhiteCalib = kwargs.get('Hypercube_WhiteCalib')
+		if Hypercube_WhiteCalib is None:
+			print('MakeMixingMatrix error:')
+			print('FromCalib has been set to True. Please provide Hypercube_WhiteCalib.')
+			return None
+	else:
+		print('Computing binary mixing matrix')
+
+	# --- Setup Matrix Dimensions ---
+	# Combine all wavelengths and find the unique sorted list to define the matrix columns
+	All_Wavelengths = list(Panel1_Wavelengths) + list(Panel2_Wavelengths)
+	Wavelengths_sorted = np.unique(All_Wavelengths)
+	N_unique_wavs = len(Wavelengths_sorted)
+
+	# The number of rows is the total number of combined images from both panels
+	N_images_P1 = len(Arduino_MixingMatrix_P1)
+	N_images_P2 = len(Arduino_MixingMatrix_P2)
+	N_total_images = N_images_P1 + N_images_P2
+
+	# Initialize the potentially non-square mixing matrix
+	MixingMatrix = np.zeros((N_total_images, N_unique_wavs))
+
+	# --- Populate Mixing Matrix (Generalized Loop) ---
+	# We group panel data to process them sequentially without repeating code
+	panel_data = [
+		(Panel1_Wavelengths, Arduino_MixingMatrix_P1),
+		(Panel2_Wavelengths, Arduino_MixingMatrix_P2)
+	]
+	
+	current_row_index = 0
+	for panel_wavs, arduino_matrix in panel_data:
+		# Iterate through each defined image combination (inner lists)
+		for image_indices in arduino_matrix:
+			# For each individual wavelength index in the current combination
+			for wav_local_idx in image_indices:
+				wav_nm = panel_wavs[wav_local_idx]
+				# Find the column index in the final sorted list of all wavelengths
+				wav_col_k = np.where(Wavelengths_sorted == wav_nm)[0][0]
+
+				# Determine the amplitude (either 1 or from calibration)
+				if FromCalib:
+					if UseMean:
+						wav_k_amp = np.nanmean(Hypercube_WhiteCalib[wav_col_k, :, :])
+					else:
+						wav_k_amp = np.nanmax(Hypercube_WhiteCalib[wav_col_k, :, :])
+				else:
+					wav_k_amp = 1
+				
+				# Assign the amplitude to the correct cell
+				MixingMatrix[current_row_index, wav_col_k] = wav_k_amp
+			
+			current_row_index += 1 # Move to the next row for the next image
+
+	# --- Compute Determinant (only if matrix is square) ---
+	if MixingMatrix.shape[0] == MixingMatrix.shape[1]:
+		Matrix_Det = np.linalg.det(MixingMatrix)
+		if np.isclose(Matrix_Det, 0):
+			print(f'WARNING! Matrix determinant is close to 0: {Matrix_Det}')
+		else:
+			print(f'Matrix determinant: {Matrix_Det}')
+	else:
+		print(f'Matrix is not square ({MixingMatrix.shape}), determinant not applicable.')
+
+	# --- Plotting ---
+	if Plot:
+		N_rows, N_cols = MixingMatrix.shape
+		row_ticks = np.arange(N_rows)
+		col_ticks = np.arange(N_cols)
+		row_labels = [f'im {i+1}' for i in row_ticks]
+		col_labels = [f'{w:.0f}' for w in Wavelengths_sorted] # Format for clarity
+
+		fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(max(5, N_cols*0.4), max(5, N_rows*0.4)))
+		im = ax.imshow(MixingMatrix, cmap='magma', aspect='auto')
+		
+		ax.set_xticks(col_ticks)
+		ax.set_yticks(row_ticks)
+		ax.set_xticklabels(col_labels, rotation=90)
+		ax.set_yticklabels(row_labels)
+
+		ax.set_xlabel('Individual Wavelengths [nm]')
+		ax.set_ylabel('Combined Image Index')
+		
+		if FromCalib:
+			fig.colorbar(im, ax=ax, label='Weight')
+
+		if FromCalib:
+			title = 'Mixing Matrix - From Calibration' + (' (mean)' if UseMean else ' (max)')
+		else:
+			title = 'Mixing Matrix - Binary'
+		title = title+'\n'+Title
+		ax.set_title(title)
+		
+		plt.tight_layout()
+		if SaveFig and SavingPath:
+			plt.savefig(SavingPath)
+			print(f"Figure saved to {SavingPath}")
+		
+		plt.show()
+
+	return MixingMatrix
 
 
 def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
@@ -193,9 +340,9 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 
 		- kwargs:
 			- Help
-			- Dark = array shape (YY, XX)
-			- WhiteCalibration = array shape (Nwavelengths, YY, XX)
-			- Sigma = 20. Integer, indicates how much blurring to apply 
+			- Dark = array, shape (YY, XX)
+			- WhiteCalibration = array, shape (Nwavelengths, YY, XX)
+			- Sigma = 5. Integer, indicates how much blurring to apply 
 				for the dark and White calibration arrays
 			- SpectralNormalisation = False. If True, the white reference will be used to normalise the spectrum
 				instead of both spectrally and spatially.
@@ -205,10 +352,8 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			- SavingFigure = '' string.
 			- Plot = True
 			- IndivFrames = False : Whether or not individual frames have been kept for each instead of being averaged
-			
-		- Normalised mixed hypercube. 
-			If Dark is indicated, the normalised hypercube will be dark subtracted
-			If WhiteCalibration is indicated, the normalised hypercube will be white normalised
+			- SaturatedPixel: Value considered to be the saturation point. Pixels with that value (or above) in the 
+				white calibration will be set to nan
 
 
 	Outputs:
@@ -225,11 +370,33 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		print(inspect.getdoc(NormaliseMixedHypercube))
 		return 0,0
 
-	Sigma = kwargs.get('Sigma', 20)
+	SaturatedPixel = kwargs.get('SaturatedPixel', 254)
+
+	Sigma = kwargs.get('Sigma', 5)
 	Dark = kwargs.get('Dark')
 	if Dark is not None:
-		Dark_g = gaussian_filter(Dark, sigma=Sigma)
-		print(f'Dark subtraction. Avg val = {np.average(Dark):.2f}, after blurring: {np.average(Dark_g):.2f}')
+		HypercubeShape = MixedHypercube.shape
+		X = HypercubeShape[-1]
+		Y = HypercubeShape[-2]
+		(Yd, Xd) = Dark.shape
+		print(f'Checking if dark needs to be cropped: Hypercube X={X}, Y={Y}, Dark Xd={Xd}, Yd={Yd}')
+		if ((Y!=Yd) or (X!=Xd)):
+			print(f'Data ({MixedHypercube.shape}) is cropped. Cropping Dark ({Dark.shape})')
+			ToCropX = Xd-X
+			ToCropY = Yd-Y
+			if ToCropX!=ToCropY:
+				print(f'Cropping doesn\'t seem to be the same along both axes. X: {ToCropX}, Y: {ToCropY}')
+
+			c = int(ToCropX/2)
+			Dark_ = Dark[c:-c, (c+1):(-c)]
+			print(f'Dark new size: {Dark_.shape}')
+		else: Dark_ = Dark
+
+
+		Dark_g = gaussian_filter(Dark_, sigma=Sigma)
+		print(f'Dark subtraction. Avg val = {np.average(Dark_):.2f}, after blurring: {np.average(Dark_g):.2f}')
+		## Check if sizes match (if data is cropped)
+		
 
 	SpectralNormalisation = kwargs.get('SpectralNormalisation', False)
 	IndivFrames = kwargs.get('IndivFrames', False)
@@ -237,6 +404,15 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	WhiteCalibration = kwargs.get('WhiteCalibration')
 	if WhiteCalibration is not None:
 		print(f'White Normalising')
+		if np.amax(WhiteCalibration)>=SaturatedPixel:
+			print(f' Saturated pixels (value >= {SaturatedPixel}) in the white calibration. Getting rid of them')
+			print(f'  Note that this functionality hasn\'t been used yet, and so might trigger errors')
+			WhiteCalibration.astype(float) 
+			WhiteCalibration[WhiteCalibration >= SaturatedPixel] = np.nan
+			count_nan = np.isnan(A).sum()
+			if count_nan>0:
+				print(f' Removed {count_nan} saturated pixels')
+
 		if SpectralNormalisation:
 			print(f'Only spectral normalisation')
 		# Wavelengths_list = kwargs.get('Wavelengths_list')
@@ -264,11 +440,6 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	if (Dark is None) and (WhiteCalibration is None):
 		print(f'No normalisation')
 		Plot=False
-
-	# if len(MixedHypercube.shape)>3:
-	# 	MixedHypercube_ = MixedHypercube
-	# else:
-	# 	MixedHypercube_ = np.array([MixedHypercube])
 
 
 	if len(MixedHypercube.shape)==3:
@@ -325,25 +496,6 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 	elif len(MixedHypercube.shape)==5:
 		MixedHypercube_N_ = MixedHypercube_N
 
-		# MixedHypercube_sub = MixedHypercube_[s,:,:,:,:]
-
-		# if Dark is not None:
-		# 	MixedHypercube_subN = SubtractDark(MixedHypercube_sub, Dark_g)
-		# else:
-		# 	MixedHypercube_subN = MixedHypercube_sub
-			
-		# for w in range(0,WW):
-		# 	frame = MixedHypercube_subN[w,:,:]
-		# 	if WhiteCalibration is None:
-		# 		frameN = frame
-		# 	else:
-		# 		whiteframe = WhiteCalibration_[w,:,:]
-		# 		if SpectralNormalisation:
-		# 			whiteval = np.average(whiteframe)
-		# 			frameN = frame/whiteval
-		# 		else:
-		# 			frameN = np.divide(frame, whiteframe, out=np.zeros_like(frame), where=whiteframe!=0)
-		# 	MixedHypercube_N[s,w,:,:] = np.ma.array(frameN, mask=Mask)
 
 	if Plot:
 		if len(MixedHypercube.shape)==3: ## Just wavelengths, Y, X
@@ -360,10 +512,14 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 		Mavg = np.average(HypercubeToPlot)
 		Mstd = np.std(HypercubeToPlot)
 		fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
+		print(f'Plotting shapes: HypercubeToPlot -> {HypercubeToPlot.shape}, Mask -> {Mask.shape} ')
 		for j in range(0,4):
 			for i in range(0,4):
 				if nn<17:
-					ToPlot_sub = np.ma.array(HypercubeToPlot[nn,:,:], mask=Mask)
+					print(HypercubeToPlot[nn,:,:].shape)
+					print(Mask.shape)
+					# ToPlot_sub = np.ma.array(HypercubeToPlot[nn,:,:], mask=Mask[nn,:,:])à
+					ToPlot_sub = HypercubeToPlot[nn,:,:]
 					ax[j,i].imshow(ToPlot_sub, cmap='magma',vmin=vmin, vmax=vmax)
 					ax[j,i].set_title(f'im {nn}')
 					ax[j,i].set_xticks([])
@@ -379,6 +535,180 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 
 	return MixedHypercube_N_, Mask
 
+
+
+
+
+def NormaliseMixedHypercube_RedChannel(MixedHypercube, RedFrames, **kwargs):
+	'''
+	Normalises the raw mixed hypercube.
+	Dark subtraction and/or white normalisation
+
+	Input:
+		- MixedHypercube
+
+		- RedFrames. Same shape as MixedHypercube
+
+		- kwargs:
+			- Help
+			- Dark = array, shape (YY, XX)
+			- Sigma = 5. Integer, indicates how much blurring to apply 
+				for the dark and White calibration arrays
+			- vmax: float. For plotting range
+			- vmin: float. For plotting range
+			- SavePlot = False
+			- SavingFigure = '' string.
+			- Plot = True
+			- SingleSweep: If len(MixedHypercube), indicate SingleSweep=True if the hypercube contains multiple frames 
+				for a single sweep, and SingleSweep=False if it contains a single frame from different sweeps.
+
+
+	Outputs:
+		- Normalised Hypercube
+
+
+	'''
+
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(NormaliseMixedHypercube))
+		return 0,0
+
+	Sigma = kwargs.get('Sigma', 5)
+	Dark = kwargs.get('Dark')
+	if Dark is not None:
+		HypercubeShape = MixedHypercube.shape
+		X = HypercubeShape[-1]
+		Y = HypercubeShape[-2]
+		(Yd, Xd) = Dark.shape
+		print(f'Checking if dark needs to be cropped: Hypercube X={X}, Y={Y}, Dark Xd={Xd}, Yd={Yd}')
+		if ((Y!=Yd) or (X!=Xd)):
+			print(f'Data ({MixedHypercube.shape}) is cropped. Cropping Dark ({Dark.shape})')
+			ToCropX = Xd-X
+			ToCropY = Yd-Y
+			if ToCropX!=ToCropY:
+				print(f'Cropping doesn\'t seem to be the same along both axes. X: {ToCropX}, Y: {ToCropY}')
+
+			c = int(ToCropX/2)
+			Dark_ = Dark[c:-c, (c+1):(-c)]
+			print(f'Dark new size: {Dark_.shape}')
+		else: Dark_ = Dark
+
+
+		Dark_g = gaussian_filter(Dark_, sigma=Sigma)
+		print(f'Dark subtraction. Avg val = {np.average(Dark_):.2f}, after blurring: {np.average(Dark_g):.2f}')
+		## Check if sizes match (if data is cropped)
+
+
+	SingleSweep = kwargs.get('SingleSweep')
+	if (len(MixedHypercube.shape)==3 and SingleSweep is None):
+		print(f'ERROR: When providing a MixedHypercube if length 4, you must indicate if the hypercube has')
+		print(f'	many frames froma single sweep (SingleSweep=True), or a single frame from many sweeps (SingleSweep=False).')
+		print(f'	setting default to SingleSweep=True.')
+
+	Plot = kwargs.get('Plot', True)
+	SaveFigure = kwargs.get('SaveFigure', True)
+	SavingPath = kwargs.get('SavingPath', '')
+	vmax = kwargs.get('vmax', 5)
+	vmin = kwargs.get('vmin', 0)
+	if (Dark is None) and (WhiteCalibration is None):
+		print(f'No normalisation')
+		Plot=False
+
+
+	if len(MixedHypercube.shape)==3:
+		MixedHypercube_ = np.array([[MixedHypercube]])
+	elif len(MixedHypercube.shape)==4:
+		MixedHypercube_ = np.array([MixedHypercube])
+	elif len(MixedHypercube.shape)==5:
+		MixedHypercube_ = MixedHypercube
+	else:
+		print(f'Shape of the Mixed hypercube not supported: len(Hypercube.shape) = {len(MixedHypercube.shape)} != [3,4,5]')
+
+
+	(SS, WW, FF, YY, XX) = MixedHypercube_.shape
+	MixedHypercube_N = np.zeros(MixedHypercube_.shape)
+	for s in range(0,SS): 
+		for w in range(0,WW):
+			for f in range(0,FF):
+				frame_data = MixedHypercube_[s,w,f,:,:]
+				frame_red = RedFrames[s,w,f,:,:]
+
+				if Dark is not None:
+					frame_dataD = np.subtract(frame_data, Dark_g)
+					frame_redD = np.subtract(frame_red, Dark_g)
+				else:
+					frame_dataD = frame_data
+					frame_redD = frame_red
+
+				## Now normalise with red frame
+				frameN = np.divide(frame_dataD, frame_redD, out=np.zeros_like(frame_dataD), where=frame_redD!=0)
+#                 if (s==0 and w==0):
+#                     fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(11,5))
+#                     ax[0].imshow(frame_redD, cmap='gray')
+#                     ax[0].set_title(f'Red Channel')
+#                     ax[1].imshow(frame_dataD, cmap='gray')
+#                     ax[1].set_title(f'Data Channel')
+#                     ax[2].imshow(frameN, cmap='gray', vmin=-0.2, vmax=1)
+#                     ax[2].set_title(f'Data/Red')
+#                     plt.tight_layout()
+#                     plt.show()
+				MixedHypercube_N[s,w,f,:,:] = frameN
+
+	if len(MixedHypercube.shape)==3: ## Just wavelengths, Y, X
+		MixedHypercube_N_ = MixedHypercube_N[0,0,:,:,:]
+	elif len(MixedHypercube.shape)==4: 
+		if SingleSweep: ## Single sweep
+			print(f'POTENTIAL ERROR: CHECK THAT THE HYPERCUBE OUTPUT DIMENSIONS ARE CORRECT')
+			print(f'   MixedHypercube_N.shape: {MixedHypercube_N.shape}')
+			print(f'   Currently reshaped as [0,:,:,:,:]')
+			MixedHypercube_N_ = MixedHypercube_N[0,:,:,:,:]
+		else: ## One sweeo but multiple frames
+			print(f'POTENTIAL ERROR: CHECK THAT THE HYPERCUBE OUTPUT DIMENSIONS ARE CORRECT')
+			print(f'   MixedHypercube_N.shape: {MixedHypercube_N.shape}')
+			print(f'   Currently reshaped as [0,:,:,:,:]')
+			MixedHypercube_N_ = MixedHypercube_N[:,0,:,:,:]
+	elif len(MixedHypercube.shape)==5:
+		MixedHypercube_N_ = MixedHypercube_N
+
+
+	if Plot:
+		if len(MixedHypercube.shape)==3: ## Just wavelengths, Y, X
+			HypercubeToPlot = MixedHypercube_N_
+		elif len(MixedHypercube.shape)==4: 
+			if IndivFrames: 
+				HypercubeToPlot = MixedHypercube_N_[:,0,:,:]
+			else:
+				HypercubeToPlot = MixedHypercube_N_[0,:,:,:]
+		elif len(MixedHypercube.shape)==5:
+			HypercubeToPlot =MixedHypercube_N_[0,:,0,:,:]
+
+		nn = 0
+		Mavg = np.average(HypercubeToPlot)
+		Mstd = np.std(HypercubeToPlot)
+		fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
+		print(f'Plotting shapes: HypercubeToPlot -> {HypercubeToPlot.shape}, Mask -> {Mask.shape} ')
+		for j in range(0,4):
+			for i in range(0,4):
+				if nn<17:
+					print(HypercubeToPlot[nn,:,:].shape)
+					print(Mask.shape)
+					# ToPlot_sub = np.ma.array(HypercubeToPlot[nn,:,:], mask=Mask[nn,:,:])à
+					ToPlot_sub = HypercubeToPlot[nn,:,:]
+					ax[j,i].imshow(ToPlot_sub, cmap='magma',vmin=vmin, vmax=vmax)
+					ax[j,i].set_title(f'im {nn}')
+					ax[j,i].set_xticks([])
+					ax[j,i].set_yticks([])
+					nn = nn+1
+				else:
+					ax[j,i].set_xticks([])
+					ax[j,i].set_yticks([])
+		plt.tight_layout()
+		if SaveFigure:
+			plt.savefig(f'{SavingPath}Normalised_Hypercube.png')
+		plt.show()
+
+	return MixedHypercube_N_
 
 def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
 	'''
@@ -507,7 +837,7 @@ def UnmixDataNNLS(MixedHypercube, MixingMatrix, intensity_thresh=1e-2, std_thres
 			return res.x if res.success else np.zeros(num_waves)
 
 		if parallel:
-			from joblib import Parallel, delayed
+			# from joblib import Parallel, delayed
 			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
 			SolvedMatrix_flat = np.array(results).T
 		else:
@@ -523,7 +853,8 @@ def UnmixDataNNLS(MixedHypercube, MixingMatrix, intensity_thresh=1e-2, std_thres
 	return UnmixedHypercube
 
 
-def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
+
+def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, CombinedMask=None, lambda_smooth=0.1,
 						intensity_thresh=1e-2, std_thresh=1e-3,
 						max_iter=5000, parallel=True, **kwargs):
 	"""
@@ -533,6 +864,8 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
 	Parameters:
 		- MixedHypercube : array, shape (S, N, Y, X) or (N, Y, X)
 		- MixingMatrix : array, shape (num_images, num_wavelengths)
+		- CombinedMask : 2D array (Y, X), optional. Boolean mask where True
+						 indicates invalid pixels to skip. # <-- NEW
 		- lambda_smooth = 0.1 : regularization strength for spectral smoothness
 		- intensity_thresh = 1e-2: intensity threshold for skipping noisy pixels (aim for ~ 1e-2*max(Hypercube))
 		- std_thresh = 1e-3 : standard deviation threshold for skipping noisy pixels
@@ -544,7 +877,7 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
 				the function can average the unmixed arrays or leave then individually
 
 	Output:
-		-  Unmixed Hypercube
+		-  Unmixed Hypercube
 	"""
 	Help = kwargs.get('Help', False)
 	Average = kwargs.get('Average', True)
@@ -569,7 +902,209 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
 	for s in range(SS):
 		hypercube_sub = MixedHypercube_[s]
 		NN, YY, XX = hypercube_sub.shape
-		ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T  # shape: (pixels, n_meas)
+		ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T # shape: (pixels, n_meas)
+		num_pixels = ObservedMatrix.shape[0]
+		SolvedMatrix_flat = np.zeros((num_waves, num_pixels))
+
+		mask_flat = None
+		if CombinedMask is not None:
+			if CombinedMask.shape != (YY, XX):
+				# Add a check to ensure mask dimensions are correct
+				raise ValueError(f"CombinedMask shape {CombinedMask.shape} does not match hypercube spatial dimensions ({YY}, {XX})")
+			mask_flat = CombinedMask.flatten()
+
+		# def solve_single(i):
+		# 	# Check the provided mask first. If True, the pixel is invalid.
+		# 	if mask_flat is not None and mask_flat[i]: 
+		# 		return np.zeros(num_waves)
+
+		# 	# Original checks for intensity and standard deviation
+		# 	pixel = ObservedMatrix[i, :]
+		# 	if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
+		# 		return np.zeros(num_waves)
+
+		# 	b_reg = np.concatenate([pixel, zeros_rhs])
+		# 	res = lsq_linear(A_reg_base, b_reg, bounds=(0, np.inf), max_iter=max_iter, method='trf')
+		# 	return res.x if res.success else np.zeros(num_waves)
+
+		def solve_single(i):
+			# Check the provided mask first. If True, the pixel is invalid.
+			if mask_flat is not None and mask_flat[i]: 
+				return np.zeros(num_waves)
+
+			# Original checks for intensity and standard deviation
+			pixel = ObservedMatrix[i, :]
+			
+			# If any value in the pixel's spectrum is NaN, skip it.
+			if np.isnan(pixel).any(): # <-- NEW NAN CHECK
+				return np.zeros(num_waves)
+
+			if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
+				return np.zeros(num_waves)
+
+			b_reg = np.concatenate([pixel, zeros_rhs])
+			res = lsq_linear(A_reg_base, b_reg, bounds=(0, np.inf), max_iter=max_iter, method='trf')
+			return res.x if res.success else np.zeros(num_waves)
+
+		if parallel:
+			# from joblib import Parallel, delayed # (Already imported above)
+			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
+			SolvedMatrix_flat = np.array(results).T
+		else:
+			for i in range(num_pixels):
+				SolvedMatrix_flat[:, i] = solve_single(i) # The logic inside solve_single handles the skip
+
+		SolvedMatrix = [SolvedMatrix_flat[n, :].reshape(YY, XX) for n in range(num_waves)]
+		UnmixedHypercube.append(SolvedMatrix)
+
+	UnmixedHypercube = np.array(UnmixedHypercube)
+	if Average:
+		UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
+	return UnmixedHypercube
+
+
+
+	
+
+# def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
+# 						intensity_thresh=1e-2, std_thresh=1e-3,
+# 						max_iter=5000, parallel=True, **kwargs):
+# 	"""
+# 	Unmix hypercube using non-negative least squares with Tikhonov regularization
+# 	promoting smoothness across wavelengths.
+
+# 	Parameters:
+# 		- MixedHypercube : array, shape (S, N, Y, X) or (N, Y, X)
+# 		- MixingMatrix : array, shape (num_images, num_wavelengths)
+# 		- lambda_smooth = 0.1 : regularization strength for spectral smoothness
+# 		- intensity_thresh = 1e-2: intensity threshold for skipping noisy pixels (aim for ~ 1e-2*max(Hypercube))
+# 		- std_thresh = 1e-3 : standard deviation threshold for skipping noisy pixels
+# 		- max_iter = 5000 : max iterations for NNLS solver
+# 		- parallel = True: use parallel joblib processing
+# 		- kwargs
+# 			- Help: Show this help message
+# 			- Average = True. If the input mixed hypercube containes more than one shape,
+# 				the function can average the unmixed arrays or leave then individually
+
+# 	Output:
+# 		-  Unmixed Hypercube
+# 	"""
+# 	Help = kwargs.get('Help', False)
+# 	Average = kwargs.get('Average', True)
+# 	if Help:
+# 		print(inspect.getdoc(UnmixDataSmoothNNLS))
+# 		return 0
+
+# 	if len(MixedHypercube.shape) > 3:
+# 		MixedHypercube_ = MixedHypercube
+# 	else:
+# 		MixedHypercube_ = np.array([MixedHypercube])
+
+# 	UnmixedHypercube = []
+# 	SS, WW, YY, XX = MixedHypercube_.shape
+# 	num_meas, num_waves = MixingMatrix.shape
+
+# 	# Construct second-difference matrix L (smoothness penalty)
+# 	L = -2 * np.eye(num_waves) + np.eye(num_waves, k=1) + np.eye(num_waves, k=-1)
+# 	A_reg_base = np.vstack([MixingMatrix, np.sqrt(lambda_smooth) * L])
+# 	zeros_rhs = np.zeros((num_waves,))
+
+# 	for s in range(SS):
+# 		hypercube_sub = MixedHypercube_[s]
+# 		NN, YY, XX = hypercube_sub.shape
+# 		ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T  # shape: (pixels, n_meas)
+# 		num_pixels = ObservedMatrix.shape[0]
+# 		SolvedMatrix_flat = np.zeros((num_waves, num_pixels))
+
+# 		def solve_single(i):
+# 			pixel = ObservedMatrix[i, :]
+# 			if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
+# 				return np.zeros(num_waves)
+# 			b_reg = np.concatenate([pixel, zeros_rhs])
+# 			res = lsq_linear(A_reg_base, b_reg, bounds=(0, np.inf), max_iter=max_iter, method='trf')
+# 			return res.x if res.success else np.zeros(num_waves)
+
+# 		if parallel:
+# 			# from joblib import Parallel, delayed
+# 			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
+# 			SolvedMatrix_flat = np.array(results).T
+# 		else:
+# 			for i in range(num_pixels):
+# 				SolvedMatrix_flat[:, i] = solve_single(i)
+
+# 		SolvedMatrix = [SolvedMatrix_flat[n, :].reshape(YY, XX) for n in range(num_waves)]
+# 		UnmixedHypercube.append(SolvedMatrix)
+
+# 	UnmixedHypercube = np.array(UnmixedHypercube)
+# 	if Average:
+# 		UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
+# 	return UnmixedHypercube
+
+
+
+
+def UnmixDataSmoothNNLSPrior(MixedHypercube, MixingMatrix, prior_spectrum,
+							lambda_smooth=0.1, lambda_prior=0.1,
+							intensity_thresh=1e-2, std_thresh=1e-3,
+							max_iter=5000, parallel=True, **kwargs):
+	"""
+	Unmix hypercube using NNLS with two regularizers:
+	1. Tikhonov regularization promoting spectral smoothness.
+	2. A penalty term that pulls the solution towards a known prior_spectrum.
+
+	Parameters:
+		- MixedHypercube : array, shape (S, N, Y, X) or (N, Y, X)
+		- MixingMatrix : array, shape (num_images, num_wavelengths)
+		- prior_spectrum : array, shape (num_wavelengths,). Your calibration/reference.
+		- lambda_smooth = 0.1 : Regularization for spectral smoothness.
+		- lambda_prior = 0.1 : Regularization for closeness to the prior.
+		... (rest of the parameters are the same) ...
+
+	Output:
+		- Unmixed Hypercube
+	"""
+	Help = kwargs.get('Help', False)
+	Average = kwargs.get('Average', True)
+	if Help:
+		print(inspect.getdoc(UnmixDataSmoothPriorNNLS))
+		return 0
+
+	if len(MixedHypercube.shape) > 3:
+		MixedHypercube_ = MixedHypercube
+	else:
+		MixedHypercube_ = np.array([MixedHypercube])
+
+	UnmixedHypercube = []
+	SS, WW, YY, XX = MixedHypercube_.shape
+	num_meas, num_waves = MixingMatrix.shape
+
+	# --- NEW: Check shape of the prior spectrum ---
+	if prior_spectrum.shape[0] != num_waves:
+		raise ValueError(f"Shape of prior_spectrum ({prior_spectrum.shape[0]}) does not match "
+						 f"number of wavelengths in MixingMatrix ({num_waves}).")
+
+	# --- MODIFIED: Construct the "triple-decker" problem matrix ---
+	# 1. Smoothness penalty matrix (L)
+	L = -2 * np.eye(num_waves) + np.eye(num_waves, k=1) + np.eye(num_waves, k=-1)
+	
+	# 2. Prior penalty matrix (Identity matrix, I)
+	I = np.eye(num_waves)
+	
+	# 3. Stack all three matrices
+	A_reg_base = np.vstack([
+		MixingMatrix,
+		np.sqrt(lambda_smooth) * L,
+		np.sqrt(lambda_prior) * I
+	])
+
+	# Prepare the constant parts of the right-hand side (b) vector
+	zeros_rhs_smooth = np.zeros((num_waves,))
+	# --- NEW: The target for the prior penalty ---
+	prior_rhs = np.sqrt(lambda_prior) * prior_spectrum
+
+	for s in range(SS):
+		hypercube_sub = MixedHypercube_[s]
+		ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T
 		num_pixels = ObservedMatrix.shape[0]
 		SolvedMatrix_flat = np.zeros((num_waves, num_pixels))
 
@@ -577,12 +1112,15 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
 			pixel = ObservedMatrix[i, :]
 			if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
 				return np.zeros(num_waves)
-			b_reg = np.concatenate([pixel, zeros_rhs])
+			
+			# --- MODIFIED: Construct the augmented b vector for each pixel ---
+			b_reg = np.concatenate([pixel, zeros_rhs_smooth, prior_rhs])
+			
 			res = lsq_linear(A_reg_base, b_reg, bounds=(0, np.inf), max_iter=max_iter, method='trf')
 			return res.x if res.success else np.zeros(num_waves)
 
 		if parallel:
-			from joblib import Parallel, delayed
+			# from joblib import Parallel, delayed
 			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
 			SolvedMatrix_flat = np.array(results).T
 		else:
@@ -597,4 +1135,42 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
 		UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
 	return UnmixedHypercube
 
+
+def omit_frames(arr, indices):
+	if arr.shape[0] != 16:
+		raise ValueError(f"Expected first dimension = 16, got {arr.shape[0]}")
+	keep_indices = list(indices)+list([o+8 for o in indices])
+	print(f'Original indices: {indices}')
+	print(f'Keeping indices: {keep_indices}')
+	return arr[keep_indices]
+
+
+def combine_hypercubes(hypercube1, hypercube2, wavelengths1, wavelengths2):
+	"""
+	Combine two hyperspectral sub-cubes into one cube sorted by wavelength.
+
+	Inputs:
+		- hypercube1: first sub hypercube to combine (size N, Y, X)
+		- hypercube2: second sub hypercube to combine (size M, Y, X)
+		- wavelengths1: wavelengths used for hypercube1 (size/length N)
+		- wavelengths2: wavelengths used for hypercube2 (size/length M)
+
+	Outputs:
+		- ccombined_hypercube: size (N+M, Y, X)
+		- combined_wavelengths: size/length N+M
+	"""
+
+	# Stack cubes and wavelengths
+	all_hypercubes = np.concatenate([hypercube1, hypercube2], axis=0)
+	print(all_hypercubes.shape)
+	all_wavelengths = np.array(list(wavelengths1) + list(wavelengths2))
+
+	# Sort indices by wavelength
+	sort_idx = np.argsort(all_wavelengths)
+
+	# Reorder
+	combined_hypercube = all_hypercubes[sort_idx]
+	combined_wavelengths = all_wavelengths[sort_idx]
+
+	return combined_hypercube, combined_wavelengths
 		
