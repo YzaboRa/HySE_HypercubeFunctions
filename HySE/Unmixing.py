@@ -342,7 +342,7 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 			- Help
 			- Dark = array, shape (YY, XX)
 			- WhiteCalibration = array, shape (Nwavelengths, YY, XX)
-			- Sigma = 20. Integer, indicates how much blurring to apply 
+			- Sigma = 5. Integer, indicates how much blurring to apply 
 				for the dark and White calibration arrays
 			- SpectralNormalisation = False. If True, the white reference will be used to normalise the spectrum
 				instead of both spectrally and spatially.
@@ -372,7 +372,7 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 
 	SaturatedPixel = kwargs.get('SaturatedPixel', 254)
 
-	Sigma = kwargs.get('Sigma', 20)
+	Sigma = kwargs.get('Sigma', 5)
 	Dark = kwargs.get('Dark')
 	if Dark is not None:
 		HypercubeShape = MixedHypercube.shape
@@ -535,6 +535,180 @@ def NormaliseMixedHypercube(MixedHypercube, **kwargs):
 
 	return MixedHypercube_N_, Mask
 
+
+
+
+
+def NormaliseMixedHypercube_RedChannel(MixedHypercube, RedFrames, **kwargs):
+	'''
+	Normalises the raw mixed hypercube.
+	Dark subtraction and/or white normalisation
+
+	Input:
+		- MixedHypercube
+
+		- RedFrames. Same shape as MixedHypercube
+
+		- kwargs:
+			- Help
+			- Dark = array, shape (YY, XX)
+			- Sigma = 5. Integer, indicates how much blurring to apply 
+				for the dark and White calibration arrays
+			- vmax: float. For plotting range
+			- vmin: float. For plotting range
+			- SavePlot = False
+			- SavingFigure = '' string.
+			- Plot = True
+			- SingleSweep: If len(MixedHypercube), indicate SingleSweep=True if the hypercube contains multiple frames 
+				for a single sweep, and SingleSweep=False if it contains a single frame from different sweeps.
+
+
+	Outputs:
+		- Normalised Hypercube
+
+
+	'''
+
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(NormaliseMixedHypercube))
+		return 0,0
+
+	Sigma = kwargs.get('Sigma', 5)
+	Dark = kwargs.get('Dark')
+	if Dark is not None:
+		HypercubeShape = MixedHypercube.shape
+		X = HypercubeShape[-1]
+		Y = HypercubeShape[-2]
+		(Yd, Xd) = Dark.shape
+		print(f'Checking if dark needs to be cropped: Hypercube X={X}, Y={Y}, Dark Xd={Xd}, Yd={Yd}')
+		if ((Y!=Yd) or (X!=Xd)):
+			print(f'Data ({MixedHypercube.shape}) is cropped. Cropping Dark ({Dark.shape})')
+			ToCropX = Xd-X
+			ToCropY = Yd-Y
+			if ToCropX!=ToCropY:
+				print(f'Cropping doesn\'t seem to be the same along both axes. X: {ToCropX}, Y: {ToCropY}')
+
+			c = int(ToCropX/2)
+			Dark_ = Dark[c:-c, (c+1):(-c)]
+			print(f'Dark new size: {Dark_.shape}')
+		else: Dark_ = Dark
+
+
+		Dark_g = gaussian_filter(Dark_, sigma=Sigma)
+		print(f'Dark subtraction. Avg val = {np.average(Dark_):.2f}, after blurring: {np.average(Dark_g):.2f}')
+		## Check if sizes match (if data is cropped)
+
+
+	SingleSweep = kwargs.get('SingleSweep')
+	if (len(MixedHypercube.shape)==3 and SingleSweep is None):
+		print(f'ERROR: When providing a MixedHypercube if length 4, you must indicate if the hypercube has')
+		print(f'	many frames froma single sweep (SingleSweep=True), or a single frame from many sweeps (SingleSweep=False).')
+		print(f'	setting default to SingleSweep=True.')
+
+	Plot = kwargs.get('Plot', True)
+	SaveFigure = kwargs.get('SaveFigure', True)
+	SavingPath = kwargs.get('SavingPath', '')
+	vmax = kwargs.get('vmax', 5)
+	vmin = kwargs.get('vmin', 0)
+	if (Dark is None) and (WhiteCalibration is None):
+		print(f'No normalisation')
+		Plot=False
+
+
+	if len(MixedHypercube.shape)==3:
+		MixedHypercube_ = np.array([[MixedHypercube]])
+	elif len(MixedHypercube.shape)==4:
+		MixedHypercube_ = np.array([MixedHypercube])
+	elif len(MixedHypercube.shape)==5:
+		MixedHypercube_ = MixedHypercube
+	else:
+		print(f'Shape of the Mixed hypercube not supported: len(Hypercube.shape) = {len(MixedHypercube.shape)} != [3,4,5]')
+
+
+	(SS, WW, FF, YY, XX) = MixedHypercube_.shape
+	MixedHypercube_N = np.zeros(MixedHypercube_.shape)
+	for s in range(0,SS): 
+		for w in range(0,WW):
+			for f in range(0,FF):
+				frame_data = MixedHypercube_[s,w,f,:,:]
+				frame_red = RedFrames[s,w,f,:,:]
+
+				if Dark is not None:
+					frame_dataD = np.subtract(frame_data, Dark_g)
+					frame_redD = np.subtract(frame_red, Dark_g)
+				else:
+					frame_dataD = frame_data
+					frame_redD = frame_red
+
+				## Now normalise with red frame
+				frameN = np.divide(frame_dataD, frame_redD, out=np.zeros_like(frame_dataD), where=frame_redD!=0)
+#                 if (s==0 and w==0):
+#                     fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(11,5))
+#                     ax[0].imshow(frame_redD, cmap='gray')
+#                     ax[0].set_title(f'Red Channel')
+#                     ax[1].imshow(frame_dataD, cmap='gray')
+#                     ax[1].set_title(f'Data Channel')
+#                     ax[2].imshow(frameN, cmap='gray', vmin=-0.2, vmax=1)
+#                     ax[2].set_title(f'Data/Red')
+#                     plt.tight_layout()
+#                     plt.show()
+				MixedHypercube_N[s,w,f,:,:] = frameN
+
+	if len(MixedHypercube.shape)==3: ## Just wavelengths, Y, X
+		MixedHypercube_N_ = MixedHypercube_N[0,0,:,:,:]
+	elif len(MixedHypercube.shape)==4: 
+		if SingleSweep: ## Single sweep
+			print(f'POTENTIAL ERROR: CHECK THAT THE HYPERCUBE OUTPUT DIMENSIONS ARE CORRECT')
+			print(f'   MixedHypercube_N.shape: {MixedHypercube_N.shape}')
+			print(f'   Currently reshaped as [0,:,:,:,:]')
+			MixedHypercube_N_ = MixedHypercube_N[0,:,:,:,:]
+		else: ## One sweeo but multiple frames
+			print(f'POTENTIAL ERROR: CHECK THAT THE HYPERCUBE OUTPUT DIMENSIONS ARE CORRECT')
+			print(f'   MixedHypercube_N.shape: {MixedHypercube_N.shape}')
+			print(f'   Currently reshaped as [0,:,:,:,:]')
+			MixedHypercube_N_ = MixedHypercube_N[:,0,:,:,:]
+	elif len(MixedHypercube.shape)==5:
+		MixedHypercube_N_ = MixedHypercube_N
+
+
+	if Plot:
+		if len(MixedHypercube.shape)==3: ## Just wavelengths, Y, X
+			HypercubeToPlot = MixedHypercube_N_
+		elif len(MixedHypercube.shape)==4: 
+			if IndivFrames: 
+				HypercubeToPlot = MixedHypercube_N_[:,0,:,:]
+			else:
+				HypercubeToPlot = MixedHypercube_N_[0,:,:,:]
+		elif len(MixedHypercube.shape)==5:
+			HypercubeToPlot =MixedHypercube_N_[0,:,0,:,:]
+
+		nn = 0
+		Mavg = np.average(HypercubeToPlot)
+		Mstd = np.std(HypercubeToPlot)
+		fig, ax = plt.subplots(nrows=4, ncols=4, figsize=(8,8))
+		print(f'Plotting shapes: HypercubeToPlot -> {HypercubeToPlot.shape}, Mask -> {Mask.shape} ')
+		for j in range(0,4):
+			for i in range(0,4):
+				if nn<17:
+					print(HypercubeToPlot[nn,:,:].shape)
+					print(Mask.shape)
+					# ToPlot_sub = np.ma.array(HypercubeToPlot[nn,:,:], mask=Mask[nn,:,:])à
+					ToPlot_sub = HypercubeToPlot[nn,:,:]
+					ax[j,i].imshow(ToPlot_sub, cmap='magma',vmin=vmin, vmax=vmax)
+					ax[j,i].set_title(f'im {nn}')
+					ax[j,i].set_xticks([])
+					ax[j,i].set_yticks([])
+					nn = nn+1
+				else:
+					ax[j,i].set_xticks([])
+					ax[j,i].set_yticks([])
+		plt.tight_layout()
+		if SaveFigure:
+			plt.savefig(f'{SavingPath}Normalised_Hypercube.png')
+		plt.show()
+
+	return MixedHypercube_N_
 
 def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
 	'''
