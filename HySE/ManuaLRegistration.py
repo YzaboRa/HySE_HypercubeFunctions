@@ -969,71 +969,80 @@ def SaveAllTransforms(transforms_list, labels_list, filename="RegistrationTransf
 	print(f"Successfully saved {len(transforms_list)} transforms to {filename}")
 
 
-
-
-def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, original_wavelengths=None):
+def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, original_wavelengths=None):
 	"""
-	Applies loaded transforms to the valid frames of a Data Hypercube.
-	Compatible with:
-	1. Manual Registration (sitk.Transform objects)
-	2. Automatic Registration (dictionaries representing SimpleElastix ParameterMaps)
-	3. Fixed Frames (integer 0)
-
+	Applies loaded transforms to a 3D stack of valid frames.
+	NaN values (from spatial normalisation masking) are preserved through resampling.
+	
 	Parameters:
 	-----------
-	data_hypercube : np.ndarray
-		4D array [Nsweeps, Nwavelengths, Y, X] containing the data to be warped.
-	selector_results : tuple or list/array
-		The output from the FrameSelector. Can be the tuple (mask, indices) 
-		or just the indices array.
+	reduced_stack : np.ndarray
+		3D array [N_valid, Y, X] containing the spatially normalized data (may contain NaNs).
+	LoadedOutcome : tuple or list/array
+		The output from the FrameSelector.
 	transforms_file_path : str
 		Path to the .pkl file created by SaveAllTransforms.
 	original_wavelengths : list, optional
-		List of original frame names (e.g., ['Frame0', 'Frame1'...]).
-		Must match what was used during registration to generate the keys.
-
-	Returns:
-	--------
-	transformed_stack : np.ndarray
-		3D array [N_valid, Y, X] of coregistered data frames.
-	valid_labels : list
-		List of labels corresponding to the output stack.
+		List of original frame names.
 	"""
 	# 1. Load Transforms
 	with open(transforms_file_path, 'rb') as f:
 		transform_dict = pickle.load(f)
 
 	# 2. Unpack indices
-	if isinstance(selector_results, tuple) and len(selector_results) == 2:
-		good_indices = selector_results[1]
+	if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
+		good_indices = LoadedOutcome[1]
 	else:
-		good_indices = selector_results
+		good_indices = LoadedOutcome
 
-	n_valid = len(good_indices)
-	_, _, h, w = data_hypercube.shape
+	n_valid, h, w = reduced_stack.shape
 
 	# 3. Handle default labels
 	if original_wavelengths is None:
-		num_wavs = data_hypercube.shape[1]
-		original_wavelengths = [f"Frame{i}" for i in range(num_wavs)]
+		max_w_idx = max(idx[1] for idx in good_indices)
+		original_wavelengths = [f"Frame{i}" for i in range(max_w_idx + 1)]
 
-	# 4. Prepare Output Array
-	transformed_stack = np.zeros((n_valid, h, w), dtype=data_hypercube.dtype)
+	# 4. Prepare Output Array (float32 to support NaN)
+	transformed_stack = np.full((n_valid, h, w), np.nan, dtype=np.float32)
 	valid_labels = []
 
 	print(f"Applying transforms to {n_valid} frames...")
 
+	def _apply_nan_safe_resample(image_np, resample_fn):
+		"""
+		Applies a resampling function while preserving NaN regions.
+		
+		resample_fn: callable that takes a float32 numpy array and returns
+					 a resampled numpy array of the same shape.
+		"""
+		nan_mask = np.isnan(image_np)
+		has_nans = nan_mask.any()
+
+		if has_nans:
+			# Replace NaNs with 0 for resampling
+			clean = np.where(nan_mask, 0.0, image_np).astype(np.float32)
+			# Resample a float mask (1.0 = valid, 0.0 = NaN)
+			valid_mask = (~nan_mask).astype(np.float32)
+		else:
+			clean = image_np.astype(np.float32)
+
+		# Resample the data
+		warped = resample_fn(clean)
+
+		if has_nans:
+			# Resample the validity mask with the same transform
+			warped_mask = resample_fn(valid_mask)
+			# Any pixel where the resampled mask is below threshold gets NaN
+			# (threshold < 1.0 catches pixels that interpolated across the NaN boundary)
+			warped[warped_mask < 0.9] = np.nan
+
+		return warped
+
 	for i, (s_idx, w_idx) in enumerate(good_indices):
-		# Extract the frame
-		image_np = data_hypercube[s_idx, w_idx, :, :]
-		sitk_img = _sitk.GetImageFromArray(image_np)
-		
-		# Reconstruct the label key
+		image_np = reduced_stack[i, :, :].astype(np.float32)
 		label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
-		
+
 		if label_key not in transform_dict:
-			# Warning only if strict checking is desired, otherwise just append raw
-			# print(f"Warning: No transform found for {label_key}. Skipping.")
 			transformed_stack[i, :, :] = image_np
 			valid_labels.append(label_key)
 			continue
@@ -1046,73 +1055,213 @@ def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, o
 			valid_labels.append(label_key)
 			continue
 
-		# --- CASE 2: AUTOMATIC REGISTRATION (SimpleElastix ParameterMaps as Dicts) ---
-		# The new Save function converts ParameterMaps -> Dicts. We must convert them back.
+		# --- CASE 2: AUTOMATIC REGISTRATION (Elastix) ---
 		elif isinstance(tform_data, (list, tuple)) and len(tform_data) > 0 and isinstance(tform_data[0], dict):
 			try:
-				# Create a Vector of ParameterMaps
 				pm_vector = _sitk.VectorOfParameterMap()
-				
 				for p_dict in tform_data:
-					# Create a new ParameterMap for each dictionary in the list
 					pm = _sitk.ParameterMap()
 					for k, v in p_dict.items():
 						pm[k] = v
 					pm_vector.append(pm)
 
-				# Use Transformix to apply the map
-				transformix = _sitk.TransformixImageFilter()
-				transformix.SetMovingImage(sitk_img)
-				transformix.SetTransformParameterMap(pm_vector)
-				transformix.LogToConsoleOff() # Suppress extensive logging
-				
-				warped_sitk = transformix.Execute()
-				transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+				def _elastix_resample(arr_np):
+					sitk_img = _sitk.GetImageFromArray(arr_np)
+					transformix = _sitk.TransformixImageFilter()
+					transformix.SetMovingImage(sitk_img)
+					transformix.SetTransformParameterMap(pm_vector)
+					transformix.LogToConsoleOff()
+					return _sitk.GetArrayFromImage(transformix.Execute())
+
+				transformed_stack[i, :, :] = _apply_nan_safe_resample(image_np, _elastix_resample)
 				valid_labels.append(label_key)
-				continue # Done for this frame
 			except Exception as e:
 				print(f"Error applying Elastix map for {label_key}: {e}")
-				continue
+			continue
 
-		# --- CASE 3: MANUAL REGISTRATION (SimpleITK Transform Object) ---
-		# If the object is already a valid SimpleITK Transform
+		# --- CASE 3: MANUAL REGISTRATION ---
 		elif isinstance(tform_data, _sitk.Transform):
 			final_transform = tform_data
 
-		# --- CASE 4: LEGACY LANDMARKS (Tuple of points) ---
-		# Backwards compatibility for raw landmark tuples
+		# --- CASE 4: LEGACY LANDMARKS ---
 		elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2 and not isinstance(tform_data[0], dict):
 			src_pts, dst_pts = tform_data
 			src_flat = [coord for point in src_pts for coord in point]
 			dst_flat = [coord for point in dst_pts for coord in point]
-			
-			# Recreate BSpline Transform from points
 			final_transform = _sitk.LandmarkBasedTransformInitializer(
-				_sitk.BSplineTransform(2, 3), 
-				src_flat, 
+				_sitk.BSplineTransform(2, 3),
+				src_flat,
 				dst_flat,
 				_sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3
 			)
-		
 		else:
 			print(f"Unknown transform format for {label_key}. Skipping.")
 			continue
 
-		# Apply Standard SimpleITK Resampling (For Cases 3 & 4)
-		resampler = _sitk.ResampleImageFilter()
-		resampler.SetReferenceImage(sitk_img)
-		resampler.SetTransform(final_transform)
-		resampler.SetInterpolator(_sitk.sitkLinear)
-		resampler.SetDefaultPixelValue(0)
-		
+		# Apply Standard SimpleITK Resampling (Cases 3 & 4)
+		reference_sitk = _sitk.GetImageFromArray(np.zeros((h, w), dtype=np.float32))
+
+		def _sitk_resample(arr_np, transform=final_transform, ref=reference_sitk):
+			sitk_img = _sitk.GetImageFromArray(arr_np)
+			resampler = _sitk.ResampleImageFilter()
+			resampler.SetReferenceImage(ref)
+			resampler.SetTransform(transform)
+			resampler.SetInterpolator(_sitk.sitkLinear)
+			resampler.SetDefaultPixelValue(0)
+			return _sitk.GetArrayFromImage(resampler.Execute(sitk_img))
+
 		try:
-			warped_sitk = resampler.Execute(sitk_img)
-			transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+			transformed_stack[i, :, :] = _apply_nan_safe_resample(image_np, _sitk_resample)
 			valid_labels.append(label_key)
 		except Exception as e:
 			print(f"Failed to apply transform for {label_key}: {e}")
 
 	return transformed_stack, valid_labels
+
+	
+
+# def ApplyAllTransforms(data_hypercube, selector_results, transforms_file_path, original_wavelengths=None):
+# 	"""
+# 	Applies loaded transforms to the valid frames of a Data Hypercube.
+# 	Compatible with:
+# 	1. Manual Registration (sitk.Transform objects)
+# 	2. Automatic Registration (dictionaries representing SimpleElastix ParameterMaps)
+# 	3. Fixed Frames (integer 0)
+
+# 	Parameters:
+# 	-----------
+# 	data_hypercube : np.ndarray
+# 		4D array [Nsweeps, Nwavelengths, Y, X] containing the data to be warped.
+# 	selector_results : tuple or list/array
+# 		The output from the FrameSelector. Can be the tuple (mask, indices) 
+# 		or just the indices array.
+# 	transforms_file_path : str
+# 		Path to the .pkl file created by SaveAllTransforms.
+# 	original_wavelengths : list, optional
+# 		List of original frame names (e.g., ['Frame0', 'Frame1'...]).
+# 		Must match what was used during registration to generate the keys.
+
+# 	Returns:
+# 	--------
+# 	transformed_stack : np.ndarray
+# 		3D array [N_valid, Y, X] of coregistered data frames.
+# 	valid_labels : list
+# 		List of labels corresponding to the output stack.
+# 	"""
+# 	# 1. Load Transforms
+# 	with open(transforms_file_path, 'rb') as f:
+# 		transform_dict = pickle.load(f)
+
+# 	# 2. Unpack indices
+# 	if isinstance(selector_results, tuple) and len(selector_results) == 2:
+# 		good_indices = selector_results[1]
+# 	else:
+# 		good_indices = selector_results
+
+# 	n_valid = len(good_indices)
+# 	_, _, h, w = data_hypercube.shape
+
+# 	# 3. Handle default labels
+# 	if original_wavelengths is None:
+# 		num_wavs = data_hypercube.shape[1]
+# 		original_wavelengths = [f"Frame{i}" for i in range(num_wavs)]
+
+# 	# 4. Prepare Output Array
+# 	transformed_stack = np.zeros((n_valid, h, w), dtype=data_hypercube.dtype)
+# 	valid_labels = []
+
+# 	print(f"Applying transforms to {n_valid} frames...")
+
+# 	for i, (s_idx, w_idx) in enumerate(good_indices):
+# 		# Extract the frame
+# 		image_np = data_hypercube[s_idx, w_idx, :, :]
+# 		sitk_img = _sitk.GetImageFromArray(image_np)
+		
+# 		# Reconstruct the label key
+# 		label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
+		
+# 		if label_key not in transform_dict:
+# 			# Warning only if strict checking is desired, otherwise just append raw
+# 			# print(f"Warning: No transform found for {label_key}. Skipping.")
+# 			transformed_stack[i, :, :] = image_np
+# 			valid_labels.append(label_key)
+# 			continue
+
+# 		tform_data = transform_dict[label_key]
+
+# 		# --- CASE 1: FIXED FRAME (No Transform) ---
+# 		if isinstance(tform_data, int) and tform_data == 0:
+# 			transformed_stack[i, :, :] = image_np
+# 			valid_labels.append(label_key)
+# 			continue
+
+# 		# --- CASE 2: AUTOMATIC REGISTRATION (SimpleElastix ParameterMaps as Dicts) ---
+# 		# The new Save function converts ParameterMaps -> Dicts. We must convert them back.
+# 		elif isinstance(tform_data, (list, tuple)) and len(tform_data) > 0 and isinstance(tform_data[0], dict):
+# 			try:
+# 				# Create a Vector of ParameterMaps
+# 				pm_vector = _sitk.VectorOfParameterMap()
+				
+# 				for p_dict in tform_data:
+# 					# Create a new ParameterMap for each dictionary in the list
+# 					pm = _sitk.ParameterMap()
+# 					for k, v in p_dict.items():
+# 						pm[k] = v
+# 					pm_vector.append(pm)
+
+# 				# Use Transformix to apply the map
+# 				transformix = _sitk.TransformixImageFilter()
+# 				transformix.SetMovingImage(sitk_img)
+# 				transformix.SetTransformParameterMap(pm_vector)
+# 				transformix.LogToConsoleOff() # Suppress extensive logging
+				
+# 				warped_sitk = transformix.Execute()
+# 				transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+# 				valid_labels.append(label_key)
+# 				continue # Done for this frame
+# 			except Exception as e:
+# 				print(f"Error applying Elastix map for {label_key}: {e}")
+# 				continue
+
+# 		# --- CASE 3: MANUAL REGISTRATION (SimpleITK Transform Object) ---
+# 		# If the object is already a valid SimpleITK Transform
+# 		elif isinstance(tform_data, _sitk.Transform):
+# 			final_transform = tform_data
+
+# 		# --- CASE 4: LEGACY LANDMARKS (Tuple of points) ---
+# 		# Backwards compatibility for raw landmark tuples
+# 		elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2 and not isinstance(tform_data[0], dict):
+# 			src_pts, dst_pts = tform_data
+# 			src_flat = [coord for point in src_pts for coord in point]
+# 			dst_flat = [coord for point in dst_pts for coord in point]
+			
+# 			# Recreate BSpline Transform from points
+# 			final_transform = _sitk.LandmarkBasedTransformInitializer(
+# 				_sitk.BSplineTransform(2, 3), 
+# 				src_flat, 
+# 				dst_flat,
+# 				_sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3
+# 			)
+		
+# 		else:
+# 			print(f"Unknown transform format for {label_key}. Skipping.")
+# 			continue
+
+# 		# Apply Standard SimpleITK Resampling (For Cases 3 & 4)
+# 		resampler = _sitk.ResampleImageFilter()
+# 		resampler.SetReferenceImage(sitk_img)
+# 		resampler.SetTransform(final_transform)
+# 		resampler.SetInterpolator(_sitk.sitkLinear)
+# 		resampler.SetDefaultPixelValue(0)
+		
+# 		try:
+# 			warped_sitk = resampler.Execute(sitk_img)
+# 			transformed_stack[i, :, :] = _sitk.GetArrayFromImage(warped_sitk)
+# 			valid_labels.append(label_key)
+# 		except Exception as e:
+# 			print(f"Failed to apply transform for {label_key}: {e}")
+
+# 	return transformed_stack, valid_labels
 
 
 	

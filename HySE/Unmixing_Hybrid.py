@@ -141,6 +141,7 @@ def IntensityCropRedNormalised(RedNormHypercube, method='auto', **kwargs):
 	- method : str. 'auto' or 'manual'.
 	
 	- **kwargs:
+		- Help
 		For method='manual':
 		   - vmin = 0.0: Minimum intensity value.
 		   - vmax = 1.0: Maximum intensity value.
@@ -160,7 +161,11 @@ def IntensityCropRedNormalised(RedNormHypercube, method='auto', **kwargs):
 	- cropped_cube : np.ndarray. The intensity-cropped hypercube
 	
 	"""
-	
+	Help = kwargs.get('Help', False)
+	if Help:
+		print(inspect.getdoc(IntensityCropRedNormalised))
+		return 0
+
 	cropped_cube = np.copy(RedNormHypercube)
 	
 	# Enforce physical reality: Intensity cannot be negative.

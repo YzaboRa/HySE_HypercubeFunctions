@@ -686,6 +686,7 @@ def ComputeHypercube_RGB_orig(DataPath, EdgePos, **kwargs):
 				# print(f's: {s}, e: {e}')
 				s = int(s)
 				e = int(e)
+				print(f'  middle: {e-s/2:.0f} (s={s}, e={e}')
 				## Print how many frames are averaged
 				## React if number unreasonable (too small or too large)
 				if i==0: 
@@ -1254,4 +1255,78 @@ def Rescale(im, PercMax, Crop=True):
 		for i in range(0,len(pos[0])):
 			imrescaled[pos[0][i],pos[1][i]] = 1
 	return imrescaled
+
+
+def SpectralNormalise(usable_frames, WhiteCalibrationTrace, LoadedOutcome):
+	"""
+	Divides each valid frame by its corresponding wavelength trace value.
+	usable_frames is shape (N_valid, Y, X).
+	"""
+	if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
+		good_indices = LoadedOutcome[1]
+	else:
+		good_indices = LoadedOutcome
+		
+	# Extract just the wavelength indices to map the trace
+	w_indices = [idx[1] for idx in good_indices]
+	
+	trace = np.asarray(WhiteCalibrationTrace, dtype=float)
+	trace = np.where(trace == 0, np.nan, trace)
+	
+	# Select only the trace values we need and reshape to (N_valid, 1, 1)
+	matched_trace_values = trace[w_indices]
+	trace_reshaped = matched_trace_values[:, np.newaxis, np.newaxis]
+	
+	# Broadcast division across the Y and X dimensions
+	return usable_frames / trace_reshaped
+
+
+
+def SpatialNormalisation(usable_data, usable_red, threshold_percent=0.01):
+	"""
+	Divides the valid data stack by the normalized valid red stack.
+	Applies a background mask to prevent division-by-zero noise.
+	
+	Parameters:
+	-----------
+	usable_data : np.ndarray
+		3D array [N_valid, Y, X]
+	usable_red : np.ndarray
+		3D array [N_valid, Y, X]
+	threshold_percent : float
+		Pixels in the red channel below this percentage of the maximum 
+		red intensity will be masked out (set to 0).
+	"""
+	data = np.asarray(usable_data, dtype=float)
+	red = np.asarray(usable_red, dtype=float)
+	
+	# 1. Calculate the normalization factor
+	red_global_mean = np.mean(red)
+	if red_global_mean == 0:
+		red_global_mean = np.nan
+		
+	red_normalized = red / red_global_mean
+	
+	# 2. Create a background mask based on the Red channel's brightness
+	# Find the max intensity across the whole red stack (or use a fixed known value)
+	red_max = np.max(red)
+	
+	# Mask is True where the signal is strong enough, False in the dark background
+	signal_mask = red > (red_max * threshold_percent)
+	
+	# 3. Perform the division safely
+	# Create an output array of zeros
+	spatially_normalized = np.zeros_like(data)
+	
+	# Temporarily replace zeros in the denominator to avoid runtime warnings
+	# (We will overwrite these pixels with 0 in the next step anyway)
+	safe_denominator = np.where(signal_mask, red_normalized, 1.0)
+	
+	# Calculate the ratio
+	spatially_normalized = data / safe_denominator
+	
+	# Ensure all background pixels are strictly 0 (or np.nan if you prefer)
+	spatially_normalized[~signal_mask] = np.nan
+	
+	return spatially_normalized
 

@@ -22,6 +22,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import math
 import inspect
 import copy
+import re
+import ast
+
 
 from matplotlib.widgets import Slider, Button
 
@@ -1718,6 +1721,64 @@ def PlotMixingMatrix(MixingMatrix, Wavelengths, Title, SavingPath):
 
 
 
+
+def process_spectral_file(filename):
+	"""
+	Reads a text file with spectral data and organizes it into a NumPy array.
+
+	The function extracts a list of method names and a dictionary of patch data,
+	then assembles them into an array where each row corresponds to a patch and
+	each column corresponds to a method.
+
+	Args:
+		filename (str): The path to the input text file.
+
+	Returns:
+		A tuple containing:
+		- list: A list of method names.
+		- np.ndarray: A 2D NumPy array of the data (Patches x Methods).
+	
+	Raises:
+		FileNotFoundError: If the specified file does not exist.
+		ValueError: If method names or patch data cannot be found in the file.
+	"""
+	methods = []
+	patch_data = {}
+
+	with open(filename, 'r') as f:
+		for line in f:
+			line = line.strip()
+			# Find the line containing the list of methods
+			if line.startswith("['") and line.endswith("']"):
+				# Use ast.literal_eval for safely parsing the list string
+				methods = ast.literal_eval(line)
+			# Find all lines that start with 'Patch'
+			elif line.startswith('Patch'):
+				# Use a regular expression to extract the patch number and the values
+				match = re.search(r"Patch (\d+): \[(.*)\]", line)
+				if match:
+					patch_num = int(match.group(1))
+					# Split the values string and convert each item to a float
+					values = [float(val.replace(' ', '').strip("'")) for val in match.group(2).split(',')]
+					patch_data[patch_num] = values
+
+	if not methods or not patch_data:
+		raise ValueError("Could not find method names or patch data in the file.")
+
+	# Determine the dimensions of the final array from the collected data
+	num_patches = max(patch_data.keys())
+	num_methods = len(methods)
+
+	# Create an empty NumPy array filled with NaN (Not a Number)
+	# This helps identify if any patches were missing in the source file
+	result_array = np.full((num_patches, num_methods), np.nan)
+
+	# Populate the array using the patch number to determine the row index
+	for patch_num, values in patch_data.items():
+		# Subtract 1 from patch_num for 0-based array indexing
+		result_array[patch_num - 1] = values
+
+	return methods, result_array
 
 
 
