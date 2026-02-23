@@ -800,8 +800,8 @@ def GetPatchesIntensity(Image, Sample_size, PatchesPositions):
 		xs, xe  = int(x0-Sample_size/2), int(x0+Sample_size/2)
 		ys, ye  = int(y0-Sample_size/2), int(y0+Sample_size/2)
 		im_sub = Image[ys:ye, xs:xe]
-		val = np.average(im_sub)
-		std = np.std(im_sub)
+		val = np.nanmean(im_sub)
+		std = np.nanstd(im_sub)
 		Intensities.append([nn, val, std])       
 	return np.array(Intensities)
 
