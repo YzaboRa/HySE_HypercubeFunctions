@@ -22,6 +22,7 @@ plt.rcParams["font.family"] = "arial"
 
 import HySE.Import
 import HySE.UserTools
+import HySE
 
 
 
@@ -216,12 +217,6 @@ import HySE.UserTools
 # 	return EdgePos
 
 
-import inspect
-import numpy as np
-import matplotlib.pyplot as plt
-import os
-from datetime import datetime
-# import HySE
 
 def FindHypercube_RGB(DataPath, **kwargs):
 	"""
