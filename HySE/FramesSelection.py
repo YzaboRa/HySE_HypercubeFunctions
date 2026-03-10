@@ -527,3 +527,39 @@ class FrameSelector:
 		else:
 			print("GUI not finished yet.")
 			return None
+
+
+
+def SelectUsableFrames(Channel, LoadedOutcome, target_nframe=1):
+	"""
+	Extracts only the selected valid frames from the 5D hypercube.
+	
+	Parameters:
+	-----------
+	Channel : np.ndarray
+		5D array [Nsweeps, Nwavelengths, Nframes, Y, X]
+	LoadedOutcome : tuple or list
+		(mask, good_indices) or just good_indices
+	target_nframe : int
+		The specific frame index to extract from the Nframes dimension
+		
+	Returns:
+	--------
+	usable_frames : np.ndarray
+		3D array [N_valid, Y, X]
+	"""
+	if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
+		good_indices = LoadedOutcome[1]
+	else:
+		good_indices = LoadedOutcome
+		
+	# Convert to array for advanced indexing
+	indices_arr = np.array(good_indices)
+	s_indices = indices_arr[:, 0]
+	w_indices = indices_arr[:, 1]
+	
+	# Advanced indexing instantly extracts and stacks the exact frames we want
+	usable_frames = Channel[s_indices, w_indices, target_nframe, :, :]
+	
+	return usable_frames
+
