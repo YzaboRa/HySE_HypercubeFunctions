@@ -128,11 +128,6 @@ def ImportData(Path, *Coords, **kwargs):
 	Trace = kwargs.get('Trace', False)
 	if Trace:
 		print(f'Only importing the trace of the data')
-
-	TrimSat = kwargs.get('TrimSat', False)
-	if TrimSat:
-		SatVal = kwargs.get('SatVal', 250)
-		print(f'Saturated image values above {SatVal} to be set to NaN')
 	
 	CropIm = kwargs.get('CropIm', True)
 	# if CropIm:
@@ -149,7 +144,15 @@ def ImportData(Path, *Coords, **kwargs):
 		print(f'Automatic cropping: [{CropImDimensions[0]} : {CropImDimensions[1]}],y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
 	else:
 		print(f'Cropping image: x [{CropImDimensions[0]} : {CropImDimensions[1]}],y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
+	Imshape = (CropImDimensions[1]-CropImDimensions[0],CropImDimensions[3]-CropImDimensions[2])
 
+	# Optional Masking, e.g. if certain areas of the image are saturated
+	Mask = kwargs.get('Mask',np.zeros(Imshape))
+	if Mask.shape!=Imshape:
+		print(f'Mask shape does not match cropped image dimensions, so mask has been ignored')
+		Mask = np.zeros(Imshape)
+	if RGB:
+		Mask = np.repeat(Mask[:,:,None],3,2)
 
 	# ## Coordinates for the image (empirical)
 	# ImagePos_PCIe = [702,1856, 39,1039] ## xmin, xmax, ymin, ymax  - CCRC SDI full canvas
@@ -215,18 +218,13 @@ def ImportData(Path, *Coords, **kwargs):
 					y_end = CropImDimensions[3]
 					frame = frame[y_start:y_end, x_start:x_end]
 				if RGB:
-					if TrimSat:  # Set values to NaNs if saturated
-						frame = frame.astype(np.float32)
-						frame[frame >= SatVal] = np.nan
+					frame = np.ma.masked_array(frame, Mask[:,:,None])  # Mask out any areas which are to be omitted from analysis
 					if Trace:
 						# data.append(np.average(frame))
 						data.append([np.nanmean(frame[:,:,0]), np.nanmean(frame[:,:,1]), np.nanmean(frame[:,:,2])])
 					else:
 						data[ii] = frame
 				else: ## bgr format
-					if TrimSat:  # Set values to NaNs if saturated in any colour channel
-						frame = frame.astype(np.float32)
-						frame[np.nanmax(frame,axis=2) >= SatVal] = np.nan
 					if Trace:
 						data.append(np.nanmean(frame[:,:,2]))
 						data.append(np.nanmean(frame[:,:,1]))
