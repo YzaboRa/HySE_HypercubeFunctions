@@ -1062,9 +1062,6 @@ def ComputeHypercube_RGB_orig(DataPath, EdgePos, **kwargs):
 # 	return Hypercube_sorted, Darks
 
 
-
-
-
 def GetLongDark(vidPath, EdgePos, **kwargs):
 	"""
 	Computes dark frame from the long darks between sweeps. 
@@ -1091,7 +1088,6 @@ def GetLongDark(vidPath, EdgePos, **kwargs):
 
 	ExtraWav = kwargs.get('ExtraWav', 0)
 	Buffer = kwargs.get('Buffer', 20)
-
 
 	(Nsweeps, Nw, _) = EdgePos.shape
 	DataAll = HySE.Import.ImportData(vidPath) # DataAll = Import.ImportData(vidPath, **kwargs)
@@ -1128,7 +1124,6 @@ def GetLongDark(vidPath, EdgePos, **kwargs):
 	return DarkAvg
 
 
-
 def GetDark_WholeVideo(vidPath, **kwargs):
 	"""
 	Computes dark frame from a dark video
@@ -1150,12 +1145,10 @@ def GetDark_WholeVideo(vidPath, **kwargs):
 		print(inspect.getdoc(GetLongDark))
 		return 0
 
+	# Import Video Data
+	RGB = kwargs.get('RGB', False)
 	CropImDimensions = kwargs.get('CropImDimensions')
-	if CropImDimensions is None:
-		DataAll = HySE.Import.ImportData(vidPath)
-	else:
-		DataAll = HySE.Import.ImportData(vidPath, CropImDimensions=CropImDimensions)
-	 # DataAll = Import.ImportData(vidPath, **kwargs)
+	DataAll = HySE.ImportData(vidPath, **kwargs)
 
 	L = len(DataAll)
 	print(f'Dataset size:  {L}')
