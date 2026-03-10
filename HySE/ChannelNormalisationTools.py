@@ -7,8 +7,7 @@ This should be done after dark normalisation, prior to co-registration and unmix
 
 import numpy as np
 import matplotlib.pyplot as plt
-
-
+import HySE
 
 
 def GetChannelInterplay(file,dark_means,buffer=10,HighPixVal=200,LowPixVal=50,return_mask=False):
@@ -32,7 +31,7 @@ def GetChannelInterplay(file,dark_means,buffer=10,HighPixVal=200,LowPixVal=50,re
     t_repeat = (n_B+n_G+n_R+n_mix+1)*t_single # Number of frames in a single cycle
 
     # Extract dark, and trace of whole video without masking
-    trace = HySE.ImportData(file,RGB=True, Trace=True,TrimSat=False)
+    trace = HySE.Import.ImportData(file,RGB=True, Trace=True,TrimSat=False)
     fig1,ax1=plt.subplots()
     for i, col in enumerate(['b', 'g', 'r']):
         ax1.plot(trace[:,i],color=col,alpha=0.2)
@@ -61,7 +60,7 @@ def GetChannelInterplay(file,dark_means,buffer=10,HighPixVal=200,LowPixVal=50,re
 
     # Mask out saturated pixels and dimly illuminated areas, then recalculate trace without saturation
     i=1 # Only look at brightest green frame, as green is always much brighter than blue and red.
-    img = HySE.ImportData(file, RGB=True, Trace=False,TrimSat=False,Coords=[int(starts[i,rpt]+buffer),int(starts[i,rpt]+t_single-buffer)]).mean(axis=0)
+    img = HySE.Import.ImportData(file, RGB=True, Trace=False,TrimSat=False,Coords=[int(starts[i,rpt]+buffer),int(starts[i,rpt]+t_single-buffer)]).mean(axis=0)
 
     fig2,ax2=plt.subplots(1,2,sharex=True,sharey=True)
     ax2[0].imshow(img/255)
@@ -69,7 +68,7 @@ def GetChannelInterplay(file,dark_means,buffer=10,HighPixVal=200,LowPixVal=50,re
     mask = 1-(img.max(axis=2)<HighPixVal)*(img.max(axis=2)>LowPixVal)
     ax2[1].imshow(mask)
 
-    trace = HySE.ImportData(file, Mask=mask.T,RGB=True, Trace=True,TrimSat=False)
+    trace = HySE.Import.ImportData(file, Mask=mask.T,RGB=True, Trace=True,TrimSat=False)
     for i, col in enumerate(['b', 'g', 'r']):
         ax1.plot(trace[:,i],color=col,alpha=1)
 
