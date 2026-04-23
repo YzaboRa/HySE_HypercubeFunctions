@@ -1257,28 +1257,71 @@ def Rescale(im, PercMax, Crop=True):
 	return imrescaled
 
 
-def SpectralNormalise(usable_frames, WhiteCalibrationTrace, LoadedOutcome):
-	"""
-	Divides each valid frame by its corresponding wavelength trace value.
-	usable_frames is shape (N_valid, Y, X).
-	"""
-	if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
-		good_indices = LoadedOutcome[1]
-	else:
-		good_indices = LoadedOutcome
+# def SpectralNormalise(usable_frames, WhiteCalibrationTrace, LoadedOutcome):
+# 	"""
+# 	Divides each valid frame by its corresponding wavelength trace value.
+# 	usable_frames is shape (N_valid, Y, X).
+# 	"""
+# 	if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
+# 		good_indices = LoadedOutcome[1]
+# 	else:
+# 		good_indices = LoadedOutcome
 		
-	# Extract just the wavelength indices to map the trace
-	w_indices = [idx[1] for idx in good_indices]
+# 	# Extract just the wavelength indices to map the trace
+# 	w_indices = [idx[1] for idx in good_indices]
 	
-	trace = np.asarray(WhiteCalibrationTrace, dtype=float)
-	trace = np.where(trace == 0, np.nan, trace)
+# 	trace = np.asarray(WhiteCalibrationTrace, dtype=float)
+# 	trace = np.where(trace == 0, np.nan, trace)
 	
-	# Select only the trace values we need and reshape to (N_valid, 1, 1)
-	matched_trace_values = trace[w_indices]
-	trace_reshaped = matched_trace_values[:, np.newaxis, np.newaxis]
+# 	# Select only the trace values we need and reshape to (N_valid, 1, 1)
+# 	matched_trace_values = trace[w_indices]
+# 	trace_reshaped = matched_trace_values[:, np.newaxis, np.newaxis]
 	
-	# Broadcast division across the Y and X dimensions
-	return usable_frames / trace_reshaped
+# 	# Broadcast division across the Y and X dimensions
+# 	return usable_frames / trace_reshaped
+
+def SpectralNormalise(usable_frames, WhiteCalibrationTrace, LoadedOutcome=None, SingleSweep=False):
+    """
+    Divides each valid frame by its corresponding wavelength trace value.
+    usable_frames is shape (N_valid, Y, X).
+    
+    If SingleSweep is True, assumes usable_frames and WhiteCalibrationTrace 
+    correspond directly (e.g., 16 frames and 16 trace values) and ignores LoadedOutcome.
+
+	Inputs:
+		- usable_frames
+		- WhiteCalibrationTrace
+		- LoadedOutcome = None (or good_indices). Set to LoadedOutcome or good_indices when using with 
+			a custom selection of frames across sweeps.
+		- SingleSweep = False. Set to True if using a single sweep.
+
+	Outputs:
+		- normalised_usable_frames
+
+    """
+    # Ensure trace is a 1D float array and handle zeros to avoid divide-by-zero errors
+    trace = np.asarray(WhiteCalibrationTrace, dtype=float).flatten()
+    trace = np.where(trace == 0, np.nan, trace)
+    
+    if SingleSweep:
+        # In backwards-compatible mode, the trace directly matches the frames
+        trace_reshaped = trace[:, np.newaxis, np.newaxis]
+    else:
+        # Extract good_indices from LoadedOutcome
+        if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
+            good_indices = LoadedOutcome[1]
+        else:
+            good_indices = LoadedOutcome
+            
+        # Extract just the wavelength indices to map the trace
+        w_indices = [idx[1] for idx in good_indices]
+        
+        # Select only the trace values we need and reshape
+        matched_trace_values = trace[w_indices]
+        trace_reshaped = matched_trace_values[:, np.newaxis, np.newaxis]
+        
+    # Broadcast division across the Y and X dimensions
+    return usable_frames / trace_reshaped
 
 
 

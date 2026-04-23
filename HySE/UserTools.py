@@ -395,103 +395,6 @@ def PlotHypercube(Hypercube, **kwargs):
 
 
 
-# def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
-# 	'''
-# 	Function that saves a mp4 video of the hypercube
-# 	Input:
-# 		- Hypercube
-# 		- SavingPathWithName
-# 		- kwargs:
-# 			- fps: frame rate for the video (default 10)
-# 			- Normalise = False. If true, self normalise
-# 			- Help
-# 	Output:
-# 		Saved:
-# 			mp4 video
-# 	'''
-# 	Help = kwargs.get('Help', False)
-# 	if Help:
-# 		print(inspect.getdoc(MakeHypercubeVideo))
-	
-# 	fps = kwargs.get('fps', 10)
-# 	Normalise = kwargs.get('Normalise', False)
-
-# 	if Normalise:
-# 		Hypercube_ToSave = Hypercube/np.nanmax(Hypercube)
-# 		print(f'Normalising Hypercube by itself')
-# 	else:
-# 		Hypercube_ToSave = Hypercube
-
-# 	(NN, YY, XX) = Hypercube.shape
-# 	if '.mp4' not in SavingPathWithName:
-# 		SavingPathWithName = SavingPathWithName+'.mp4'
-
-# 	out = cv2.VideoWriter(SavingPathWithName, cv2.VideoWriter_fourcc(*'mp4v'), fps, (XX, YY), False)
-# 	for i in range(NN):
-# 		data = Hypercube[i,:,:].astype('uint8')
-# 		out.write(data)
-# 	out.release()
-
-
-# def MakeHypercubeVideo(Hypercube, SavingPathWithName, **kwargs):
-# 	'''
-# 	Function that saves a mp4 video of the hypercube.
-# 	Safely handles np.nan values by converting them to black (0).
-	
-# 	Input:
-# 		- Hypercube: A 3D numpy array (Frames, Y, X) of float dtype, may contain nans.
-# 		- SavingPathWithName
-# 		- kwargs:
-# 			- fps: frame rate for the video (default 10)
-# 			- Help
-
-# 	Output:
-# 		Saved:
-# 			mp4 video
-# 	'''
-# 	Help = kwargs.get('Help', False)
-# 	if Help:
-# 		print(inspect.getdoc(MakeHypercubeVideo))
-# 		return
-
-# 	fps = kwargs.get('fps', 10)
-
-# 	# --- Step 1: Handle NaNs and Scale the entire Hypercube ---
-# 	# It ensures that the brightest pixel across all frames becomes 255,
-# 	# and all other pixels are scaled relative to that.
-	
-# 	# Find the maximum value in the cube, ignoring NaNs
-# 	max_val = np.nanmax(Hypercube)
-	
-# 	# Avoid division by zero if the hypercube is all zeros or NaNs
-# 	if max_val == 0:
-# 		max_val = 1.0 
-
-# 	# Scale the float data to the 0-255 range
-# 	scaled_hypercube = (Hypercube / max_val) * 255.0
-
-# 	# Now, replace any remaining NaN values with 0 (black)
-# 	scaled_hypercube[np.isnan(scaled_hypercube)] = 0
-	
-# 	# It is now safe to convert the entire cube to uint8
-# 	hypercube_to_save = scaled_hypercube.astype('uint8')
-
-# 	# --- Step 2: Write the Video ---
-# 	(NN, YY, XX) = hypercube_to_save.shape
-# 	if not SavingPathWithName.endswith('.mp4'):
-# 		SavingPathWithName += '.mp4'
-
-# 	# The 'False' argument at the end means we are creating a grayscale video
-# 	out = cv2.VideoWriter(SavingPathWithName, cv2.VideoWriter_fourcc(*'mp4v'), fps, (XX, YY), False)
-	
-# 	for i in range(NN):
-# 		# Each frame is now a clean uint8 array, ready to be written
-# 		out.write(hypercube_to_save[i, :, :])
-		
-# 	out.release()
-# 	print(f"Video saved to {SavingPathWithName}")
-
-
 def ApplyMask(Hypercube, Mask, **kwargs):
 	"""
 	Function that applies a mask to all frames in a 3D array
@@ -1625,5 +1528,30 @@ def RestoreNaNs(OriginalMixed, UnmixedData):
 #     restored_mixed, 
 	return restored_unmixed
 
+
+def NormaliseRefSpectra(RedChannelWavs, RefSpectra, RefWavs):
+	"""
+	When doing spatial normalisation (red channel normalisation), allows to also
+	normalise the ground truth reference for the Macbeth Spectra
+
+	Parameters:
+	-----------
+	RedChannelWavs: Wavelengths used in the red channel normalisation
+	RefSpectra: Ground truth spectra to be normalised
+	RefWavs: Wavelengths from the reference spectra
+
+	Returns:
+	-----------
+	Normalised spectra
+
+	"""
+	Values = []
+	for i in range(0,len(RedChannelWavs)):
+		wav = RedChannelWavs[i]
+		indx = find_closest(RefWavs, wav)
+		Values.append(RefSpectra[indx])
+	
+	NewSpectra = RefSpectra/np.average(Values)
+	return NewSpectra
 
 

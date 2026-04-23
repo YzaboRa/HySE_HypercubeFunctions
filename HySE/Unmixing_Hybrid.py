@@ -130,99 +130,196 @@ def generate_local_index_matrix(original_matrix, global_indices_for_subgroup):
 	return sub_matrix
 
 
+import numpy as np
+import inspect
 
 def IntensityCropRedNormalised(RedNormHypercube, method='auto', **kwargs):
-	"""
-	Crops and rescales the intensity of a normalized hypercube to remove background noise spikes.
+    """
+    Crops and rescales the intensity of a normalized hypercube to remove background noise spikes.
+    
+    Parameters:
+    -----------
+    - RedNormHypercube : np.ndarray. The spatially normalized hypercube.
+    - method : str. 'auto' or 'manual'.
+    
+    - **kwargs:
+        - Help
+        For method='manual':
+           - vmin = 0.0: Minimum intensity value.
+           - vmax = 1.0: Maximum intensity value.
+            
+        For method='auto':
+           - raw_hypercube (np.ndarray, optional): The unnormalized raw hypercube. 
+           - p_low = 1.0: Lower percentile for auto-cropping
+           - p_high = 99.0: Upper percentile for auto-cropping
+           - bg_percentile = 5.0: If raw_hypercube is provided, pixels below this percentile 
+                                   in the raw data are masked out as background
+                                   
+        - rescale = False: If True, rescales the final cropped values to strictly [0, 1]
+        - enforce_physical = True: If True, clamps all negative values to 0 before processing
+        
+    Returns:
+    --------
+    - cropped_cube : np.ndarray. The intensity-cropped hypercube
+    
+    """
+    Help = kwargs.get('Help', False)
+    if Help:
+        print(inspect.getdoc(IntensityCropRedNormalised))
+        return 0
+
+    cropped_cube = np.copy(RedNormHypercube)
+    
+    # Enforce physical reality: Intensity cannot be negative.
+    # Note: NaNs safely evaluate to False in < 0 comparisons and remain NaN.
+    if kwargs.get('enforce_physical', True):
+        with np.errstate(invalid='ignore'):
+            cropped_cube[cropped_cube < 0] = 0.0
+    
+    if method == 'manual':
+        vmin = kwargs.get('vmin', 0.0)
+        vmax = kwargs.get('vmax', 1.0)
+        
+    elif method == 'auto':
+        p_low = kwargs.get('p_low', 1.0)
+        p_high = kwargs.get('p_high', 99.0)
+        raw_cube = kwargs.get('raw_hypercube', None)
+        
+        if raw_cube is not None:
+            bg_percentile = kwargs.get('bg_percentile', 5.0)
+            
+            # 1. Find the background threshold from the raw data, ensuring it's at least 0
+            raw_floor = np.maximum(raw_cube, 0.0) if kwargs.get('enforce_physical', True) else raw_cube
+            
+            # Use nanpercentile to ignore NaNs
+            bg_threshold = np.nanpercentile(raw_floor, bg_percentile)
+            
+            with np.errstate(invalid='ignore'):
+                signal_mask = raw_floor > bg_threshold
+            
+            # 2. Calculate vmin and vmax ONLY from the valid signal regions
+            valid_pixels = cropped_cube[signal_mask]
+            
+            # If mask is empty or contains only NaNs, fallback to the whole cube
+            if len(valid_pixels) == 0 or np.all(np.isnan(valid_pixels)):
+                valid_pixels = cropped_cube 
+                
+            vmin = np.nanpercentile(valid_pixels, p_low)
+            vmax = np.nanpercentile(valid_pixels, p_high)
+            
+        else:
+            # If no raw cube is provided, calculate percentiles directly on the cropped cube
+            vmin = np.nanpercentile(cropped_cube, p_low)
+            vmax = np.nanpercentile(cropped_cube, p_high)
+
+    # 3. Apply the clipping. np.clip automatically leaves NaNs untouched.
+    cropped_cube = np.clip(cropped_cube, vmin, vmax)
+    
+    # 4. Rescale to [0, 1] if requested
+    if kwargs.get('rescale', False):
+        if vmax > vmin:
+            cropped_cube = (cropped_cube - vmin) / (vmax - vmin)
+        else:
+            # If vmax == vmin (uniform image), zero out everything except the NaNs
+            cropped_cube = np.where(np.isnan(cropped_cube), np.nan, 0.0)
+            
+    return cropped_cube
+    
+
+
+
+# def IntensityCropRedNormalised(RedNormHypercube, method='auto', **kwargs):
+# 	"""
+# 	Crops and rescales the intensity of a normalized hypercube to remove background noise spikes.
 	
-	Parameters:
-	-----------
-	- RedNormHypercube : np.ndarray. The spatially normalized hypercube.
-	- method : str. 'auto' or 'manual'.
+# 	Parameters:
+# 	-----------
+# 	- RedNormHypercube : np.ndarray. The spatially normalized hypercube.
+# 	- method : str. 'auto' or 'manual'.
 	
-	- **kwargs:
-		- Help
-		For method='manual':
-		   - vmin = 0.0: Minimum intensity value.
-		   - vmax = 1.0: Maximum intensity value.
+# 	- **kwargs:
+# 		- Help
+# 		For method='manual':
+# 		   - vmin = 0.0: Minimum intensity value.
+# 		   - vmax = 1.0: Maximum intensity value.
 			
-		For method='auto':
-		   - raw_hypercube (np.ndarray, optional): The unnormalized raw hypercube. 
-		   - p_low = 1.0: Lower percentile for auto-cropping
-		   - p_high = 99.0: Upper percentile for auto-cropping
-		   - bg_percentile = 5.0: If raw_hypercube is provided, pixels below this percentile 
-								   in the raw data are masked out as background
+# 		For method='auto':
+# 		   - raw_hypercube (np.ndarray, optional): The unnormalized raw hypercube. 
+# 		   - p_low = 1.0: Lower percentile for auto-cropping
+# 		   - p_high = 99.0: Upper percentile for auto-cropping
+# 		   - bg_percentile = 5.0: If raw_hypercube is provided, pixels below this percentile 
+# 								   in the raw data are masked out as background
 								   
-		- rescale = False: If True, rescales the final cropped values to strictly [0, 1]
-		- enforce_physical = True: If True, clamps all negative values to 0 before processing
+# 		- rescale = False: If True, rescales the final cropped values to strictly [0, 1]
+# 		- enforce_physical = True: If True, clamps all negative values to 0 before processing
 		
-	Returns:
-	--------
-	- cropped_cube : np.ndarray. The intensity-cropped hypercube
+# 	Returns:
+# 	--------
+# 	- cropped_cube : np.ndarray. The intensity-cropped hypercube
 	
-	"""
-	Help = kwargs.get('Help', False)
-	if Help:
-		print(inspect.getdoc(IntensityCropRedNormalised))
-		return 0
+# 	"""
+# 	Help = kwargs.get('Help', False)
+# 	if Help:
+# 		print(inspect.getdoc(IntensityCropRedNormalised))
+# 		return 0
 
-	cropped_cube = np.copy(RedNormHypercube)
+# 	cropped_cube = np.copy(RedNormHypercube)
 	
-	# Enforce physical reality: Intensity cannot be negative.
-	if kwargs.get('enforce_physical', True):
-		cropped_cube[cropped_cube < 0] = 0.0
+# 	# Enforce physical reality: Intensity cannot be negative.
+# 	if kwargs.get('enforce_physical', True):
+# 		cropped_cube[cropped_cube < 0] = 0.0
 	
-	if method == 'manual':
-		vmin = kwargs.get('vmin', 0.0)
-		vmax = kwargs.get('vmax', 1.0)
+# 	if method == 'manual':
+# 		vmin = kwargs.get('vmin', 0.0)
+# 		vmax = kwargs.get('vmax', 1.0)
 		
-	elif method == 'auto':
-		p_low = kwargs.get('p_low', 1.0)
-		p_high = kwargs.get('p_high', 99.0)
-		raw_cube = kwargs.get('raw_hypercube', None)
+# 	elif method == 'auto':
+# 		p_low = kwargs.get('p_low', 1.0)
+# 		p_high = kwargs.get('p_high', 99.0)
+# 		raw_cube = kwargs.get('raw_hypercube', None)
 		
-		if raw_cube is not None:
-			bg_percentile = kwargs.get('bg_percentile', 5.0)
+# 		if raw_cube is not None:
+# 			bg_percentile = kwargs.get('bg_percentile', 5.0)
 			
-			# 1. Find the background threshold from the raw data, ensuring it's at least 0
-			raw_floor = np.maximum(raw_cube, 0.0) if kwargs.get('enforce_physical', True) else raw_cube
-			bg_threshold = np.percentile(raw_floor, bg_percentile)
-			signal_mask = raw_floor > bg_threshold
+# 			# 1. Find the background threshold from the raw data, ensuring it's at least 0
+# 			raw_floor = np.maximum(raw_cube, 0.0) if kwargs.get('enforce_physical', True) else raw_cube
+# 			bg_threshold = np.percentile(raw_floor, bg_percentile)
+# 			signal_mask = raw_floor > bg_threshold
 			
-			# 2. Calculate vmin and vmax ONLY from the valid signal regions
-			valid_pixels = cropped_cube[signal_mask]
+# 			# 2. Calculate vmin and vmax ONLY from the valid signal regions
+# 			valid_pixels = cropped_cube[signal_mask]
 			
-			if len(valid_pixels) == 0:
-				valid_pixels = cropped_cube 
+# 			if len(valid_pixels) == 0:
+# 				valid_pixels = cropped_cube 
 				
-			vmin = np.percentile(valid_pixels, p_low)
-			vmax = np.percentile(valid_pixels, p_high)
+# 			vmin = np.percentile(valid_pixels, p_low)
+# 			vmax = np.percentile(valid_pixels, p_high)
 			
-			# Ensure auto vmin doesn't drop below 0 if we are enforcing physical limits
-			if kwargs.get('enforce_physical', True):
-				vmin = max(0.0, vmin)
+# 			# Ensure auto vmin doesn't drop below 0 if we are enforcing physical limits
+# 			if kwargs.get('enforce_physical', True):
+# 				vmin = max(0.0, vmin)
 			
-			# 3. Suppress the dark background entirely
-			cropped_cube[~signal_mask] = vmin
+# 			# 3. Suppress the dark background entirely
+# 			cropped_cube[~signal_mask] = vmin
 			
-		else:
-			vmin = np.percentile(cropped_cube, p_low)
-			vmax = np.percentile(cropped_cube, p_high)
+# 		else:
+# 			vmin = np.percentile(cropped_cube, p_low)
+# 			vmax = np.percentile(cropped_cube, p_high)
 			
-			if kwargs.get('enforce_physical', True):
-				vmin = max(0.0, vmin)
+# 			if kwargs.get('enforce_physical', True):
+# 				vmin = max(0.0, vmin)
 			
-	else:
-		raise ValueError("method must be either 'auto' or 'manual'")
+# 	else:
+# 		raise ValueError("method must be either 'auto' or 'manual'")
 
-	# Apply the clipping
-	cropped_cube = np.clip(cropped_cube, vmin, vmax)
+# 	# Apply the clipping
+# 	cropped_cube = np.clip(cropped_cube, vmin, vmax)
 	
-	# Optional: Rescale the output
-	if kwargs.get('rescale', False):
-		if vmax > vmin:  
-			cropped_cube = (cropped_cube - vmin) / (vmax - vmin)
-		else:
-			cropped_cube = np.zeros_like(cropped_cube)
+# 	# Optional: Rescale the output
+# 	if kwargs.get('rescale', False):
+# 		if vmax > vmin:  
+# 			cropped_cube = (cropped_cube - vmin) / (vmax - vmin)
+# 		else:
+# 			cropped_cube = np.zeros_like(cropped_cube)
 			
-	return cropped_cube
+# 	return cropped_cube
