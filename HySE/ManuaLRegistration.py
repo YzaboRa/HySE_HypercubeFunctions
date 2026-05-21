@@ -61,10 +61,10 @@ import SimpleITK as _sitk
 
 
 
-OriginPosition = 'lower'
-# OriginPosition = 'upper' ## standard python
+# OriginPosition = 'lower'
+OriginPosition = 'upper' ## standard python
 
-## N.A. Functions and GUI written with Gemini
+## N.B. Functions and GUI written with Gemini
 
 class LandmarkPicker:
 	"""
@@ -579,6 +579,30 @@ def CoRegisterImages_Manual(im_static, im_shifted, **kwargs):
 
 
 def ManualRegistration(RawHypercube, Wavelengths_list, **kwargs):
+	"""
+	Manual Registration
+
+	Inputs:
+		- RawHypercube
+		- Wavelengths_list
+		- kwargs:
+			- TransformSmoothing (100)
+			- AnchorCorners (True)
+			- Static_Index (0)
+			- Cropping (0)
+			- Exact (True)
+			- Blurring (True)
+			- Sigma (2)
+			- HideReflections (True)
+			- AllReflectionsMasks (None)
+			- deviation_threshold (200)
+			- 
+
+
+
+
+	"""
+
 	# --- Standard Parameters ---
 	TransformSmoothing = kwargs.get('TransformSmoothing', 100)
 	AnchorCorners = kwargs.get('AnchorCorners', True)
@@ -590,6 +614,7 @@ def ManualRegistration(RawHypercube, Wavelengths_list, **kwargs):
 	HideReflections = kwargs.get('HideReflections', True)
 	AllReflectionsMasks = kwargs.get('AllReflectionsMasks')
 	deviation_threshold = kwargs.get('DeviationThreshold', 200)
+	
 	backup_path = 'registration_backup.json'
 
 	t0 = time.time()
