@@ -134,9 +134,9 @@ def ImportData(Path, *Coords, **kwargs):
 
 	CropImDimensions = kwargs.get('CropImDimensions')
 	if not CropImDimensions:
-		CropImDimensions = [663,1818,9,1013]
+		CropImDimensions = [263,695, 99,475]
 		## [702,1856, 39,1039] ## xmin, xmax, ymin, ymax - CCRC SDI full canvas
-		## [263,695, 99,475] ## xmin, xmax, ymin, ymax  - CCRC standard canvas
+		## [263,695, 99,475] ## xmin, xmax, ymin, ymax  - CCRC standard canvas, again singe ~April 2026
 		## [663,1818,9,1013] ## xmin, xmax, ymin, ymax  - CCRC standard canvas since August 2025
 		print(f'Automatic cropping: [{CropImDimensions[0]} : {CropImDimensions[1]}],y [{CropImDimensions[2]}, {CropImDimensions[3]}]')
 	else:
