@@ -354,7 +354,10 @@ def ComputeHypercube_RGB(DataPath, EdgePos, **kwargs):
 	
 	CropImDimensions = kwargs.get('CropImDimensions')
 	if not CropImDimensions:
-		CropImDimensions = [663, 1818, 9, 1013]
+		CropImDimensions = [702,1856, 39,1039]
+		## [702,1856, 39,1039] ## xmin, xmax, ymin, ymax - CCRC SDI full canvas ,singe ~April 2026
+		## [263,695, 99,475] ## xmin, xmax, ymin, ymax  - CCRC standard canvas
+		## [663,1818,9,1013] ## xmin, xmax, ymin, ymax  - CCRC standard canvas since August 2025
 		print(f'Automatic cropping: x[{CropImDimensions[0]}:{CropImDimensions[1]}], y[{CropImDimensions[2]}:{CropImDimensions[3]}]')
 	
 	# Determine number of sweeps
