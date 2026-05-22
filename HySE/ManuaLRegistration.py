@@ -857,67 +857,178 @@ def SaveAllTransforms(transforms_list, labels_list=None, filename="RegistrationT
 
 
 
-# def SaveAllTransforms(transforms_list, labels_list, filename="RegistrationTransforms.pkl"):
-# 	"""
-# 	Saves a list of SimpleITK transforms and their associated labels to a single file.
-	
-# 	Backwards compatible with Automatic Registration output (tuples of ParameterMaps)
-# 	and Manual Registration output (sitk.Transform objects).
 
+
+# def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, original_wavelengths=None, labels_list=None):
+# 	"""
+# 	Applies loaded transforms to a 3D stack of valid frames.
+# 	NaN values (from spatial normalisation masking) are preserved through resampling.
+	
 # 	Parameters:
 # 	-----------
-# 	transforms_list : list
-# 		List of transform objects. Can be:
-# 		- sitk.Transform (Manual Registration)
-# 		- int (0 for fixed frames)
-# 		- tuple of sitk.ParameterMap (Automatic Registration)
-# 	labels_list : list
-# 		List of strings identifying each transform.
-# 	filename : str
-# 		Path to save the output file.
+# 	reduced_stack : np.ndarray
+# 		3D array [N_valid, Y, X] containing the spatially normalized data (may contain NaNs).
+# 	LoadedOutcome : tuple, list/array, or None
+# 		The output from the FrameSelector. If None, assumes sequential frames.
+# 	transforms_file_path : str
+# 		Path to the .pkl file created by SaveAllTransforms.
+# 	original_wavelengths : list, optional
+# 		List of original frame names (used when LoadedOutcome is provided).
+# 	labels_list : list, optional
+# 		List of custom transform labels. Used if LoadedOutcome is None but custom labels were saved.
 # 	"""
-# 	if len(transforms_list) != len(labels_list):
-# 		raise ValueError("Error: The number of transforms must match the number of labels.")
+# 	# 1. Load Transforms
+# 	with open(transforms_file_path, 'rb') as f:
+# 		transform_dict = pickle.load(f)
 
-# 	def _make_serializable(item):
-# 		"""Recursively converts SwigPyObjects (like ParameterMaps) to pickle-able Python types."""
-# 		# Pass integers through (handles the '0' for fixed frames)
-# 		if isinstance(item, int):
-# 			return item
+# 	n_valid, h, w = reduced_stack.shape
+
+# 	# 2. Unpack indices and handle labels based on LoadedOutcome presence
+# 	if LoadedOutcome is not None and len(LoadedOutcome) > 0:
+# 		if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
+# 			good_indices = LoadedOutcome[1]
+# 		else:
+# 			good_indices = LoadedOutcome
+
+# 		# Handle default labels for standard multiplexed mode
+# 		if original_wavelengths is None:
+# 			max_w_idx = max(idx[1] for idx in good_indices)
+# 			original_wavelengths = [f"Frame{i}" for i in range(max_w_idx + 1)]
+# 	else:
+# 		good_indices = None
+
+# 	# 3. Prepare Output Array (float32 to support NaN)
+# 	transformed_stack = np.full((n_valid, h, w), np.nan, dtype=np.float32)
+# 	valid_labels = []
+
+# 	print(f"Applying transforms to {n_valid} frames...")
+
+# 	def _apply_nan_safe_resample(image_np, resample_fn):
+# 		"""
+# 		Applies a resampling function while preserving NaN regions.
 		
-# 		# Handle tuples recursively (handles the tuple of 2 ParameterMaps)
-# 		if isinstance(item, tuple):
-# 			return tuple(_make_serializable(x) for x in item)
+# 		resample_fn: callable that takes a float32 numpy array and returns
+# 					 a resampled numpy array of the same shape.
+# 		"""
+# 		nan_mask = np.isnan(image_np)
+# 		has_nans = nan_mask.any()
+
+# 		if has_nans:
+# 			# Replace NaNs with 0 for resampling
+# 			clean = np.where(nan_mask, 0.0, image_np).astype(np.float32)
+# 			# Resample a float mask (1.0 = valid, 0.0 = NaN)
+# 			valid_mask = (~nan_mask).astype(np.float32)
+# 		else:
+# 			clean = image_np.astype(np.float32)
+
+# 		# Resample the data
+# 		warped = resample_fn(clean)
+
+# 		if has_nans:
+# 			# Resample the validity mask with the same transform
+# 			warped_mask = resample_fn(valid_mask)
+# 			# Any pixel where the resampled mask is below threshold gets NaN
+# 			# (threshold < 1.0 catches pixels that interpolated across the NaN boundary)
+# 			warped[warped_mask < 0.9] = np.nan
+
+# 		return warped
+
+# 	# Iterate strictly over the number of frames in the stack
+# 	for i in range(n_valid):
+# 		image_np = reduced_stack[i, :, :].astype(np.float32)
 		
-# 		# Handle lists recursively
-# 		if isinstance(item, list):
-# 			return [_make_serializable(x) for x in item]
+# 		# Determine the correct dictionary key based on our operating mode
+# 		if good_indices is not None:
+# 			s_idx, w_idx = good_indices[i]
+# 			label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
+# 		else:
+# 			# Sequential mode fallback: match either custom list or default "Frame_i" logic
+# 			if labels_list is not None:
+# 				label_key = labels_list[i]
+# 			else:
+# 				label_key = f"Frame_{i}"
 
-# 		# Handle SimpleITK ParameterMaps (The source of the TypeError)
-# 		# converting them to dicts makes them serializable.
-# 		if "ParameterMap" in item.__class__.__name__:
-# 			return dict(item)
+# 		if label_key not in transform_dict:
+# 			transformed_stack[i, :, :] = image_np
+# 			valid_labels.append(label_key)
+# 			continue
 
-# 		# Default: Return the item as is (e.g., sitk.Transform objects from Manual Registration)
-# 		return item
+# 		tform_data = transform_dict[label_key]
 
-# 	# Clean the input list to ensure all items are serializable
-# 	clean_transforms_list = [_make_serializable(t) for t in transforms_list]
+# 		# --- CASE 1: FIXED FRAME (No Transform) ---
+# 		if isinstance(tform_data, int) and tform_data == 0:
+# 			transformed_stack[i, :, :] = image_np
+# 			valid_labels.append(label_key)
+# 			continue
 
-# 	# Create a dictionary mapping Label -> Transform
-# 	transform_dict = dict(zip(labels_list, clean_transforms_list))
+# 		# --- CASE 2: AUTOMATIC REGISTRATION (Elastix) ---
+# 		elif isinstance(tform_data, (list, tuple)) and len(tform_data) > 0 and isinstance(tform_data[0], dict):
+# 			try:
+# 				pm_vector = _sitk.VectorOfParameterMap()
+# 				for p_dict in tform_data:
+# 					pm = _sitk.ParameterMap()
+# 					for k, v in p_dict.items():
+# 						pm[k] = v
+# 					pm_vector.append(pm)
 
-# 	# Save to a single pickle file
-# 	with open(filename, 'wb') as f:
-# 		pickle.dump(transform_dict, f)
-	
-# 	print(f"Successfully saved {len(transforms_list)} transforms to {filename}")
+# 				def _elastix_resample(arr_np):
+# 					sitk_img = _sitk.GetImageFromArray(arr_np)
+# 					transformix = _sitk.TransformixImageFilter()
+# 					transformix.SetMovingImage(sitk_img)
+# 					transformix.SetTransformParameterMap(pm_vector)
+# 					transformix.LogToConsoleOff()
+# 					return _sitk.GetArrayFromImage(transformix.Execute())
+
+# 				transformed_stack[i, :, :] = _apply_nan_safe_resample(image_np, _elastix_resample)
+# 				valid_labels.append(label_key)
+# 			except Exception as e:
+# 				print(f"Error applying Elastix map for {label_key}: {e}")
+# 			continue
+
+# 		# --- CASE 3: MANUAL REGISTRATION ---
+# 		elif isinstance(tform_data, _sitk.Transform):
+# 			final_transform = tform_data
+
+# 		# --- CASE 4: LEGACY LANDMARKS ---
+# 		elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2 and not isinstance(tform_data[0], dict):
+# 			src_pts, dst_pts = tform_data
+# 			src_flat = [coord for point in src_pts for coord in point]
+# 			dst_flat = [coord for point in dst_pts for coord in point]
+# 			final_transform = _sitk.LandmarkBasedTransformInitializer(
+# 				_sitk.BSplineTransform(2, 3),
+# 				src_flat,
+# 				dst_flat,
+# 				_sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3
+# 			)
+# 		else:
+# 			print(f"Unknown transform format for {label_key}. Skipping.")
+# 			continue
+
+# 		# Apply Standard SimpleITK Resampling (Cases 3 & 4)
+# 		reference_sitk = _sitk.GetImageFromArray(np.zeros((h, w), dtype=np.float32))
+
+# 		def _sitk_resample(arr_np, transform=final_transform, ref=reference_sitk):
+# 			sitk_img = _sitk.GetImageFromArray(arr_np)
+# 			resampler = _sitk.ResampleImageFilter()
+# 			resampler.SetReferenceImage(ref)
+# 			resampler.SetTransform(transform)
+# 			resampler.SetInterpolator(_sitk.sitkLinear)
+# 			resampler.SetDefaultPixelValue(0)
+# 			return _sitk.GetArrayFromImage(resampler.Execute(sitk_img))
+
+# 		try:
+# 			transformed_stack[i, :, :] = _apply_nan_safe_resample(image_np, _sitk_resample)
+# 			valid_labels.append(label_key)
+# 		except Exception as e:
+# 			print(f"Failed to apply transform for {label_key}: {e}")
+
+# 	return transformed_stack, valid_labels
+
 
 
 # import pickle
 # import numpy as np
-# Assuming SimpleITK is imported as _sitk in your environment as per the snippet
-# import SimpleITK as _sitk 
+# import SimpleITK as _sitk
 
 def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, original_wavelengths=None, labels_list=None):
 	"""
@@ -957,6 +1068,40 @@ def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, origi
 	else:
 		good_indices = None
 
+	# --- NEW: AUTO-DETECT CROPPING ---
+	target_h, target_w = h, w
+	
+	# Scan for the first Elastix parameter map to find expected target dimensions
+	for tform in transform_dict.values():
+		if isinstance(tform, (list, tuple)) and len(tform) > 0 and isinstance(tform[0], dict):
+			if 'Size' in tform[0]:
+				# Elastix Size is typically (Width, Height)
+				size_str = tform[0]['Size']
+				target_w, target_h = int(size_str[0]), int(size_str[1])
+				break
+	
+	# If the expected dimensions differ from the input stack, verify and apply the crop
+	if target_h != h or target_w != w:
+		dh = h - target_h
+		dw = w - target_w
+		
+		# Validate that the size mismatch is due to a uniform, symmetric crop
+		if dh != dw or dh < 0 or dw < 0 or dh % 2 != 0:
+			raise ValueError(
+				f"Inconsistent size mismatch detected. Original shape: {(h, w)}, "
+				f"Target shape from transform: {(target_h, target_w)}. "
+				"Mismatch cannot be explained by a symmetric cropping."
+			)
+		
+		crop = dh // 2
+		print(f"Detected uniform cropping of {crop} pixels. Applying to input stack...")
+		
+		# Apply the exact crop to all sides
+		reduced_stack = reduced_stack[:, crop:-crop, crop:-crop]
+		
+		# Update h and w for the rest of the function (pre-allocation and reference maps)
+		h, w = target_h, target_w
+
 	# 3. Prepare Output Array (float32 to support NaN)
 	transformed_stack = np.full((n_valid, h, w), np.nan, dtype=np.float32)
 	valid_labels = []
@@ -966,29 +1111,20 @@ def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, origi
 	def _apply_nan_safe_resample(image_np, resample_fn):
 		"""
 		Applies a resampling function while preserving NaN regions.
-		
-		resample_fn: callable that takes a float32 numpy array and returns
-					 a resampled numpy array of the same shape.
 		"""
 		nan_mask = np.isnan(image_np)
 		has_nans = nan_mask.any()
 
 		if has_nans:
-			# Replace NaNs with 0 for resampling
 			clean = np.where(nan_mask, 0.0, image_np).astype(np.float32)
-			# Resample a float mask (1.0 = valid, 0.0 = NaN)
 			valid_mask = (~nan_mask).astype(np.float32)
 		else:
 			clean = image_np.astype(np.float32)
 
-		# Resample the data
 		warped = resample_fn(clean)
 
 		if has_nans:
-			# Resample the validity mask with the same transform
 			warped_mask = resample_fn(valid_mask)
-			# Any pixel where the resampled mask is below threshold gets NaN
-			# (threshold < 1.0 catches pixels that interpolated across the NaN boundary)
 			warped[warped_mask < 0.9] = np.nan
 
 		return warped
@@ -1002,7 +1138,6 @@ def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, origi
 			s_idx, w_idx = good_indices[i]
 			label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
 		else:
-			# Sequential mode fallback: match either custom list or default "Frame_i" logic
 			if labels_list is not None:
 				label_key = labels_list[i]
 			else:
@@ -1083,158 +1218,6 @@ def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, origi
 			print(f"Failed to apply transform for {label_key}: {e}")
 
 	return transformed_stack, valid_labels
-
-
-# def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, original_wavelengths=None):
-# 	"""
-# 	Applies loaded transforms to a 3D stack of valid frames.
-# 	NaN values (from spatial normalisation masking) are preserved through resampling.
-	
-# 	Parameters:
-# 	-----------
-# 	reduced_stack : np.ndarray
-# 		3D array [N_valid, Y, X] containing the spatially normalized data (may contain NaNs).
-# 	LoadedOutcome : tuple or list/array
-# 		The output from the FrameSelector.
-# 	transforms_file_path : str
-# 		Path to the .pkl file created by SaveAllTransforms.
-# 	original_wavelengths : list, optional
-# 		List of original frame names.
-# 	"""
-# 	# 1. Load Transforms
-# 	with open(transforms_file_path, 'rb') as f:
-# 		transform_dict = pickle.load(f)
-
-# 	# 2. Unpack indices
-# 	if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
-# 		good_indices = LoadedOutcome[1]
-# 	else:
-# 		good_indices = LoadedOutcome
-
-# 	n_valid, h, w = reduced_stack.shape
-
-# 	# 3. Handle default labels
-# 	if original_wavelengths is None:
-# 		max_w_idx = max(idx[1] for idx in good_indices)
-# 		original_wavelengths = [f"Frame{i}" for i in range(max_w_idx + 1)]
-
-# 	# 4. Prepare Output Array (float32 to support NaN)
-# 	transformed_stack = np.full((n_valid, h, w), np.nan, dtype=np.float32)
-# 	valid_labels = []
-
-# 	print(f"Applying transforms to {n_valid} frames...")
-
-# 	def _apply_nan_safe_resample(image_np, resample_fn):
-# 		"""
-# 		Applies a resampling function while preserving NaN regions.
-		
-# 		resample_fn: callable that takes a float32 numpy array and returns
-# 					 a resampled numpy array of the same shape.
-# 		"""
-# 		nan_mask = np.isnan(image_np)
-# 		has_nans = nan_mask.any()
-
-# 		if has_nans:
-# 			# Replace NaNs with 0 for resampling
-# 			clean = np.where(nan_mask, 0.0, image_np).astype(np.float32)
-# 			# Resample a float mask (1.0 = valid, 0.0 = NaN)
-# 			valid_mask = (~nan_mask).astype(np.float32)
-# 		else:
-# 			clean = image_np.astype(np.float32)
-
-# 		# Resample the data
-# 		warped = resample_fn(clean)
-
-# 		if has_nans:
-# 			# Resample the validity mask with the same transform
-# 			warped_mask = resample_fn(valid_mask)
-# 			# Any pixel where the resampled mask is below threshold gets NaN
-# 			# (threshold < 1.0 catches pixels that interpolated across the NaN boundary)
-# 			warped[warped_mask < 0.9] = np.nan
-
-# 		return warped
-
-# 	for i, (s_idx, w_idx) in enumerate(good_indices):
-# 		image_np = reduced_stack[i, :, :].astype(np.float32)
-# 		label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
-
-# 		if label_key not in transform_dict:
-# 			transformed_stack[i, :, :] = image_np
-# 			valid_labels.append(label_key)
-# 			continue
-
-# 		tform_data = transform_dict[label_key]
-
-# 		# --- CASE 1: FIXED FRAME (No Transform) ---
-# 		if isinstance(tform_data, int) and tform_data == 0:
-# 			transformed_stack[i, :, :] = image_np
-# 			valid_labels.append(label_key)
-# 			continue
-
-# 		# --- CASE 2: AUTOMATIC REGISTRATION (Elastix) ---
-# 		elif isinstance(tform_data, (list, tuple)) and len(tform_data) > 0 and isinstance(tform_data[0], dict):
-# 			try:
-# 				pm_vector = _sitk.VectorOfParameterMap()
-# 				for p_dict in tform_data:
-# 					pm = _sitk.ParameterMap()
-# 					for k, v in p_dict.items():
-# 						pm[k] = v
-# 					pm_vector.append(pm)
-
-# 				def _elastix_resample(arr_np):
-# 					sitk_img = _sitk.GetImageFromArray(arr_np)
-# 					transformix = _sitk.TransformixImageFilter()
-# 					transformix.SetMovingImage(sitk_img)
-# 					transformix.SetTransformParameterMap(pm_vector)
-# 					transformix.LogToConsoleOff()
-# 					return _sitk.GetArrayFromImage(transformix.Execute())
-
-# 				transformed_stack[i, :, :] = _apply_nan_safe_resample(image_np, _elastix_resample)
-# 				valid_labels.append(label_key)
-# 			except Exception as e:
-# 				print(f"Error applying Elastix map for {label_key}: {e}")
-# 			continue
-
-# 		# --- CASE 3: MANUAL REGISTRATION ---
-# 		elif isinstance(tform_data, _sitk.Transform):
-# 			final_transform = tform_data
-
-# 		# --- CASE 4: LEGACY LANDMARKS ---
-# 		elif isinstance(tform_data, (tuple, list)) and len(tform_data) == 2 and not isinstance(tform_data[0], dict):
-# 			src_pts, dst_pts = tform_data
-# 			src_flat = [coord for point in src_pts for coord in point]
-# 			dst_flat = [coord for point in dst_pts for coord in point]
-# 			final_transform = _sitk.LandmarkBasedTransformInitializer(
-# 				_sitk.BSplineTransform(2, 3),
-# 				src_flat,
-# 				dst_flat,
-# 				_sitk.BSplineTransformInitializerFilter.BSPLINE_ORDER_3
-# 			)
-# 		else:
-# 			print(f"Unknown transform format for {label_key}. Skipping.")
-# 			continue
-
-# 		# Apply Standard SimpleITK Resampling (Cases 3 & 4)
-# 		reference_sitk = _sitk.GetImageFromArray(np.zeros((h, w), dtype=np.float32))
-
-# 		def _sitk_resample(arr_np, transform=final_transform, ref=reference_sitk):
-# 			sitk_img = _sitk.GetImageFromArray(arr_np)
-# 			resampler = _sitk.ResampleImageFilter()
-# 			resampler.SetReferenceImage(ref)
-# 			resampler.SetTransform(transform)
-# 			resampler.SetInterpolator(_sitk.sitkLinear)
-# 			resampler.SetDefaultPixelValue(0)
-# 			return _sitk.GetArrayFromImage(resampler.Execute(sitk_img))
-
-# 		try:
-# 			transformed_stack[i, :, :] = _apply_nan_safe_resample(image_np, _sitk_resample)
-# 			valid_labels.append(label_key)
-# 		except Exception as e:
-# 			print(f"Failed to apply transform for {label_key}: {e}")
-
-# 	return transformed_stack, valid_labels
-
-	
 	
 
 

@@ -430,12 +430,88 @@ def SelectUsableFrames(Channel, LoadedOutcome, target_nframe=None):
 
 
 
+def FlattenToPseudoSweeps(usable_frames, LoadedOutcome):
+	"""
+	Reshapes a 4D array of extracted frames into a 3D stack, treating 
+	extra frames as independent pseudo-sweeps. Generates a new LoadedOutcome
+	matching this flattened structure.
+
+	Parameters:
+	-----------
+	usable_frames : np.ndarray
+		4D array [N_valid_combinations, N_frames, Y, X] from SelectUsableFrames.
+	LoadedOutcome : tuple or list
+		The original (mask, good_indices) or just good_indices 
+		containing the uncollapsed sweep and wavelength indices.
+
+	Returns:
+	--------
+	flattened_stack : np.ndarray
+		3D array [N_valid * N_frames, Y, X] logically sorted.
+	new_LoadedOutcome : list of tuples
+		New good_indices mapping each frame to its new pseudo-sweep and wavelength.
+	"""
+	if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
+		good_indices = LoadedOutcome[1]
+	else:
+		good_indices = LoadedOutcome
+		
+	# Safety catch: If it's already 3D, no unrolling is needed
+	if usable_frames.ndim == 3:
+		print("Input is already 3D. Assuming frames are already flattened.")
+		return usable_frames, good_indices
+
+	n_valid, n_frames, h, w = usable_frames.shape
+	indices_arr = np.array(good_indices)
+	
+	s_arr = indices_arr[:, 0]
+	w_arr = indices_arr[:, 1]
+	
+	flattened_list = []
+	new_indices_list = []
+	
+	for i in range(n_valid):
+		orig_s = s_arr[i]
+		orig_w = w_arr[i]
+		
+		for f in range(n_frames):
+			# Calculate pseudo-sweep index
+			pseudo_s = orig_s * n_frames + f
+			
+			flattened_list.append(usable_frames[i, f, :, :])
+			new_indices_list.append([pseudo_s, orig_w])
+			
+	flattened_stack_raw = np.array(flattened_list)
+	new_indices_raw = np.array(new_indices_list)
+	
+	# np.lexsort sorts by the last provided array first.
+	# This sorts primarily by pseudo-sweep (col 0), then by wavelength (col 1),
+	# ensuring that all wavelengths for Sweep 0 are grouped together in order.
+	sort_order = np.lexsort((new_indices_raw[:, 1], new_indices_raw[:, 0]))
+	
+	flattened_stack = flattened_stack_raw[sort_order]
+	sorted_indices = new_indices_raw[sort_order]
+	
+	# Format the output indices as a list of tuples for ApplyAllTransforms
+	new_LoadedOutcome = [(int(s), int(w)) for s, w in sorted_indices]
+	
+	return flattened_stack, new_LoadedOutcome
+
+
+
 
 class FrameSelector:
 	def __init__(self, hypercube, wavelength_labels=None):
 		"""
 		GUI for selecting usable frames in a Hypercube [Nsweep, Nwavelengths, Y, X].
 		"""
+		# --- FIX: Unbind default left/right keys to prevent navigation conflicts ---
+		if 'left' in mpl.rcParams['keymap.back']:
+			mpl.rcParams['keymap.back'].remove('left')
+		if 'right' in mpl.rcParams['keymap.forward']:
+			mpl.rcParams['keymap.forward'].remove('right')
+
+
 		self.cube = hypercube
 		self.n_sweeps, self.n_wavs, self.h, self.w = hypercube.shape
 		
