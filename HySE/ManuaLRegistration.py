@@ -1133,17 +1133,38 @@ def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, origi
 	for i in range(n_valid):
 		image_np = reduced_stack[i, :, :].astype(np.float32)
 		
+		# # Determine the correct dictionary key based on our operating mode
+		# if good_indices is not None:
+		# 	s_idx, w_idx = good_indices[i]
+		# 	label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
+		# else:
+		# 	if labels_list is not None:
+		# 		label_key = labels_list[i]
+		# 	else:
+		# 		label_key = f"Frame_{i}"
+
+
 		# Determine the correct dictionary key based on our operating mode
-		if good_indices is not None:
+		if labels_list is not None:
+			# FIX 1: Prioritize explicit custom labels if you provide them
+			label_key = labels_list[i]
+		elif good_indices is not None:
 			s_idx, w_idx = good_indices[i]
 			label_key = f"S{s_idx}_{original_wavelengths[w_idx]}"
+			
+			# FIX 2: Auto-detect flattened pseudo-sweeps
+			if label_key not in transform_dict:
+				# Map the flattened sweep index back to the original (e.g., 69 // 3 = 23)
+				original_s_idx = s_idx // 3
+				fallback_key = f"S{original_s_idx}_{original_wavelengths[w_idx]}"
+				if fallback_key in transform_dict:
+					label_key = fallback_key
 		else:
-			if labels_list is not None:
-				label_key = labels_list[i]
-			else:
-				label_key = f"Frame_{i}"
+			label_key = f"Frame_{i}"
+			
 
 		if label_key not in transform_dict:
+			print(f"WARNING: Key '{label_key}' not found in saved transforms. Skipping!")
 			transformed_stack[i, :, :] = image_np
 			valid_labels.append(label_key)
 			continue
