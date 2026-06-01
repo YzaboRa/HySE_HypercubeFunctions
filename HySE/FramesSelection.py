@@ -68,77 +68,62 @@ from matplotlib.widgets import Slider, Button, CheckButtons, RadioButtons
 OriginPosition = 'upper'
 
 
-
-
-
-
-def SelectUsableFrames(Channel, LoadedOutcome, target_nframe=None):
+def SelectUsableFrames(Channel, LoadedOutcome, is_collapsed=True, target_nframe=None):
 	"""
 	Extracts only the selected valid frames from a 5D hypercube.
-	Automatically handles collapsed sweep/frame selections and multi-frame extraction.
-	
+	Automatically un-collapses pseudo-sweep indexes back to real Sweep/Frame coordinates.
+
 	Parameters:
 	-----------
 	Channel : np.ndarray
 		5D array [Nsweeps, Nwavelengths, Nframes, Y, X]
 	LoadedOutcome : tuple or list
 		(mask, good_indices) or just good_indices
-	target_nframe : int, list, array, or None
-		The specific frame index/indices to extract from the Nframes dimension.
-		If None, it extracts all frames available for that selection.
-		
-	Returns:
-	--------
-	usable_frames : np.ndarray
-		4D array [N_valid, N_extracted_frames, Y, X] if extracting multiple frames,
-		or 3D array [N_valid, Y, X] if extracting a single frame.
+	is_collapsed : bool
+		Set to True if processing indices from the multi-frame registration GUI.
 	"""
 	if isinstance(LoadedOutcome, tuple) and len(LoadedOutcome) == 2:
 		good_indices = LoadedOutcome[1]
 	else:
 		good_indices = LoadedOutcome
-		
-	# Convert to array for advanced indexing
+
 	indices_arr = np.array(good_indices)
 	s_indices = indices_arr[:, 0]
 	w_indices = indices_arr[:, 1]
-	
-	# Get actual structural dimensions of the hypercube channel
+
+	# Get actual structural dimensions of the 5D raw hypercube channel
 	n_sweeps, n_wavs, n_frames, height, width = Channel.shape
-	
-	# --- STEP 1: Handle Collapsed GUI Selections (e.g., 96 sweeps instead of 32) ---
-	if np.max(s_indices) >= n_sweeps:
-		# The indices came from the 96-collapsed selector. 
-		# Un-collapse the 0-95 index back into real sweep and frame coordinates.
-		s_indices_actual = s_indices // n_frames
-		f_indices_actual = s_indices % n_frames
-		
-		# In this scenario, the user already explicitly hand-picked the precise frame 
-		# in the GUI, so we extract exactly those chosen frames and ignore target_nframe.
+
+	# --- STEP 1: Handle Collapsed GUI Selections ---
+	if is_collapsed:
+		# FIX: Because GetHypercubeForRegistration loops through frames on the outside,
+		# the pseudo-sweeps are stacked in blocks of 'n_sweeps' (e.g. blocks of 5).
+		s_indices_actual = s_indices % n_sweeps
+		f_indices_actual = s_indices // n_sweeps
+
+		# Pull the exact frame coordinates directly from the 5D array
 		usable_frames = Channel[s_indices_actual, w_indices, f_indices_actual, :, :]
 		return usable_frames
 
-	# --- STEP 2: Handle Native 5D Indexing with Multiple Target Frames ---
+	# --- STEP 2: Handle Native 5D Indexing ---
 	if target_nframe is None:
 		target_nframe = np.arange(n_frames)
 	else:
 		target_nframe = np.atleast_1d(target_nframe)
-		
+
 	if len(target_nframe) == 1:
-		# Keeps output 3D [N_valid, Y, X] if only querying a single frame index
 		usable_frames = Channel[s_indices, w_indices, target_nframe[0], :, :]
 	else:
-		# Multi-frame advanced indexing using explicit broadcasting dimensions.
-		# Forces s_indices and w_indices to shape (N_valid, 1) 
-		# Forces target_nframe to shape (1, N_extracted_frames)
-		# They cleanly broadcast together to map out the entire space.
 		s_indices_bc = s_indices[:, None]
 		w_indices_bc = w_indices[:, None]
 		f_indices_bc = target_nframe[None, :]
-		
+
 		usable_frames = Channel[s_indices_bc, w_indices_bc, f_indices_bc, :, :]
-		
+
 	return usable_frames
+
+
+
 
 
 

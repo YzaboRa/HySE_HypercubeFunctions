@@ -2,6 +2,8 @@
 
 Manual Registration (indicating fixed points manually)
 
+N.B. Functions and GUI written with Gemini
+
 
 """
 
@@ -64,7 +66,6 @@ import SimpleITK as _sitk
 # OriginPosition = 'lower'
 OriginPosition = 'upper' ## standard python
 
-## N.B. Functions and GUI written with Gemini
 
 # class LandmarkPicker:
 # 	"""
