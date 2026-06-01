@@ -1302,7 +1302,7 @@ def SaveAllTransforms(transforms_list, labels_list=None, filename="RegistrationT
 # import numpy as np
 # import SimpleITK as _sitk
 
-def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, original_wavelengths=None, labels_list=None):
+def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, n_selected_frames=3, original_wavelengths=None, labels_list=None):
 	"""
 	Applies loaded transforms to a 3D stack of valid frames.
 	NaN values (from spatial normalisation masking) are preserved through resampling.
@@ -1315,6 +1315,8 @@ def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, origi
 		The output from the FrameSelector. If None, assumes sequential frames.
 	transforms_file_path : str
 		Path to the .pkl file created by SaveAllTransforms.
+	n_selected_frames : int (3)
+		Number of frames kept for each plateau/wavelength combination. Standard 3 or 1, adjust if needed
 	original_wavelengths : list, optional
 		List of original frame names (used when LoadedOutcome is provided).
 	labels_list : list, optional
@@ -1427,7 +1429,7 @@ def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, origi
 			# FIX 2: Auto-detect flattened pseudo-sweeps
 			if label_key not in transform_dict:
 				# Map the flattened sweep index back to the original (e.g., 69 // 3 = 23)
-				original_s_idx = s_idx // 3
+				original_s_idx = s_idx // n_selected_frames
 				fallback_key = f"S{original_s_idx}_{original_wavelengths[w_idx]}"
 				if fallback_key in transform_dict:
 					label_key = fallback_key
