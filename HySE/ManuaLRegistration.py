@@ -1517,7 +1517,79 @@ def ApplyAllTransforms(reduced_stack, LoadedOutcome, transforms_file_path, n_sel
 
 
 
-def CombineFrames(transformed_stack, labels_list, n_wavelengths=16):
+# def CombineFrames(transformed_stack, labels_list, n_wavelengths=16):
+# 	"""
+# 	Averages registered frames belonging to the same wavelength index.
+
+# 	NB: Current implementation returns NaN when any of the averaged frames contain a 
+# 	NaN at this pixel. A NaN-aware version is commented out, which allows to return
+# 	the average of the non-NaN pixels instead.
+
+# 	Parameters:
+# 	-----------
+# 	transformed_stack : np.ndarray
+# 		3D array [N_valid, Y, X] output from ApplyAllTransforms.
+# 	labels_list : list
+# 		List of labels matching transformed_stack (e.g., ["S0_Frame0", "S1_Frame0"...]).
+# 	n_wavelengths : int (16)
+# 		The expected number of unique wavelengths (frames per sweep).
+
+# 	Returns:
+# 	--------
+# 	combined_cube : np.ndarray
+# 		3D array [Nwavelengths, Y, X] containing the averaged data.
+# 	"""
+# 	N, h, w = transformed_stack.shape
+	
+# 	# Initialize accumulators
+# 	# sum_cube stores the pixel sums
+# 	sum_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
+# 	# count_cube stores how many frames contributed to each pixel
+# 	count_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
+
+# 	print("Combining frames by averaging...")
+
+# 	for i, label in enumerate(labels_list):
+	# 	# Parse the label to get the frame index
+	# 	# Assuming label format "S{sweep}_Frame{wav}" or similar
+	# 	# We look for the part after the underscore or explicitly find the Wav index
+		
+	# 	# Regex to find the index associated with the "Frame" part
+	# 	# Looks for "Frame" followed by digits
+	# 	match = re.search(r'Frame(\d+)', label)
+	# 	if match:
+	# 		wav_idx = int(match.group(1))
+	# 	else:
+	# 		# Fallback: if you used a custom list like ['Blue', 'Red']
+	# 		# We have to map string -> index manually. 
+	# 		# For now, assuming "FrameX" format as per previous steps.
+	# 		print(f"Error parsing label {label}. Skipping.")
+	# 		continue
+			
+	# 	# print(f'label: {label} - wav_idx: {wav_idx}')
+	# 	if wav_idx >= n_wavelengths:
+	# 		continue
+
+	# 	# Add current frame to accumulator
+	# 	# Convert to float to avoid rounding errors
+	# 	sum_cube[wav_idx] += transformed_stack[i].astype('float32')
+	# 	count_cube[wav_idx] += 1
+
+	# 	# ## NaN aware version:
+	# 	# valid = ~np.isnan(frame)
+	# 	# sum_cube[wav_idx][valid] += frame[valid]
+	# 	# count_cube[wav_idx][valid] += 1
+
+	# # Divide by count to get average
+	# # Avoid division by zero where no frames were present
+	# with np.errstate(divide='ignore', invalid='ignore'):
+	# 	combined_cube = sum_cube / count_cube
+	# 	combined_cube[count_cube == 0] = 0 # Handle empty frames
+
+	# return combined_cube
+
+
+def CombineFrames(transformed_stack, labels_list, n_wavelengths=16, NaN_aware=False):
 	"""
 	Averages registered frames belonging to the same wavelength index.
 
@@ -1527,57 +1599,76 @@ def CombineFrames(transformed_stack, labels_list, n_wavelengths=16):
 		3D array [N_valid, Y, X] output from ApplyAllTransforms.
 	labels_list : list
 		List of labels matching transformed_stack (e.g., ["S0_Frame0", "S1_Frame0"...]).
-	n_wavelengths : int (16)
-		The expected number of unique wavelengths (frames per sweep).
+	n_wavelengths : int
+		The expected number of unique wavelengths.
+	NaN_aware : bool
+		If True, ignore NaN pixels when averaging.
+		If False, use standard averaging (current behaviour).
 
 	Returns:
 	--------
 	combined_cube : np.ndarray
 		3D array [Nwavelengths, Y, X] containing the averaged data.
 	"""
+
 	N, h, w = transformed_stack.shape
-	
-	# Initialize accumulators
-	# sum_cube stores the pixel sums
-	sum_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
-	# count_cube stores how many frames contributed to each pixel
-	count_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
 
 	print("Combining frames by averaging...")
 
-	for i, label in enumerate(labels_list):
-		# Parse the label to get the frame index
-		# Assuming label format "S{sweep}_Frame{wav}" or similar
-		# We look for the part after the underscore or explicitly find the Wav index
-		
-		# Regex to find the index associated with the "Frame" part
-		# Looks for "Frame" followed by digits
-		match = re.search(r'Frame(\d+)', label)
-		if match:
-			wav_idx = int(match.group(1))
-		else:
-			# Fallback: if you used a custom list like ['Blue', 'Red']
-			# We have to map string -> index manually. 
-			# For now, assuming "FrameX" format as per previous steps.
-			print(f"Error parsing label {label}. Skipping.")
-			continue
-			
-		# print(f'label: {label} - wav_idx: {wav_idx}')
-		if wav_idx >= n_wavelengths:
-			continue
+	if not NaN_aware:
+		sum_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
+		count_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
 
-		# Add current frame to accumulator
-		# Convert to float to avoid rounding errors
-		sum_cube[wav_idx] += transformed_stack[i].astype('float32')
-		count_cube[wav_idx] += 1
+		for i, label in enumerate(labels_list):
 
-	# Divide by count to get average
-	# Avoid division by zero where no frames were present
-	with np.errstate(divide='ignore', invalid='ignore'):
-		combined_cube = sum_cube / count_cube
-		combined_cube[count_cube == 0] = 0 # Handle empty frames
+			match = re.search(r'Frame(\d+)', label)
+			if match:
+				wav_idx = int(match.group(1))
+			else:
+				print(f"Error parsing label {label}. Skipping.")
+				continue
 
-	return combined_cube
+			if wav_idx >= n_wavelengths:
+				continue
+
+			sum_cube[wav_idx] += transformed_stack[i].astype(np.float32)
+			count_cube[wav_idx] += 1
+
+		with np.errstate(divide='ignore', invalid='ignore'):
+			combined_cube = sum_cube / count_cube
+			combined_cube[count_cube == 0] = 0
+
+		return combined_cube
+
+	else:
+		# NaN-aware implementation
+		sum_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
+		count_cube = np.zeros((n_wavelengths, h, w), dtype=np.float32)
+
+		for i, label in enumerate(labels_list):
+
+			match = re.search(r'Frame(\d+)', label)
+			if match:
+				wav_idx = int(match.group(1))
+			else:
+				print(f"Error parsing label {label}. Skipping.")
+				continue
+
+			if wav_idx >= n_wavelengths:
+				continue
+
+			frame = transformed_stack[i].astype(np.float32)
+
+			valid_mask = ~np.isnan(frame)
+
+			sum_cube[wav_idx][valid_mask] += frame[valid_mask]
+			count_cube[wav_idx][valid_mask] += 1
+
+		with np.errstate(divide='ignore', invalid='ignore'):
+			combined_cube = sum_cube / count_cube
+			combined_cube[count_cube == 0] = np.nan
+
+		return combined_cube
 
 
 
