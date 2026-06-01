@@ -12,10 +12,220 @@ import inspect
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.ndimage import gaussian_filter
 from scipy.optimize import lsq_linear
-matplotlib.rcParams.update({'font.size': 14})
-plt.rcParams["font.family"] = "arial"
 from joblib import Parallel, delayed
 import HySE.Masking
+import copy
+matplotlib.rcParams.update({'font.size': 14})
+plt.rcParams["font.family"] = "arial"
+
+
+
+
+def GetBlueMatrix_3Wav(GreenMatrix, index_418=7,
+					  SameIms=[0,4]):
+	Nframes = len(GreenMatrix)
+	BlueMatrix = []
+	for i in range(0,Nframes):
+		line = copy.deepcopy(GreenMatrix[i])
+		if i in SameIms:
+			BlueMatrix.append(line)
+		else:
+			line.append(index_418)
+			BlueMatrix.append(line)
+	return BlueMatrix
+
+def GetShortGreenMatrices_3Wav(GreenMatrix, index_418=7, 
+							   indices_4x4=[1,4,5,6], 
+							   indices_3x3=[0,2,3]):
+	Nframes = len(GreenMatrix)
+	matrix_6x6 = []
+	matrix_4x4 = []
+	matrix_3x3 = []
+	for i in range(0,Nframes):
+		line = GreenMatrix[i]
+		if index_418 in line:
+			print(f'Im {i} contains FSK to avoid (418/478). Skipping for 6x6 matrix.')
+		else:
+			matrix_6x6.append(line)
+		if any(x in line for x in indices_4x4):
+			if any(x in line for x in indices_3x3):
+				print(f'Error: there seems to be a mixing of the indices indicated for the 4x4 and 3x3 submatrices:')
+				print(f'  indices_4x4={indices_4x4}')
+				print(f'  indices_3x3={indices_3x3}')
+			else:
+				matrix_4x4.append(line)
+		if any(x in line for x in indices_3x3):
+			if any(x in line for x in indices_4x4):
+				print(f'Error: there seems to be a mixing of the indices indicated for the 4x4 and 3x3 submatrices:')
+				print(f'  indices_4x4={indices_4x4}')
+				print(f'  indices_3x3={indices_3x3}')
+			else:
+				matrix_3x3.append(line)
+				
+	return matrix_6x6, matrix_4x4, matrix_3x3
+		
+	
+	
+def GetShortPanelWavs_3Wav(Panel2_Wavelengths, Panel4_Wavelengths, indices_4x4, indices_3x3, index_418):
+	P2 = list(Panel2_Wavelengths)
+	P4 = list(Panel4_Wavelengths)
+	P2.pop(index_418)
+	P4.pop(index_418)
+	Wavs_6x6_P2 = P2
+	Wavs_6x6_P4 = P4
+	P2_4x4 = list(Panel2_Wavelengths)
+	P4_4x4 = list(Panel4_Wavelengths)
+	P2_4x4 = [P2_4x4[x] for x in indices_4x4]
+	P4_4x4 = [P4_4x4[x] for x in indices_4x4]
+	Wavs_4x4_P2 = P2_4x4
+	Wavs_4x4_P4 = P4_4x4
+	
+	P2_3x3 = list(Panel2_Wavelengths)
+	P4_3x3 = list(Panel4_Wavelengths)
+	P2_3x3 = [P2_3x3[x] for x in indices_3x3]
+	P4_3x3 = [P4_3x3[x] for x in indices_3x3]
+	Wavs_3x3_P2 = P2_3x3
+	Wavs_3x3_P4 = P4_3x3
+	return Wavs_6x6_P2, Wavs_6x6_P4, Wavs_4x4_P2, Wavs_4x4_P4, Wavs_3x3_P2, Wavs_3x3_P4
+
+
+def generate_local_index_matrix(original_matrix, global_indices_for_subgroup):
+	"""
+	Remaps a section of a global mixing matrix to a local, zero-based index matrix.
+
+	This function is designed to create a "sub-matrix" suitable for unmixing a
+	smaller group of wavelengths. It filters the original matrix to include only
+	the rows that are exclusively composed of the specified global indices, and then
+	converts those global indices to a local 0, 1, 2, ... format.
+
+	Inputs:
+		- original_matrix (list of lists): The full mixing matrix containing
+		  "global" indices (e.g., [[4, 5, 6], [8, 9, 10], [4, 6, 7]]).
+		- global_indices_for_subgroup (list): A list of the global indices that
+		  define the subgroup you want to isolate (e.g., [4, 5, 6, 7]).
+
+	Outputs:
+		- sub_matrix (list of lists): A new mixing matrix where the rows from the
+		  original matrix that fit the subgroup have been re-indexed to be
+		  zero-based (e.g., [[0, 1, 2], [0, 2, 3]]).
+
+	"""
+	# Create a mapping from the global index to its new local index (0, 1, 2...)
+	# This is the core of the conversion. e.g., {4: 0, 5: 1, 6: 2, 7: 3}
+	index_map = {global_idx: local_idx for local_idx, global_idx in enumerate(global_indices_for_subgroup)}
+
+	# Use a set for efficient checking of which indices are valid for our subgroup.
+	valid_global_indices = set(global_indices_for_subgroup)
+
+	sub_matrix = []
+	# Iterate through each combination (row) in the original matrix
+	for original_row in original_matrix:
+		# Check if ALL indices in this row belong to our desired subgroup
+		if all(idx in valid_global_indices for idx in original_row):
+			# If they do, create the new row by looking up each global index
+			# in our map to get its new local index.
+			new_local_row = [index_map[global_idx] for global_idx in original_row]
+			sub_matrix.append(new_local_row)
+
+	return sub_matrix
+
+
+
+def IntensityCropRedNormalised(RedNormHypercube, method='auto', **kwargs):
+    """
+    Crops and rescales the intensity of a normalized hypercube to remove background noise spikes.
+    
+    Parameters:
+    -----------
+    - RedNormHypercube : np.ndarray. The spatially normalized hypercube.
+    - method : str. 'auto' or 'manual'.
+    
+    - **kwargs:
+        - Help
+        For method='manual':
+           - vmin = 0.0: Minimum intensity value.
+           - vmax = 1.0: Maximum intensity value.
+            
+        For method='auto':
+           - raw_hypercube (np.ndarray, optional): The unnormalized raw hypercube. 
+           - p_low = 1.0: Lower percentile for auto-cropping
+           - p_high = 99.0: Upper percentile for auto-cropping
+           - bg_percentile = 5.0: If raw_hypercube is provided, pixels below this percentile 
+                                   in the raw data are masked out as background
+                                   
+        - rescale = False: If True, rescales the final cropped values to strictly [0, 1]
+        - enforce_physical = True: If True, clamps all negative values to 0 before processing
+        
+    Returns:
+    --------
+    - cropped_cube : np.ndarray. The intensity-cropped hypercube
+    
+    """
+    Help = kwargs.get('Help', False)
+    if Help:
+        print(inspect.getdoc(IntensityCropRedNormalised))
+        return 0
+
+    cropped_cube = np.copy(RedNormHypercube)
+    
+    # Enforce physical reality: Intensity cannot be negative.
+    # Note: NaNs safely evaluate to False in < 0 comparisons and remain NaN.
+    if kwargs.get('enforce_physical', True):
+        with np.errstate(invalid='ignore'):
+            cropped_cube[cropped_cube < 0] = 0.0
+    
+    if method == 'manual':
+        vmin = kwargs.get('vmin', 0.0)
+        vmax = kwargs.get('vmax', 1.0)
+        
+    elif method == 'auto':
+        p_low = kwargs.get('p_low', 1.0)
+        p_high = kwargs.get('p_high', 99.0)
+        raw_cube = kwargs.get('raw_hypercube', None)
+        
+        if raw_cube is not None:
+            bg_percentile = kwargs.get('bg_percentile', 5.0)
+            
+            # 1. Find the background threshold from the raw data, ensuring it's at least 0
+            raw_floor = np.maximum(raw_cube, 0.0) if kwargs.get('enforce_physical', True) else raw_cube
+            
+            # Use nanpercentile to ignore NaNs
+            bg_threshold = np.nanpercentile(raw_floor, bg_percentile)
+            
+            with np.errstate(invalid='ignore'):
+                signal_mask = raw_floor > bg_threshold
+            
+            # 2. Calculate vmin and vmax ONLY from the valid signal regions
+            valid_pixels = cropped_cube[signal_mask]
+            
+            # If mask is empty or contains only NaNs, fallback to the whole cube
+            if len(valid_pixels) == 0 or np.all(np.isnan(valid_pixels)):
+                valid_pixels = cropped_cube 
+                
+            vmin = np.nanpercentile(valid_pixels, p_low)
+            vmax = np.nanpercentile(valid_pixels, p_high)
+            
+        else:
+            # If no raw cube is provided, calculate percentiles directly on the cropped cube
+            vmin = np.nanpercentile(cropped_cube, p_low)
+            vmax = np.nanpercentile(cropped_cube, p_high)
+
+    # 3. Apply the clipping. np.clip automatically leaves NaNs untouched.
+    cropped_cube = np.clip(cropped_cube, vmin, vmax)
+    
+    # 4. Rescale to [0, 1] if requested
+    if kwargs.get('rescale', False):
+        if vmax > vmin:
+            cropped_cube = (cropped_cube - vmin) / (vmax - vmin)
+        else:
+            # If vmax == vmin (uniform image), zero out everything except the NaNs
+            cropped_cube = np.where(np.isnan(cropped_cube), np.nan, 0.0)
+            
+    return cropped_cube
+    
+
+#########################################################################################################################
+#########################################################################################################################
 
 
 def MakeMixingMatrix_Flexible(Panel1_Wavelengths, Arduino_MixingMatrix_P1,
@@ -287,6 +497,31 @@ def MakeMixingMatrix(Wavelengths_unsorted, Arduino_MixingMatrix, **kwargs):
 		plt.show()
 
 	return MixingMatrix
+
+
+def MakeObservedMatrix(Hypercube):
+	"""
+	Make observed matrix (ravel) from the hypercube to feed in the unmixing algorithm
+
+	Inputs:
+		- Hypercube
+
+	Outptus:
+		- ObservedMatrix
+
+
+	"""
+	N, YY, XX = Hypercube.shape
+	Matrix = []
+	for n in range(0,N):
+		data_sub = Hypercube[n,:,:]
+		Matrix.append(data_sub.ravel())
+	return np.array(Matrix)
+
+
+#########################################################################################################################
+#########################################################################################################################
+
 
 def BlurWhiteCalibration(WhiteCalibration, Sigma):
 	"""
@@ -710,6 +945,14 @@ def NormaliseMixedHypercube_RedChannel(MixedHypercube, RedFrames, **kwargs):
 
 	return MixedHypercube_N_
 
+
+
+
+
+#########################################################################################################################
+#########################################################################################################################
+
+
 def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
 	'''
 	Computes the unmixing of the raw hypercube according to a mixing matrix
@@ -761,25 +1004,6 @@ def UnmixData(MixedHypercube, MixingMatrix, **kwargs):
 	return UnmixedHypercube
 
 		
-		
-def MakeObservedMatrix(Hypercube):
-	"""
-	Make observed matrix (ravel) from the hypercube to feed in the unmixing algorithm
-
-	Inputs:
-		- Hypercube
-
-	Outptus:
-		- ObservedMatrix
-
-
-	"""
-	N, YY, XX = Hypercube.shape
-	Matrix = []
-	for n in range(0,N):
-		data_sub = Hypercube[n,:,:]
-		Matrix.append(data_sub.ravel())
-	return np.array(Matrix)
 
 
 
@@ -913,19 +1137,6 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, CombinedMask=None, lambda_
 				raise ValueError(f"CombinedMask shape {CombinedMask.shape} does not match hypercube spatial dimensions ({YY}, {XX})")
 			mask_flat = CombinedMask.flatten()
 
-		# def solve_single(i):
-		# 	# Check the provided mask first. If True, the pixel is invalid.
-		# 	if mask_flat is not None and mask_flat[i]: 
-		# 		return np.zeros(num_waves)
-
-		# 	# Original checks for intensity and standard deviation
-		# 	pixel = ObservedMatrix[i, :]
-		# 	if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
-		# 		return np.zeros(num_waves)
-
-		# 	b_reg = np.concatenate([pixel, zeros_rhs])
-		# 	res = lsq_linear(A_reg_base, b_reg, bounds=(0, np.inf), max_iter=max_iter, method='trf')
-		# 	return res.x if res.success else np.zeros(num_waves)
 
 		def solve_single(i):
 			# Check the provided mask first. If True, the pixel is invalid.
@@ -962,83 +1173,6 @@ def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, CombinedMask=None, lambda_
 		UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
 	return UnmixedHypercube
 
-
-
-	
-
-# def UnmixDataSmoothNNLS(MixedHypercube, MixingMatrix, lambda_smooth=0.1,
-# 						intensity_thresh=1e-2, std_thresh=1e-3,
-# 						max_iter=5000, parallel=True, **kwargs):
-# 	"""
-# 	Unmix hypercube using non-negative least squares with Tikhonov regularization
-# 	promoting smoothness across wavelengths.
-
-# 	Parameters:
-# 		- MixedHypercube : array, shape (S, N, Y, X) or (N, Y, X)
-# 		- MixingMatrix : array, shape (num_images, num_wavelengths)
-# 		- lambda_smooth = 0.1 : regularization strength for spectral smoothness
-# 		- intensity_thresh = 1e-2: intensity threshold for skipping noisy pixels (aim for ~ 1e-2*max(Hypercube))
-# 		- std_thresh = 1e-3 : standard deviation threshold for skipping noisy pixels
-# 		- max_iter = 5000 : max iterations for NNLS solver
-# 		- parallel = True: use parallel joblib processing
-# 		- kwargs
-# 			- Help: Show this help message
-# 			- Average = True. If the input mixed hypercube containes more than one shape,
-# 				the function can average the unmixed arrays or leave then individually
-
-# 	Output:
-# 		-  Unmixed Hypercube
-# 	"""
-# 	Help = kwargs.get('Help', False)
-# 	Average = kwargs.get('Average', True)
-# 	if Help:
-# 		print(inspect.getdoc(UnmixDataSmoothNNLS))
-# 		return 0
-
-# 	if len(MixedHypercube.shape) > 3:
-# 		MixedHypercube_ = MixedHypercube
-# 	else:
-# 		MixedHypercube_ = np.array([MixedHypercube])
-
-# 	UnmixedHypercube = []
-# 	SS, WW, YY, XX = MixedHypercube_.shape
-# 	num_meas, num_waves = MixingMatrix.shape
-
-# 	# Construct second-difference matrix L (smoothness penalty)
-# 	L = -2 * np.eye(num_waves) + np.eye(num_waves, k=1) + np.eye(num_waves, k=-1)
-# 	A_reg_base = np.vstack([MixingMatrix, np.sqrt(lambda_smooth) * L])
-# 	zeros_rhs = np.zeros((num_waves,))
-
-# 	for s in range(SS):
-# 		hypercube_sub = MixedHypercube_[s]
-# 		NN, YY, XX = hypercube_sub.shape
-# 		ObservedMatrix = HySE.MakeObservedMatrix(hypercube_sub).T  # shape: (pixels, n_meas)
-# 		num_pixels = ObservedMatrix.shape[0]
-# 		SolvedMatrix_flat = np.zeros((num_waves, num_pixels))
-
-# 		def solve_single(i):
-# 			pixel = ObservedMatrix[i, :]
-# 			if np.sum(pixel) < 0 or np.sum(pixel) < intensity_thresh or np.std(pixel) < std_thresh:
-# 				return np.zeros(num_waves)
-# 			b_reg = np.concatenate([pixel, zeros_rhs])
-# 			res = lsq_linear(A_reg_base, b_reg, bounds=(0, np.inf), max_iter=max_iter, method='trf')
-# 			return res.x if res.success else np.zeros(num_waves)
-
-# 		if parallel:
-# 			# from joblib import Parallel, delayed
-# 			results = Parallel(n_jobs=-1)(delayed(solve_single)(i) for i in range(num_pixels))
-# 			SolvedMatrix_flat = np.array(results).T
-# 		else:
-# 			for i in range(num_pixels):
-# 				SolvedMatrix_flat[:, i] = solve_single(i)
-
-# 		SolvedMatrix = [SolvedMatrix_flat[n, :].reshape(YY, XX) for n in range(num_waves)]
-# 		UnmixedHypercube.append(SolvedMatrix)
-
-# 	UnmixedHypercube = np.array(UnmixedHypercube)
-# 	if Average:
-# 		UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
-# 	return UnmixedHypercube
 
 
 
@@ -1134,6 +1268,11 @@ def UnmixDataSmoothNNLSPrior(MixedHypercube, MixingMatrix, prior_spectrum,
 	if Average:
 		UnmixedHypercube = np.mean(UnmixedHypercube, axis=0)
 	return UnmixedHypercube
+
+
+
+#########################################################################################################################
+#########################################################################################################################
 
 
 def omit_frames(arr, indices):
