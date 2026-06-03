@@ -153,190 +153,190 @@ def visualize_edge_density_overlay(hypercube, method='sobel',
 
 
 def visualize_hypercube_movement(hypercube, method='sobel', 
-                                sobel_ksize=5,  # Integer kernel size (3, 5, 7, etc.)
-                                canny_sigma=2.0, # Separated Canny sigma
-                                cap_intensity=0.5, raw_threshold=0.1, 
-                                reflection_mask=None, nframe=0, 
-                                mask_dilation_kernel=0, 
-                                denoise_sigma=0.0, 
-                                denoise_method='gaussian',
-                                mask_inpaint_method='zero_fill', 
-                                display_power_gamma=1.0,
-                                min_gradient_threshold=0.0,
-                                white_overlay=10):
-    """
-    Visualizes movement in a hypercube using OpenCV for robust gradient calculation.
+								sobel_ksize=5,  # Integer kernel size (3, 5, 7, etc.)
+								canny_sigma=2.0, # Separated Canny sigma
+								cap_intensity=0.5, raw_threshold=0.1, 
+								reflection_mask=None, nframe=0, 
+								mask_dilation_kernel=0, 
+								denoise_sigma=0.0, 
+								denoise_method='gaussian',
+								mask_inpaint_method='zero_fill', 
+								display_power_gamma=1.0,
+								min_gradient_threshold=0.0,
+								white_overlay=10):
+	"""
+	Visualizes movement in a hypercube using OpenCV for robust gradient calculation.
 
-    Parameters:
-    -----------
-    hypercube : numpy.ndarray
-        Input array (N, Y, X).
-    method : str
-        'sobel', 'canny', or 'raw_thresholded'.
-    sobel_ksize : int
-        Kernel size for OpenCV Sobel. Must be an odd integer (1, 3, 5, 7, ...).
-        - 3: Standard, sharp edges, susceptible to noise.
-        - 5: Smooths noise, highlights medium features. (RECOMMENDED for your data)
-        - 7: Very smooth, ignores fine texture completely.
-    canny_sigma : float
-        Sigma for Canny edge detection (if method='canny').
-    cap_intensity : float
-        Clips high-intensity features (0.0 to 1.0).
-    raw_threshold : float
-        Threshold for 'raw_thresholded'.
-    reflection_mask : numpy.ndarray
-        Binary mask (2D or 3D).
-    nframe : int
-        Context frame index.
-    mask_dilation_kernel : int
-        Size of dilation for reflection mask.
-    denoise_sigma : float
-        Pre-filtering strength.
-    denoise_method : str
-        'gaussian' or 'median'.
-    mask_inpaint_method : str
-        'zero_fill' or 'inpaint'.
-    display_power_gamma : float
-        Power law (val^gamma) to darken background noise.
-    min_gradient_threshold : float
-        Hard cutoff (0.0 to 1.0). Signals below this are set to 0.
+	Parameters:
+	-----------
+	hypercube : numpy.ndarray
+		Input array (N, Y, X).
+	method : str
+		'sobel', 'canny', or 'raw_thresholded'.
+	sobel_ksize : int
+		Kernel size for OpenCV Sobel. Must be an odd integer (1, 3, 5, 7, ...).
+		- 3: Standard, sharp edges, susceptible to noise.
+		- 5: Smooths noise, highlights medium features. (RECOMMENDED for your data)
+		- 7: Very smooth, ignores fine texture completely.
+	canny_sigma : float
+		Sigma for Canny edge detection (if method='canny').
+	cap_intensity : float
+		Clips high-intensity features (0.0 to 1.0).
+	raw_threshold : float
+		Threshold for 'raw_thresholded'.
+	reflection_mask : numpy.ndarray
+		Binary mask (2D or 3D).
+	nframe : int
+		Context frame index.
+	mask_dilation_kernel : int
+		Size of dilation for reflection mask.
+	denoise_sigma : float
+		Pre-filtering strength.
+	denoise_method : str
+		'gaussian' or 'median'.
+	mask_inpaint_method : str
+		'zero_fill' or 'inpaint'.
+	display_power_gamma : float
+		Power law (val^gamma) to darken background noise.
+	min_gradient_threshold : float
+		Hard cutoff (0.0 to 1.0). Signals below this are set to 0.
 
-    Returns:
-    --------
-    fig : matplotlib.figure.Figure
-    """
-    
-    n_frames, height, width = hypercube.shape
-    hypercube = np.nan_to_num(hypercube, nan=0.0)
+	Returns:
+	--------
+	fig : matplotlib.figure.Figure
+	"""
+	
+	n_frames, height, width = hypercube.shape
+	hypercube = np.nan_to_num(hypercube, nan=0.0)
 
-    # --- Validation ---
-    if reflection_mask is not None:
-        if len(reflection_mask.shape) == 3:
-            if reflection_mask.shape != hypercube.shape: raise ValueError("Mask shape mismatch.")
-        elif len(reflection_mask.shape) == 2:
-             if reflection_mask.shape != (height, width): raise ValueError("Mask shape mismatch.")
-    
-    # Ensure sobel_ksize is odd
-    if sobel_ksize % 2 == 0:
-        sobel_ksize += 1
-        print(f"Warning: sobel_ksize must be odd. Automatically adjusted to {sobel_ksize}.")
+	# --- Validation ---
+	if reflection_mask is not None:
+		if len(reflection_mask.shape) == 3:
+			if reflection_mask.shape != hypercube.shape: raise ValueError("Mask shape mismatch.")
+		elif len(reflection_mask.shape) == 2:
+			 if reflection_mask.shape != (height, width): raise ValueError("Mask shape mismatch.")
+	
+	# Ensure sobel_ksize is odd
+	if sobel_ksize % 2 == 0:
+		sobel_ksize += 1
+		print(f"Warning: sobel_ksize must be odd. Automatically adjusted to {sobel_ksize}.")
 
-    composite_image = np.zeros((height, width, 3), dtype=np.float32)
+	composite_image = np.zeros((height, width, 3), dtype=np.float32)
 #     hues = np.linspace(0, 1, n_frames + 1)[:-1]
-    golden_ratio_conjugate = 0.618033988749895
-    hues = (np.arange(n_frames) * golden_ratio_conjugate) % 1.0
-    
-    def apply_denoise(img, strength, method):
-        if strength <= 0: return img
-        if method == 'gaussian': return gaussian_filter(img, sigma=strength)
-        elif method == 'median': return median_filter(img, size=int(max(2, strength)))
-        return img
+	golden_ratio_conjugate = 0.618033988749895
+	hues = (np.arange(n_frames) * golden_ratio_conjugate) % 1.0
+	
+	def apply_denoise(img, strength, method):
+		if strength <= 0: return img
+		if method == 'gaussian': return gaussian_filter(img, sigma=strength)
+		elif method == 'median': return median_filter(img, size=int(max(2, strength)))
+		return img
 
-    # --- Context Frame (Left Subplot) ---
-    ref_frame = hypercube[nframe].copy()
-    ref_frame_norm = (ref_frame - ref_frame.min()) / (ref_frame.max() - ref_frame.min() + 1e-8)
-    ref_frame_processed = ref_frame_norm.copy()
-    mask_label = "Raw Normalized"
-    
-    if reflection_mask is not None and method in ['canny', 'sobel']:
-        ref_mask = reflection_mask[nframe].astype(bool) if len(reflection_mask.shape) == 3 else reflection_mask.astype(bool)
-        if mask_dilation_kernel > 0:
-            ref_mask = binary_dilation(ref_mask, structure=np.ones((mask_dilation_kernel, mask_dilation_kernel)))
+	# --- Context Frame (Left Subplot) ---
+	ref_frame = hypercube[nframe].copy()
+	ref_frame_norm = (ref_frame - ref_frame.min()) / (ref_frame.max() - ref_frame.min() + 1e-8)
+	ref_frame_processed = ref_frame_norm.copy()
+	mask_label = "Raw Normalized"
+	
+	if reflection_mask is not None and method in ['canny', 'sobel']:
+		ref_mask = reflection_mask[nframe].astype(bool) if len(reflection_mask.shape) == 3 else reflection_mask.astype(bool)
+		if mask_dilation_kernel > 0:
+			ref_mask = binary_dilation(ref_mask, structure=np.ones((mask_dilation_kernel, mask_dilation_kernel)))
 
-        if mask_inpaint_method == 'inpaint':
-            ref_frame_processed = inpaint.inpaint_biharmonic(ref_frame_norm, ref_mask, channel_axis=None)
-            mask_label = "Inpainted"
-        else: 
-            ref_frame_processed[ref_mask] = 0.0
-            mask_label = "Zero-Fill"
-        
-        if denoise_sigma > 0.0:
-            ref_frame_processed = apply_denoise(ref_frame_processed, denoise_sigma, denoise_method)
+		if mask_inpaint_method == 'inpaint':
+			ref_frame_processed = inpaint.inpaint_biharmonic(ref_frame_norm, ref_mask, channel_axis=None)
+			mask_label = "Inpainted"
+		else: 
+			ref_frame_processed[ref_mask] = 0.0
+			mask_label = "Zero-Fill"
+		
+		if denoise_sigma > 0.0:
+			ref_frame_processed = apply_denoise(ref_frame_processed, denoise_sigma, denoise_method)
 
-    overlap_count = np.zeros((height, width), dtype=np.int32)
-    # --- Main Loop ---
-    for i in range(n_frames):
-        frame = hypercube[i]
-        frame_norm = (frame - frame.min()) / (frame.max() - frame.min() + 1e-8)
-        working_frame = frame_norm.copy()
-        
-        # 1. Masking / Inpainting
-        if reflection_mask is not None:
-            mask = reflection_mask[i].astype(bool) if len(reflection_mask.shape) == 3 else reflection_mask.astype(bool)
-            if mask_dilation_kernel > 0:
-                mask = binary_dilation(mask, structure=np.ones((mask_dilation_kernel, mask_dilation_kernel)))
-            
-            if method in ['canny', 'sobel']:
-                if mask_inpaint_method == 'inpaint':
-                    working_frame = inpaint.inpaint_biharmonic(working_frame, mask, channel_axis=None)
-                else: 
-                    working_frame[mask] = 0.0
-        
-        # 2. Filtering
-        if method in ['canny', 'sobel']:
-            # A. Pre-Denoise
-            working_frame = apply_denoise(working_frame, denoise_sigma, denoise_method)
-            
-            # B. Edge Detection
-            if method == 'canny':
-                feature_map = feature.canny(working_frame, sigma=canny_sigma).astype(np.float32)
-            
-            elif method == 'sobel':
+	overlap_count = np.zeros((height, width), dtype=np.int32)
+	# --- Main Loop ---
+	for i in range(n_frames):
+		frame = hypercube[i]
+		frame_norm = (frame - frame.min()) / (frame.max() - frame.min() + 1e-8)
+		working_frame = frame_norm.copy()
+		
+		# 1. Masking / Inpainting
+		if reflection_mask is not None:
+			mask = reflection_mask[i].astype(bool) if len(reflection_mask.shape) == 3 else reflection_mask.astype(bool)
+			if mask_dilation_kernel > 0:
+				mask = binary_dilation(mask, structure=np.ones((mask_dilation_kernel, mask_dilation_kernel)))
+			
+			if method in ['canny', 'sobel']:
+				if mask_inpaint_method == 'inpaint':
+					working_frame = inpaint.inpaint_biharmonic(working_frame, mask, channel_axis=None)
+				else: 
+					working_frame[mask] = 0.0
+		
+		# 2. Filtering
+		if method in ['canny', 'sobel']:
+			# A. Pre-Denoise
+			working_frame = apply_denoise(working_frame, denoise_sigma, denoise_method)
+			
+			# B. Edge Detection
+			if method == 'canny':
+				feature_map = feature.canny(working_frame, sigma=canny_sigma).astype(np.float32)
+			
+			elif method == 'sobel':
 
-                # CV_64F handles negative gradients correctly (important!)
-                grad_x = cv2.Sobel(working_frame, cv2.CV_64F, 1, 0, ksize=sobel_ksize)
-                grad_y = cv2.Sobel(working_frame, cv2.CV_64F, 0, 1, ksize=sobel_ksize)
-                
-                # Calculate magnitude
-                grad_mag = cv2.magnitude(grad_x, grad_y)
-                
-                # Rescale to 0-1 for display
-                feature_map = exposure.rescale_intensity(grad_mag, in_range='image')
+				# CV_64F handles negative gradients correctly (important!)
+				grad_x = cv2.Sobel(working_frame, cv2.CV_64F, 1, 0, ksize=sobel_ksize)
+				grad_y = cv2.Sobel(working_frame, cv2.CV_64F, 0, 1, ksize=sobel_ksize)
+				
+				# Calculate magnitude
+				grad_mag = cv2.magnitude(grad_x, grad_y)
+				
+				# Rescale to 0-1 for display
+				feature_map = exposure.rescale_intensity(grad_mag, in_range='image')
 
-            # C. Post-Processing
-            if min_gradient_threshold > 0.0:
-                feature_map[feature_map < min_gradient_threshold] = 0.0
-            
-            feature_map = np.clip(feature_map, 0.0, cap_intensity)
-            if cap_intensity < 1.0 and feature_map.max() > 0:
-                feature_map = feature_map / cap_intensity  
-            
-            if display_power_gamma != 1.0:
-                feature_map = feature_map ** display_power_gamma
-                
-        elif method == 'raw_thresholded':
-            feature_map = (working_frame < raw_threshold).astype(np.float32)
-            if reflection_mask is not None:
-                if mask_dilation_kernel > 0:
-                    mask = binary_dilation(mask, structure=np.ones((mask_dilation_kernel, mask_dilation_kernel)))
-                feature_map[mask] = 0.0 
+			# C. Post-Processing
+			if min_gradient_threshold > 0.0:
+				feature_map[feature_map < min_gradient_threshold] = 0.0
+			
+			feature_map = np.clip(feature_map, 0.0, cap_intensity)
+			if cap_intensity < 1.0 and feature_map.max() > 0:
+				feature_map = feature_map / cap_intensity  
+			
+			if display_power_gamma != 1.0:
+				feature_map = feature_map ** display_power_gamma
+				
+		elif method == 'raw_thresholded':
+			feature_map = (working_frame < raw_threshold).astype(np.float32)
+			if reflection_mask is not None:
+				if mask_dilation_kernel > 0:
+					mask = binary_dilation(mask, structure=np.ones((mask_dilation_kernel, mask_dilation_kernel)))
+				feature_map[mask] = 0.0 
 
-        # 3. Coloring
-        current_color_hsv = np.array([[[hues[i], 1.0, 1.0]]])
-        current_color_rgb = color.hsv2rgb(current_color_hsv)
-        
-        colored_layer = feature_map[..., np.newaxis] * current_color_rgb
-        overlap_count += (feature_map > 0).astype(np.int32)
-        composite_image += colored_layer
+		# 3. Coloring
+		current_color_hsv = np.array([[[hues[i], 1.0, 1.0]]])
+		current_color_rgb = color.hsv2rgb(current_color_hsv)
+		
+		colored_layer = feature_map[..., np.newaxis] * current_color_rgb
+		overlap_count += (feature_map > 0).astype(np.int32)
+		composite_image += colored_layer
 
-    composite_image[overlap_count >= white_overlay] = [1.0, 1.0, 1.0] 
-    final_display = np.clip(composite_image, 0, 1)
+	composite_image[overlap_count >= white_overlay] = [1.0, 1.0, 1.0] 
+	final_display = np.clip(composite_image, 0, 1)
 #     final_display = np.clip(composite_image, 0, 1)
-    
-    # --- Plotting ---
+	
+	# --- Plotting ---
 #     plt.close()
-    fig, axes = plt.subplots(1, 2, figsize=(8, 5))
+	fig, axes = plt.subplots(1, 2, figsize=(8, 5))
 
-    axes[0].imshow(ref_frame_processed, cmap='gray')
-    axes[0].set_title(f"Context Frame (Index: {nframe})\n{mask_label}")
-    axes[0].axis('off')
+	axes[0].imshow(ref_frame_processed, cmap='gray')
+	axes[0].set_title(f"Context Frame (Index: {nframe})\n{mask_label}")
+	axes[0].axis('off')
 
-    axes[1].imshow(final_display)
-    axes[1].set_title(f"Movement Vis\nSobel Kernel: {sobel_ksize}x{sobel_ksize}, Thresh: {min_gradient_threshold}")
-    axes[1].axis('off')
-    
-    plt.tight_layout()
-    return final_display, ref_frame_processed
+	axes[1].imshow(final_display)
+	axes[1].set_title(f"Movement Vis\nSobel Kernel: {sobel_ksize}x{sobel_ksize}, Thresh: {min_gradient_threshold}")
+	axes[1].axis('off')
+	
+	plt.tight_layout()
+	return final_display, ref_frame_processed
 
 
 
@@ -357,6 +357,106 @@ from matplotlib.widgets import RadioButtons, Slider
 from matplotlib.path import Path
 import io
 import matplotlib as mpl
+import glob
+
+
+def GetPath(DataPath, Name, extension='.npz'):
+	String = f'{DataPath}*{Name}*{extension}'
+	paths = glob.glob(String)
+	if len(paths)==1:
+		output = paths[0]
+	else:
+		print(f'ATTENTION: There are {len(paths)} files containing {Name} at this location:')
+		for i in range(0,len(paths)):
+			print(f'   {paths[i]}')
+			print(f'{String}')
+		output = None
+	return output
+
+
+def LoadBiopsiesData(SavingPath, Keys=None):
+	"""
+	Simplified function to load biospies data
+
+	Handles different keys.
+
+		Default:
+		['Coordinates', 'AvgSpectra_Green', 'AllSpectra_Green', 'AvgSpectra_Blue', 'AllSpectra_Blue', 'Pathology']
+
+		Accepts:
+		['Coordinates', 'AvgSpectra', 'AllSpectra']
+
+		or any key input through "Keys=" input. It must be a list of strings.
+
+	Outputs:
+		Output, 
+			List of length len(Keys), containing the data for each key (array)
+
+		KeysOutput
+			List of length len(Keys) containing the labels for each key (string)
+
+
+
+	"""
+	loaded_archive = np.load(SavingPath, allow_pickle=True)
+	BiopsiesLocation = loaded_archive['ROIs'].tolist()
+	Output = []
+	if Keys is not None:
+		for k in Keys:
+			values = [roi[k] for roi in BiopsiesLocation]
+			Output.append(values)
+			KeysOutput = Keys
+		
+	else: ## If not proving keys, use standard
+		Coordinates = [roi['Coordinates'] for roi in BiopsiesLocation]
+		Output.append(Coordinates)
+		try:
+			Keys_All = ['AvgSpectra_Green', 'AllSpectra_Green', 'AvgSpectra_Blue', 'AllSpectra_Blue', 'Pathology']
+			print(f'Looking for keys: \n   \'Coordinates\', and {Keys_All}')
+			for k in Keys_All:
+				values = [roi[k] for roi in BiopsiesLocation]
+				Output.append(values)
+				KeysOutput = Keys_All
+
+		except KeyError:
+			Keys_Old = ['AvgSpectra', 'AllSpectra']
+			print(f'New keys not existing. Using old ones: \n   \'Coordinates\', and {Keys_Old}')
+			for k in Keys_Old:
+				values = [roi[k] for roi in BiopsiesLocation]
+				Output.append(values)
+				KeysOutput = Keys_Old
+	return Output, KeysOutput
+
+
+def SaveBiopsiesData(SavingPath, Coordinates, AvgSpectra_Green, AllSpectra_Green, AvgSpectra_Blue, AllSpectra_Blue, Pathology):
+	"""
+	Takes ROI coordinates and spectra information to save.
+
+	To open:
+
+	loaded_archive = np.load(SavingPath, allow_pickle=True)
+	BiopsiesLocation = loaded_archive['ROIs'].tolist()
+	# Extract coordinates 
+	SavedCoords = [roi['Coordinates'] for roi in BiopsiesLocation]
+
+	etc.
+
+
+	"""
+	ROIs = [
+		dict(Coordinates=c, AvgSpectra_Green=ag, AllSpectra_Green=sg, AvgSpectra_Blue=ab, AllSpectra_Blue=sb, Pathology=p)
+		for c, ag, sg, ab, sb, p in zip(
+			Coordinates,
+			AvgSpectra_Green,
+			AllSpectra_Green,
+			AvgSpectra_Blue,
+			AllSpectra_Blue,
+			Pathology,
+		)
+	]
+	np.savez_compressed(SavingPath, ROIs=np.array(ROIs, dtype=object))
+	print(f'Saved data at:\n{SavingPath}')
+
 
 def GetBiopsyLocations(RegisteredHypercube, initial_rois=None, **kwargs):
 	"""
@@ -539,8 +639,8 @@ def GetBiopsyLocations(RegisteredHypercube, initial_rois=None, **kwargs):
 							   facecolor=color, edgecolor=color, alpha=self.alpha_done, label=f"ROI {len(self.rois)+1}")
 			self.ax.add_patch(poly)
 			
-			cx = np.mean([v[0] for v in self.current_roi_verts])
-			cy = np.mean([v[1] for v in self.current_roi_verts])
+			cx = np.nanmean([v[0] for v in self.current_roi_verts])
+			cy = np.nanmean([v[1] for v in self.current_roi_verts])
 			text = self.ax.text(cx, cy, str(len(self.rois) + 1), color='white', 
 								weight='bold', ha='center', va='center', fontsize=10)
 			
@@ -564,8 +664,8 @@ def GetBiopsyLocations(RegisteredHypercube, initial_rois=None, **kwargs):
 			if roi_idx < 0 or roi_idx >= len(self.rois): return
 			roi = self.rois[roi_idx]
 			roi['artist_poly'].set_xy(roi['vertices'])
-			cx = np.mean([v[0] for v in roi['vertices']])
-			cy = np.mean([v[1] for v in roi['vertices']])
+			cx = np.nanmean([v[0] for v in roi['vertices']])
+			cy = np.nanmean([v[1] for v in roi['vertices']])
 			roi['artist_text'].set_position((cx, cy))
 			if roi['artist_markers']:
 				xs, ys = zip(*roi['vertices'])
@@ -797,8 +897,8 @@ def GetBiopsyLocations(RegisteredHypercube, initial_rois=None, **kwargs):
 				poly = plt.Polygon(r['vertices'], closed=True, 
 								   facecolor=r['color'], edgecolor=r['color'], alpha=0.7)
 				p_ax.add_patch(poly)
-				cx = np.mean([v[0] for v in r['vertices']])
-				cy = np.mean([v[1] for v in r['vertices']])
+				cx = np.nanmean([v[0] for v in r['vertices']])
+				cy = np.nanmean([v[1] for v in r['vertices']])
 				p_ax.text(cx, cy, str(i+1), color='white', weight='bold', ha='center', va='center', fontsize=12)
 			
 			# Save to buffer
@@ -821,7 +921,7 @@ def GetBiopsyLocations(RegisteredHypercube, initial_rois=None, **kwargs):
 				if pixels.shape[1] > 0:
 					pixels = pixels.T 
 					all_spectra.append(pixels)
-					avg_spectra.append(np.mean(pixels, axis=0))
+					avg_spectra.append(np.nanmean(pixels, axis=0))
 				else:
 					all_spectra.append(np.empty((0, self.frames)))
 					avg_spectra.append(np.zeros(self.frames))
