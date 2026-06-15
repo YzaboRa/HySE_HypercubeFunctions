@@ -198,7 +198,7 @@ def FlattenToPseudoSweeps(usable_frames, LoadedOutcome):
 
 
 class FrameSelector:
-	def __init__(self, hypercube, wavelength_labels=None):
+	def __init__(self, hypercube, wavelength_labels=None, colourmap='magma'):
 		"""
 		GUI for selecting usable frames in a Hypercube [Nsweep, Nwavelengths, Y, X].
 		"""
@@ -240,7 +240,8 @@ class FrameSelector:
 		self.internal_update = False 
 		
 		# Visual State
-		self.cmap_name = 'gray'
+		# self.cmap_name = 'gray'
+		self.cmap_name = colourmap
 		flat_sample = hypercube[::max(1, self.n_sweeps//5)].flatten() 
 		self.vmin = np.percentile(flat_sample, 1)
 		self.vmax = np.percentile(flat_sample, 99)

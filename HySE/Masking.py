@@ -234,7 +234,7 @@ def BooleanMaskOperation(bool_white, bool_wav):
 # 	result = vectorized_function(mask_white, mask_shifted)
 # 	return result
 
-def CombineMasks(mask1, mask2):
+def CombineMasks(mask1_, mask2_):
 	"""
 	OLD
 	Function that combines two maks (OR operator).
@@ -249,9 +249,16 @@ def CombineMasks(mask1, mask2):
 
 
 	"""
+	mask1 = mask1_*1
+	mask1 = mask1.astype('uint8')
+
+	mask2 = mask2_*1
+	mask2 = mask2.astype('uint8')
+
+
 	combined_mask = np.ma.mask_or(mask1, mask2)
 	combined_mask = combined_mask*1
-	combined_mask = mask.astype('uint8')
+	combined_mask = combined_mask.astype('uint8')
 	return combined_mask
 	
 

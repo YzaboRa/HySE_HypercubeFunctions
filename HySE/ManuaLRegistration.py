@@ -412,7 +412,7 @@ class LandmarkPicker:
 	with undo, color-coding, enforced point selection, and image controls.
 	"""
 	def __init__(self, fixed_image, moving_image=None, fixed_points_to_display=None,
-				 frame_info=None, warning_message=None, deviation_threshold=150):
+				 frame_info=None, warning_message=None, deviation_threshold=150, colourmap='magma'):
 		self.fixed_image = fixed_image
 		self.moving_image = moving_image
 		self.fixed_points = []
@@ -443,7 +443,7 @@ class LandmarkPicker:
 			self.num_total_points = None
 			self.fig.suptitle("PHASE 1: Select landmarks. Use toolbar to Zoom/Pan.\n'z': undo, 'p': labels. Close to finish.", fontsize=14)
 			self.fixed_img_norm = self._normalize(self.fixed_image)
-			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='gray', origin=OriginPosition)
+			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap=colourmap, origin=OriginPosition)
 			
 			# Add label to fixed frame title
 			lbl = f" | {self.frame_info}" if self.frame_info else ""
@@ -457,11 +457,11 @@ class LandmarkPicker:
 			self.fig.suptitle(f"PHASE 2: Registering Frame\nUse toolbar to Zoom/Pan. 'z': undo, 'p': labels, 'w': warnings. Select {self.num_total_points} points.", fontsize=14)
 			
 			self.fixed_img_norm = self._normalize(self.fixed_image)
-			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap='gray', origin=OriginPosition)
+			self.im_fixed_obj = self.ax_fixed.imshow(self.fixed_img_norm, cmap=colourmap, origin=OriginPosition)
 			self.ax_fixed.set_title('FIXED points (reference)')
 			
 			self.moving_img_norm = self._normalize(self.moving_image)
-			self.im_moving_obj = self.ax_moving.imshow(self.moving_img_norm, cmap='gray', origin=OriginPosition)
+			self.im_moving_obj = self.ax_moving.imshow(self.moving_img_norm, cmap=colourmap, origin=OriginPosition)
 		
 		if warning_message:
 			self.fig.text(0.5, 0.95, warning_message, color='red', ha='center', fontsize=12, weight='bold',
