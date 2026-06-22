@@ -1,4 +1,4 @@
-# HySE_HypercubeFunctions
+# HySE
 Functions to compute hypercube from endoscope videos 
 
 ## Installation
