@@ -57,7 +57,7 @@ Every function in the HySE library includes documentation, which can be accessed
 A general help function allows to print all the modules and associated functions:
 
 ```python
-PathToFunctions = 'GitHub/HySE_HypercubeFunctions/'
+PathToFunctions = 'GitHub/HySE/'
 sys.path.append(PathToFunctions)
 import HySE
 
