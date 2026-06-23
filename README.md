@@ -40,7 +40,7 @@ If SimpleITK is not installed, or cannot be imported, the code will simply ignor
 Last updated: 16 June 2026
 
 ## Example notebooks
-Three notebooks in the Example/ folfer show examples of how to process the white calibration files, how to run the pre-processing pipeline and how to idenfity biopsied locations.
+Three notebooks in the Example/ folder show examples of how to process the white calibration files, how to run the pre-processing pipeline and how to idenfity biopsied locations.
 
 These notebooks include the full pipeline. This readme file gives details about the main functions, but cannot be used to run the full pipeline on its own.
 
