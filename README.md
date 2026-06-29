@@ -1572,7 +1572,7 @@ HySE.MakeMixingMatrix(_,_,Help=True)
 </details>
 
 ## To do
-- [ ] Reference chanel normalisation
+- [ ] Channel Interplay
 
 ## Comments
 - If the functions cannote be loaded, try adding an empty \__init__.py file in the same folder
