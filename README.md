@@ -831,13 +831,13 @@ Unmixed_Green_Split4_nan = HySE.RestoreNaNs(RegGreenCombined[2:,:,:], Unmixed_Gr
 ```
 
 
-<p align="center">
+<!-- <p align="center">
   <img src="https://github.com/user-attachments/assets/49fd5867-b39b-40b0-8cfc-38f39294e873" width="500"/>
 </p>
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/650e1403-c03a-44b0-9424-341d801b709a" width="850"/>
-</p>
+</p> -->
 
 
 <p align="center">
